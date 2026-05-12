@@ -1,0 +1,16 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+data/
+vectorstore/
+logs/
+*.log
+temp_*.png
+page_*.png
+output.txt
+
+.DS_Store
+Thumbs.db
