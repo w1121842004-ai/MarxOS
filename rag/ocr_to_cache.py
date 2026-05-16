@@ -66,10 +66,17 @@ def should_log_page(page_num):
 
 
 def clean_text(text):
-    text = text.replace("\n", "")
-    text = re.sub(r"\s+", "", text)
+    cleaned_lines = []
 
-    return text
+    for line in text.splitlines():
+        line = re.sub(r"[ \t\r\f\v]+", " ", line).strip()
+        line = re.sub(r"^111(?=[.．、\s])", "III", line)
+        line = re.sub(r"^11(?=[.．、\s])", "II", line)
+
+        if line:
+            cleaned_lines.append(line)
+
+    return "\n".join(cleaned_lines)
 
 
 def get_cache_path(filename, page_num):
@@ -121,14 +128,14 @@ def ocr_pdf_page(ocr, pdf_path, filename, page_num):
 
     try:
         result = ocr.ocr(image_path, cls=True)
-        all_text = ""
+        all_text = []
 
         if result and result[0]:
             for line in result[0]:
                 text = line[1][0]
-                all_text += text
+                all_text.append(text)
 
-        cleaned_text = clean_text(all_text)
+        cleaned_text = clean_text("\n".join(all_text))
         save_cached_text(filename, page_num, cleaned_text)
         print(f"OCR完成：{filename} 第{page_num}页，字符数：{len(cleaned_text)}")
 
