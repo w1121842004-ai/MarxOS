@@ -139,7 +139,10 @@ def extract_unquoted_title(query):
         "属于哪卷",
         "在哪本",
         "从哪页",
+        "从哪一页",
         "从第几页",
+        "哪一页开始",
+        "从哪一页开始",
         "第几页",
         "起始页",
         "开始页",
@@ -178,7 +181,10 @@ def is_bibliographic_query(query):
         "属于哪卷",
         "在哪本",
         "从哪页",
+        "从哪一页",
         "从第几页",
+        "哪一页开始",
+        "从哪一页开始",
         "起始页",
         "开始页",
         "收录页",
@@ -325,48 +331,19 @@ def find_toc_entries_from_map(title):
                 }
             )
 
-    if normalized_title == normalize_for_match("自然辩证法"):
-        grouped_entries = []
-        for source, source_map in ARTICLE_MAP.items():
-            if not any(
-                normalized_title in normalize_for_match(clean_text(item.get("title"), ""))
-                for item in source_map.get("entries", [])
-            ):
-                continue
-
-            metadata = {
-                "source": source,
-                "book": source_map.get("book", ""),
-                "article": title,
-            }
-            _, book_title, volume, year = normalize_book_parts(metadata)
-
-            for item in source_map.get("entries", []):
-                entry_title = clean_text(item.get("title"), "")
-                if normalize_for_match("论文") not in normalize_for_match(entry_title):
-                    continue
-
-                grouped_entries.append(
-                    {
-                        "source": source,
-                        "book_title": book_title,
-                        "volume": volume,
-                        "year": year,
-                        "article": "自然辩证法[论文]",
-                        "start_page": item.get("start_printed_page"),
-                        "end_page": item.get("end_printed_page"),
-                    }
-                )
-
-        if grouped_entries:
-            return best_toc_entries(grouped_entries)
-
     exact_entries = [
         entry for entry in entries
-        if normalize_for_match(entry["article"]).endswith(normalized_title)
+        if normalize_for_match(entry["article"]) == normalized_title
     ]
     if exact_entries:
         entries = exact_entries
+
+    suffix_entries = [
+        entry for entry in entries
+        if normalize_for_match(entry["article"]).endswith(normalized_title)
+    ]
+    if suffix_entries:
+        entries = suffix_entries
 
     derivative_terms = ["草稿", "初稿", "遗稿", "导言", "序言", "扉页", "封面", "一书导言", "第一页", "材料"]
     if not any(term in title for term in derivative_terms):

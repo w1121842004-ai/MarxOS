@@ -83,6 +83,96 @@ def clean_title(title):
     return title[:120]
 
 
+def strip_trailing_subtitle(title):
+    title = clean_title(title)
+    match = re.match(r"(?P<parent>.+?)[［\[][^］\]]+[］\]]$", title)
+
+    if not match:
+        return None
+
+    parent = clean_title(match.group("parent"))
+
+    if len(parent) < 2:
+        return None
+
+    return parent
+
+
+def looks_like_child_entry(title):
+    title = clean_title(title)
+
+    if re.match(r"^[［\[][^］\]]+[］\]]$", title):
+        return True
+
+    if title in {"导言", "序言", "前言", "跋", "附录", "论文"}:
+        return True
+
+    if re.match(r"^[一二三四五六七八九十]+[、.．]", title):
+        return True
+
+    return False
+
+
+def looks_like_new_major_entry(title):
+    title = clean_title(title)
+
+    if not title:
+        return False
+
+    if title in {"注释", "人名索引", "名目索引", "期刊索引"}:
+        return True
+
+    if title.endswith("索引") or title.endswith("年表"):
+        return True
+
+    if title.startswith("《") and not title.endswith("》的总计划草案") and "第一页" not in title:
+        return True
+
+    if re.match(r"^第[一二三四五六七八九十百]+[编部分]", title):
+        return True
+
+    return False
+
+
+def add_parent_entries(entries):
+    enriched = list(entries)
+
+    for index, entry in enumerate(entries):
+        parent_title = strip_trailing_subtitle(entry["title"])
+        if not parent_title:
+            continue
+
+        end_page = entry["end_printed_page"]
+
+        for next_entry in entries[index + 1:]:
+            next_title = clean_title(next_entry["title"])
+
+            if looks_like_new_major_entry(next_title) and parent_title not in next_title:
+                break
+
+            if parent_title in next_title or looks_like_child_entry(next_title):
+                end_page = max(end_page, next_entry["end_printed_page"])
+                continue
+
+            # Short unquoted titles immediately after a bracketed section are
+            # often children of the same parent, e.g. 导言 under 自然辩证法.
+            if len(next_title) <= 24 and not next_title.startswith("《"):
+                end_page = max(end_page, next_entry["end_printed_page"])
+                continue
+
+            break
+
+        enriched.append(
+            {
+                "title": parent_title,
+                "start_printed_page": entry["start_printed_page"],
+                "end_printed_page": end_page,
+            }
+        )
+
+    return enriched
+
+
 def extract_toc_entries(pdf_path):
     doc = fitz.open(str(pdf_path))
     entries = []
@@ -143,7 +233,7 @@ def extract_toc_entries(pdf_path):
 
     doc.close()
 
-    return normalize_ranges(entries)
+    return normalize_ranges(add_parent_entries(entries))
 
 
 def normalize_ranges(entries):
