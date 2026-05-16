@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from rag.core_classics import classic_entries_for_query
 
 
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
@@ -63,6 +70,27 @@ def load_article_map() -> dict:
 
 
 def find_title_matches(article_map: dict, title: str, limit: int = 5) -> list[tuple[str, dict, dict]]:
+    core_entries = classic_entries_for_query(title)
+    if core_entries:
+        matches = []
+        for entry in core_entries[:limit]:
+            source = entry["source"]
+            payload = article_map.get(source, {"book": source, "entries": []})
+            matches.append(
+                (
+                    source,
+                    payload,
+                    {
+                        "title": entry.get("article") or entry.get("classic_title"),
+                        "start_printed_page": entry["start_page"],
+                        "end_printed_page": entry["end_page"],
+                        "level": 0,
+                        "parent": f"core_classic:{entry.get('classic_id')}",
+                    },
+                )
+            )
+        return matches
+
     normalized_title = normalize_for_match(title)
     matches = []
 
@@ -129,6 +157,38 @@ def load_vectorstore() -> FAISS:
     )
 
 
+def page_in_entry(metadata: dict, entry: dict) -> bool:
+    if metadata.get("source") != entry["source"]:
+        return False
+
+    try:
+        page = int(metadata.get("printed_page") or metadata.get("page"))
+    except (TypeError, ValueError):
+        return False
+
+    return entry["start_page"] <= page <= entry["end_page"]
+
+
+def rerank_with_core_classic(query: str, docs: list, limit: int) -> list:
+    entries = classic_entries_for_query(query)
+
+    if not entries:
+        return docs[:limit]
+
+    ranked = []
+    for doc in docs:
+        score = 0
+        for entry in entries:
+            if doc.metadata.get("source") == entry["source"]:
+                score += 50
+            if page_in_entry(doc.metadata, entry):
+                score += 100 - entry.get("priority", 99)
+        ranked.append((score, doc))
+
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return [doc for score, doc in ranked[:limit]]
+
+
 def evaluate(k: int = 3) -> None:
     article_map = load_article_map()
     db = None
@@ -154,7 +214,9 @@ def evaluate(k: int = 3) -> None:
         if db is None:
             db = load_vectorstore()
 
-        docs = db.similarity_search(item.question, k=k)
+        fetch_k = 120 if classic_entries_for_query(item.question) else k
+        docs = db.similarity_search(item.question, k=fetch_k)
+        docs = rerank_with_core_classic(item.question, docs, k)
         if not docs:
             print("No retrieval results.")
             continue

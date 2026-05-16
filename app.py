@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sys
+from rag.core_classics import classic_entries_for_query
 
 
 load_dotenv()
@@ -273,7 +274,40 @@ def best_toc_entries(entries):
     )
 
 
+def enrich_core_classic_entries(entries):
+    enriched = []
+
+    for entry in entries:
+        source = entry["source"]
+        metadata = {
+            "source": source,
+            "book": ARTICLE_MAP.get(source, {}).get("book", ""),
+            "article": entry.get("article", entry.get("classic_title", "")),
+        }
+        _, book_title, volume, year = normalize_book_parts(metadata)
+        enriched.append(
+            {
+                "source": source,
+                "book_title": book_title,
+                "volume": volume,
+                "year": year,
+                "article": entry.get("article") or entry.get("classic_title"),
+                "start_page": entry["start_page"],
+                "end_page": entry["end_page"],
+                "classic_id": entry.get("classic_id"),
+                "classic_title": entry.get("classic_title"),
+                "priority": entry.get("priority", 99),
+            }
+        )
+
+    return sorted(enriched, key=lambda item: (item.get("priority", 99), item["source"]))
+
+
 def find_toc_entries_from_map(title):
+    core_entries = classic_entries_for_query(title)
+    if core_entries:
+        return enrich_core_classic_entries(core_entries)
+
     entries = []
     normalized_title = normalize_for_match(title)
 
@@ -452,6 +486,20 @@ def answer_bibliographic_query(query):
 
 def constraints_from_query(query):
     title = extract_bibliographic_title(query)
+    core_entries = classic_entries_for_query(title or query)
+    if core_entries:
+        entries = enrich_core_classic_entries(core_entries)
+        title = title or entries[0].get("classic_title")
+        return {
+            "title": title,
+            "entries": entries,
+            "sources": {entry["source"] for entry in entries},
+            "page_ranges": {
+                entry["source"]: (entry["start_page"], entry["end_page"])
+                for entry in entries
+            },
+        }
+
     if not title:
         return {}
 
