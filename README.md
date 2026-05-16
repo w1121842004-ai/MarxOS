@@ -1,362 +1,185 @@
-````markdown
 # MarxOS
 
-> MarxOS 是一个基于 OCR + RAG + Academic Retrieval 的马克思主义学术智能体。
+MarxOS 是一个基于 OCR、RAG 和 Academic Retrieval 的马克思主义学术智能体，目标是构建可检索、可引用、可扩展的马克思主义原著知识系统。
 
----
+## Project Overview
 
-# Project Overview
+MarxOS 希望支持：
 
-MarxOS 的目标是：
+- 阅读扫描版马克思主义原著 PDF
+- 将 OCR 文本转换为可检索知识库
+- 基于原著进行学术问答
+- 提供页码级引用和篇目定位
+- 支持概念解释、引文查找和理论分析
 
-构建一个能够：
-
-- 阅读马克思主义原著
-- 理解理论内容
-- 支持学术检索
-- 提供页码级引用
-- 进行理论解释与生成
-
-的：
-
-# Academic AI Knowledge System
-
----
-
-# Core Features
-
-## 1. OCR PDF Recognition
-
-支持：
-
-```text
-扫描版 PDF
-↓
-OCR
-↓
-可检索文本
-````
-
-核心技术：
-
-* PaddleOCR
-* pdf2image
-* Poppler
-
----
-
-## 2. Academic RAG
-
-支持：
-
-```text
-原著检索
-+
-LLM 学术生成
-```
-
-实现：
-
-* 多文档检索
-* 理论问答
-* 学术解释
-* Citation RAG
-
----
-
-## 3. Metadata Engineering
-
-当前支持：
-
-```json
-{
-  "book": "马克思恩格斯全集 第49卷",
-  "page": 3,
-  "source": "me49.pdf",
-  "ocr": true
-}
-```
-
-支持：
-
-* 页码级引用
-* Academic Citation
-* 多文档来源追踪
-
----
-
-## 4. Multi-Document Knowledge Base
-
-当前知识库已支持：
-
-* 《马克思恩格斯全集》
-* 《德意志意识形态》
-* 《1857-1858年经济学手稿》
-
-等文献联合检索。
-
----
-
-# System Architecture
-
-当前 MarxOS Pipeline：
+## Core Pipeline
 
 ```text
 PDF
-↓
-OCR (PaddleOCR)
-↓
-Text Cleaning
-↓
-Document(metadata)
-↓
-Chunking
-↓
-Embedding
-↓
-FAISS
-↓
-Retriever
-↓
-DeepSeek
-↓
-Academic Answer
+-> OCR cache
+-> Text cleaning
+-> Document(metadata)
+-> Chunking
+-> Embedding
+-> FAISS
+-> Retriever
+-> DeepSeek
+-> Academic answer
 ```
 
----
+## Current Progress
 
-# Tech Stack
+当前已经完成：
 
-## AI / RAG
+- OCR Pipeline
+- OCR cache 复用
+- FAISS Knowledge Base
+- Multi-Document RAG
+- Metadata Engineering
+- Citation RAG
+- Article / catalog mapping
+- Query intent classification
+- Academic citation formatting
 
-* LangChain
-* FAISS
-* Sentence Transformers
-* DeepSeek API
+本地已生成的核心资产包括：
 
----
+```text
+data/ocr_cache/
+vectorstore/marx_knowledge_base/
+rag/article_map.json
+```
 
-## OCR
+注意：`data/` 和 `vectorstore/` 体积较大，默认不会提交到 Git。
 
-* PaddleOCR
-* PaddlePaddle
-* pdf2image
+## Quick Start
 
----
+建议使用 Python 3.10。PaddleOCR / PaddlePaddle 在较新的 Python 版本上容易出现 ABI 或 DLL 兼容问题。
 
-## Vector Database
+```powershell
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-* FAISS
+复制环境变量示例：
 
----
+```powershell
+copy .env.example .env
+```
 
-## Environment
+然后在 `.env` 中填写：
 
-* Python 3.10
+```text
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+```
 
----
+运行问答入口：
 
-# Project Structure
+```powershell
+venv\Scripts\python.exe app.py
+```
+
+如需查看内部检索来源：
+
+```powershell
+$env:MARXOS_DEBUG_SOURCES="1"
+venv\Scripts\python.exe app.py
+```
+
+## Build Knowledge Base
+
+如果已经有 OCR 缓存，可以直接从缓存构建向量库：
+
+```powershell
+venv\Scripts\python.exe rag\build_vectorstore_from_cache.py
+```
+
+常用过滤参数：
+
+```powershell
+$env:ME_VOLUMES_ONLY="1"
+$env:SKIP_PDFS="capital.pdf"
+$env:BATCH_SIZE="1024"
+venv\Scripts\python.exe rag\build_vectorstore_from_cache.py
+```
+
+构建结果会写入：
+
+```text
+vectorstore/marx_knowledge_base/
+```
+
+## Project Structure
 
 ```text
 MarxOS/
-
 ├── app.py
-├── README.md
 ├── requirements.txt
-├── .env
-
 ├── crawler/
 │   └── crawl_marxists.py
-
 ├── ocr/
 │   └── pdf_to_text.py
-
 ├── rag/
-│   ├── build_vectorstore.py
-│   └── build_knowledge_base.py
-
-├── vectorstore/
-│   └── marx_knowledge_base/
-
-├── data/
-│   └── marx_engels全集/
-
+│   ├── article_map.json
+│   ├── build_vectorstore_from_cache.py
+│   ├── generate_article_map.py
+│   ├── ocr_to_cache.py
+│   └── repair_vectorstore_metadata.py
 ├── docs/
+│   ├── eval_questions.md
 │   └── dev_logs/
+├── data/              # local only
+└── vectorstore/       # local only
 ```
 
----
+## Evaluation
 
-# Current Progress
-
-当前已完成：
-
-* OCR Pipeline
-* Metadata System
-* FAISS Knowledge Base
-* Multi-Document RAG
-* Academic Retrieval
-* Citation RAG
-* Chunk Engineering
-
-当前知识库 chunk 数量：
+固定评测问题见：
 
 ```text
-1421+
+docs/eval_questions.md
 ```
 
----
+每次修改检索、metadata、prompt、reranker 或引用格式后，建议用这组问题做一次回归检查。
 
-# Key Engineering Problems
+## Known Issues
 
-## 1. Python 3.13/3.14 Compatibility
+- `app.py` 目前聚合了检索、意图识别、引用格式、prompt 构建和 LLM 调用，后续应拆分模块。
+- `article_map.json` 仍依赖启发式目录抽取，需要对重要著作做人工抽样校验。
+- 页码 metadata 受 OCR 质量影响，部分印刷页码仍需复核。
+- `data/`、`vectorstore/` 不提交到 Git，换机器时需要重新生成或从本地备份恢复。
 
-问题：
+## Roadmap
 
-```text
-PaddleOCR 与 Python 3.13+ 不兼容
+### Stage 3: Retrieval Engineering
+
+- BM25 Hybrid Search
+- Reranker
+- Query Rewrite
+- Citation Grounding
+- Fixed evaluation workflow
+
+### Stage 4: Knowledge Engineering
+
+- 自动章节识别
+- 理论主题 metadata
+- 重点著作人工校验表
+- 学术知识图谱
+
+### Stage 5: Productization
+
+- Web UI
+- Academic Research Assistant
+- 多用户系统
+- 学术论文辅助
+
+## PowerShell Encoding
+
+如果 PowerShell 中看到 README 或日志中文乱码，优先设置 UTF-8 输出：
+
+```powershell
+chcp 65001
+$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::UTF8
 ```
 
-解决：
-
-```text
-统一切换 Python 3.10
-```
-
----
-
-## 2. numpy / opencv ABI Conflict
-
-问题：
-
-```text
-numpy.core.multiarray failed to import
-```
-
-解决：
-
-```text
-numpy==1.23.5
-opencv-python==4.6.0.66
-```
-
----
-
-## 3. OCR Text Noise
-
-问题：
-
-OCR 输出存在：
-
-* 换行混乱
-* 空格异常
-* 句子断裂
-
-解决：
-
-```python
-clean_text()
-```
-
-进行文本清洗。
-
----
-
-## 4. Chunk Semantic Pollution
-
-问题：
-
-```text
-chunk_size=500
-```
-
-导致多个理论主题混入同一 chunk。
-
-解决：
-
-```python
-chunk_size=300
-chunk_overlap=50
-```
-
-并增加：
-
-```python
-separators=["。","？","！"]
-```
-
-实现中文语义切块。
-
----
-
-# Roadmap
-
-## Stage 3 — Retrieval Engineering
-
-计划：
-
-* Reranker
-* BM25 Hybrid Search
-* Query Rewrite
-* Citation Grounding
-
----
-
-## Stage 4 — Knowledge Engineering
-
-计划：
-
-* 自动章节识别
-* 理论主题 metadata
-* 学术知识图谱
-
----
-
-## Stage 5 — Productization
-
-计划：
-
-* Streamlit Web UI
-* 多用户系统
-* Academic Research Assistant
-* AI 学术论文辅助
-
----
-
-# Engineering Reflection
-
-MarxOS 当前最大的工程收获：
-
-```text
-AI 系统真正核心
-不是模型本身
-而是：
-
-- 数据工程
-- Knowledge Engineering
-- Retrieval Engineering
-```
-
----
-
-# Future Vision
-
-MarxOS 的长期目标：
-
-```text
-构建真正的：
-马克思主义 AI 学术研究平台
-```
-
-未来将逐步支持：
-
-* 原著研究
-* 理论分析
-* 学术论文辅助
-* 知识图谱
-* AI 学术助手
-* Marxism Research Agent
-
-```
-```
+文件本身应以 UTF-8 保存。
