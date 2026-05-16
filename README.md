@@ -140,6 +140,13 @@ MarxOS/
 docs/eval_questions.md
 ```
 
+运行轻量检索评测：
+
+```powershell
+$env:PYTHONIOENCODING="utf-8"
+venv\Scripts\python.exe scripts\evaluate_retrieval.py
+```
+
 每次修改检索、metadata、prompt、reranker 或引用格式后，建议用这组问题做一次回归检查。
 
 ## Known Issues
