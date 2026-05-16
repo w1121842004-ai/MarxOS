@@ -173,6 +173,93 @@ def add_parent_entries(entries):
     return enriched
 
 
+def can_be_parent(entry):
+    title = clean_title(entry["title"])
+
+    if not title:
+        return False
+
+    if looks_like_child_entry(title):
+        return False
+
+    return entry["end_printed_page"] > entry["start_printed_page"]
+
+
+def entry_width(entry):
+    return entry["end_printed_page"] - entry["start_printed_page"]
+
+
+def find_parent_entry(entry, entries):
+    candidates = []
+
+    for candidate in entries:
+        if candidate is entry:
+            continue
+
+        if not can_be_parent(candidate):
+            continue
+
+        if candidate["title"] == entry["title"]:
+            continue
+
+        if candidate["start_printed_page"] > entry["start_printed_page"]:
+            continue
+
+        if candidate["end_printed_page"] < entry["end_printed_page"]:
+            continue
+
+        if entry_width(candidate) <= entry_width(entry):
+            continue
+
+        candidates.append(candidate)
+
+    if not candidates:
+        return None
+
+    return sorted(
+        candidates,
+        key=lambda item: (
+            entry_width(item),
+            -item["start_printed_page"],
+            item["title"],
+        ),
+    )[0]
+
+
+def annotate_hierarchy(entries):
+    annotated = []
+
+    for entry in entries:
+        annotated.append(
+            {
+                **entry,
+                "level": 1,
+                "parent": None,
+            }
+        )
+
+    # Multiple passes let nested levels settle even when the parent appears
+    # after a child in sorted page order, as with synthesized parent titles.
+    for _ in range(4):
+        changed = False
+
+        for entry in annotated:
+            parent = find_parent_entry(entry, annotated)
+            parent_title = parent["title"] if parent else None
+            parent_level = parent["level"] if parent else 0
+            level = min(parent_level + 1, 6) if parent else 1
+
+            if entry["parent"] != parent_title or entry["level"] != level:
+                entry["parent"] = parent_title
+                entry["level"] = level
+                changed = True
+
+        if not changed:
+            break
+
+    return annotated
+
+
 def extract_toc_entries(pdf_path):
     doc = fitz.open(str(pdf_path))
     entries = []
@@ -233,7 +320,7 @@ def extract_toc_entries(pdf_path):
 
     doc.close()
 
-    return normalize_ranges(add_parent_entries(entries))
+    return annotate_hierarchy(normalize_ranges(add_parent_entries(entries)))
 
 
 def normalize_ranges(entries):
