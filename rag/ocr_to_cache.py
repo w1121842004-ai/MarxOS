@@ -17,6 +17,7 @@ if POPPLER_PATH and not os.path.exists(POPPLER_PATH):
 # Optional environment variables:
 # START_PAGE=100 END_PAGE=105 limits each PDF to a page range.
 # PDF_NAME=me49.pdf limits the run to one PDF.
+# TARGET_PDFS=mea01.pdf,mes01.pdf limits the run to selected PDFs.
 # SKIP_PDFS=capital.pdf,foo.pdf skips selected PDFs.
 # OVERWRITE_OCR=1 rebuilds existing cached txt files.
 # TEXT_LAYER_MIN_LENGTH=80 controls when extracted PDF text is considered usable.
@@ -28,6 +29,11 @@ START_PAGE = int(os.getenv("START_PAGE", "1"))
 END_PAGE = os.getenv("END_PAGE")
 END_PAGE = int(END_PAGE) if END_PAGE else None
 PDF_NAME = os.getenv("PDF_NAME")
+TARGET_PDFS = {
+    name.strip()
+    for name in os.getenv("TARGET_PDFS", "").split(",")
+    if name.strip()
+}
 SKIP_PDFS = {
     name.strip()
     for name in os.getenv("SKIP_PDFS", "capital.pdf").split(",")
@@ -170,6 +176,9 @@ def iter_pdf_files():
                 continue
 
             if PDF_NAME and filename != PDF_NAME:
+                continue
+
+            if TARGET_PDFS and filename not in TARGET_PDFS:
                 continue
 
             if ME_VOLUMES_ONLY and not is_me_volume(filename):

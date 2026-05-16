@@ -10,8 +10,8 @@ from langchain_community.vectorstores import FAISS
 
 
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-VECTORSTORE_DIR = Path("vectorstore/marx_knowledge_base")
-ARTICLE_MAP_PATH = Path("rag/article_map.json")
+VECTORSTORE_DIR = Path("vectorstore/marx_reader_core")
+ARTICLE_MAP_PATH = Path("rag/article_map_core.json")
 
 
 @dataclass(frozen=True)

@@ -9,8 +9,8 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
 
-OCR_CACHE_DIR = "data/ocr_cache"
-VECTORSTORE_DIR = "vectorstore/marx_knowledge_base"
+OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "data/ocr_cache")
+VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_knowledge_base")
 TEMP_VECTORSTORE_DIR = f"{VECTORSTORE_DIR}_tmp"
 ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map.json")
 
@@ -25,8 +25,14 @@ SPLIT_PROGRESS_EVERY = int(os.getenv("SPLIT_PROGRESS_EVERY", "5000"))
 
 # Optional environment variables:
 # ME_VOLUMES_ONLY=1 only builds from me01-me50 style caches.
+# TARGET_PDFS=mea01.pdf,mes01.pdf only builds selected cached PDFs.
 # SKIP_PDFS=capital.pdf,foo.pdf skips selected cached PDFs.
 ME_VOLUMES_ONLY = os.getenv("ME_VOLUMES_ONLY") == "1"
+TARGET_PDFS = {
+    name.strip()
+    for name in os.getenv("TARGET_PDFS", "").split(",")
+    if name.strip()
+}
 SKIP_PDFS = {
     name.strip()
     for name in os.getenv("SKIP_PDFS", "capital.pdf").split(",")
@@ -346,6 +352,9 @@ def document_from_cache(cache_path):
     source = f"{source_stem}.pdf"
 
     if source in SKIP_PDFS:
+        return None
+
+    if TARGET_PDFS and source not in TARGET_PDFS:
         return None
 
     if ME_VOLUMES_ONLY and not is_me_volume(source):

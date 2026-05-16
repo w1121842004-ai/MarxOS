@@ -13,9 +13,9 @@ load_dotenv()
 
 
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-VECTORSTORE_DIR = "vectorstore/marx_knowledge_base"
-OCR_CACHE_DIR = "data/ocr_cache"
-ARTICLE_MAP_PATH = "rag/article_map.json"
+VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader_core")
+OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "data/ocr_cache")
+ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json")
 VOLUME_PUBLICATION_YEARS = {
     "me46a": "1979年",
     "me46b": "1979年",

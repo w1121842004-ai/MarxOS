@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 
-ARTICLE_MAP_PATH = Path("rag/article_map.json")
+ARTICLE_MAP_PATH = Path(os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json"))
 
 
 def load_article_map() -> dict:

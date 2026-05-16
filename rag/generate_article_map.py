@@ -9,8 +9,13 @@ from build_vectorstore_from_cache import BOOK_MAPPING, is_me_volume, normalize_d
 
 
 DATA_DIR = "data"
-ARTICLE_MAP_PATH = "rag/article_map.json"
+ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map.json")
 MAX_TOC_PAGES = int(os.getenv("MAX_TOC_PAGES", "40"))
+TARGET_PDFS = {
+    name.strip()
+    for name in os.getenv("TARGET_PDFS", "").split(",")
+    if name.strip()
+}
 
 WATERMARK_MARKERS = [
     "本PDF文件",
@@ -353,7 +358,10 @@ def normalize_ranges(entries):
 
 def iter_target_pdfs():
     for pdf_path in sorted(Path(DATA_DIR).rglob("*.pdf")):
-        if is_me_volume(pdf_path.name):
+        if TARGET_PDFS and pdf_path.name not in TARGET_PDFS:
+            continue
+
+        if TARGET_PDFS or is_me_volume(pdf_path.name):
             yield pdf_path
 
 

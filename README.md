@@ -45,8 +45,8 @@ PDF
 
 ```text
 data/ocr_cache/
-vectorstore/marx_knowledge_base/
-rag/article_map.json
+vectorstore/marx_reader_core/
+rag/article_map_core.json
 ```
 
 注意：`data/` 和 `vectorstore/` 体积较大，默认不会提交到 Git。
@@ -103,10 +103,31 @@ $env:BATCH_SIZE="1024"
 venv\Scripts\python.exe rag\build_vectorstore_from_cache.py
 ```
 
-构建结果会写入：
+当前推荐先使用较小的文集/选集工作集：
 
 ```text
-vectorstore/marx_knowledge_base/
+mea01.pdf-mea10.pdf
+mes01.pdf-mes04.pdf
+```
+
+对应构建结果写入：
+
+```text
+vectorstore/marx_reader_core/
+```
+
+构建命令示例：
+
+```powershell
+$targets="mea01.pdf,mea02.pdf,mea03.pdf,mea04.pdf,mea05.pdf,mea06.pdf,mea07.pdf,mea08.pdf,mea09.pdf,mea10.pdf,mes01.pdf,mes02.pdf,mes03.pdf,mes04.pdf"
+$env:TARGET_PDFS=$targets
+$env:SKIP_PDFS=""
+$env:ARTICLE_MAP_PATH="rag/article_map_core.json"
+venv\Scripts\python.exe rag\generate_article_map.py
+
+$env:VECTORSTORE_DIR="vectorstore/marx_reader_core"
+$env:BATCH_SIZE="1024"
+venv\Scripts\python.exe -u rag\build_vectorstore_from_cache.py
 ```
 
 ## Project Structure
@@ -147,7 +168,7 @@ $env:PYTHONIOENCODING="utf-8"
 venv\Scripts\python.exe scripts\evaluate_retrieval.py
 ```
 
-每次修改检索、metadata、prompt、reranker 或引用格式后，建议用这组问题做一次回归检查。
+每次修改检索、metadata、prompt、reranker 或引用格式后，建议用这组问题做一次回归检查。当前评测默认使用 `vectorstore/marx_reader_core` 和 `rag/article_map_core.json`。
 
 ## Known Issues
 
