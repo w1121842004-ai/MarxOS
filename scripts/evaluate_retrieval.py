@@ -14,6 +14,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from rag.core_classics import classic_entries_for_query
+from rag.exact_quote_lookup import exact_quote_lookup
 
 
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
@@ -214,9 +215,13 @@ def evaluate(k: int = 3) -> None:
         if db is None:
             db = load_vectorstore()
 
-        fetch_k = 120 if classic_entries_for_query(item.question) else k
-        docs = db.similarity_search(item.question, k=fetch_k)
-        docs = rerank_with_core_classic(item.question, docs, k)
+        exact_docs = exact_quote_lookup(item.question, limit=k)
+        if exact_docs:
+            docs = exact_docs
+        else:
+            fetch_k = 120 if classic_entries_for_query(item.question) else k
+            docs = db.similarity_search(item.question, k=fetch_k)
+            docs = rerank_with_core_classic(item.question, docs, k)
         if not docs:
             print("No retrieval results.")
             continue

@@ -8,6 +8,7 @@ import os
 import re
 import sys
 from rag.core_classics import classic_entries_for_query
+from rag.exact_quote_lookup import exact_quote_lookup
 
 
 load_dotenv()
@@ -580,6 +581,10 @@ def rerank_documents(query, docs, constraints):
 
 
 def retrieve_documents(query, db, k=5):
+    exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k)
+    if exact_docs:
+        return exact_docs
+
     constraints = constraints_from_query(query)
     fetch_k = 80 if constraints else 30
 
