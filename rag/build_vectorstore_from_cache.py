@@ -7,6 +7,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+from clean_ocr_text import clean_ocr_page
 
 
 OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "data/ocr_cache")
@@ -317,12 +318,37 @@ def is_me_volume(filename):
 
 
 def page_num_from_cache_file(path):
-    match = re.search(r"page_(\d+)\.txt$", path)
+    match = re.search(r"page_(\d+)\.(?:txt|json)$", path)
 
     if not match:
         return None
 
     return int(match.group(1))
+
+
+def cache_json_path(cache_path):
+    return re.sub(r"\.txt$", ".json", cache_path)
+
+
+def load_cleaned_cache_page(cache_path, source, page_num, book):
+    json_path = cache_json_path(cache_path)
+
+    if os.path.exists(json_path):
+        with open(json_path, "r", encoding="utf-8") as f:
+            page = json.load(f)
+
+        if "cleaned_text" in page and "page_type" in page:
+            return page
+
+    with open(cache_path, "r", encoding="utf-8") as f:
+        raw_text = f.read()
+
+    return clean_ocr_page(
+        raw_text,
+        source=source,
+        page_num=page_num,
+        book_title=book,
+    )
 
 
 def iter_cache_files():
@@ -342,7 +368,7 @@ def iter_cache_files():
     )
 
 
-def document_from_cache(cache_path):
+def document_from_cache(cache_path, title_context):
     page_num = page_num_from_cache_file(cache_path)
 
     if page_num is None:
@@ -360,20 +386,38 @@ def document_from_cache(cache_path):
     if ME_VOLUMES_ONLY and not is_me_volume(source):
         return None
 
-    with open(cache_path, "r", encoding="utf-8") as f:
-        text = f.read().strip()
+    book = BOOK_MAPPING.get(source, source_stem)
+    cleaned_page = load_cleaned_cache_page(cache_path, source, page_num, book)
+    text = (cleaned_page.get("cleaned_text") or "").strip()
+    page_type = cleaned_page.get("page_type") or "body"
+    title_candidate = cleaned_page.get("title_candidate")
+    author_candidate = cleaned_page.get("author_candidate")
+
+    if page_type == "title_page":
+        if title_candidate:
+            title_context[source] = {
+                "title": title_candidate,
+                "author": author_candidate,
+                "pdf_page": page_num,
+            }
+        return None
+
+    if page_type == "toc":
+        return None
 
     if len(text) < MIN_TEXT_LENGTH:
         return None
 
-    book = BOOK_MAPPING.get(source, source_stem)
     fallback_article = ARTICLE_MAPPING.get(source, "未知篇目")
     printed_page, chapter = infer_page_metadata(text, fallback_article, page_num)
     if not is_plausible_for_pdf_page(printed_page, page_num):
         printed_page = None
     page = printed_page if printed_page is not None else page_num
     section = article_from_map(source, printed_page)
-    article = chapter
+    title_page_info = title_context.get(source) or {}
+    title_page_title = title_page_info.get("title")
+    article = section or title_page_title or chapter
+    chapter = title_page_title or chapter
 
     return Document(
         page_content=text,
@@ -387,19 +431,26 @@ def document_from_cache(cache_path):
             "pdf_page": page_num,
             "source": source,
             "ocr": True,
+            "page_type": page_type,
+            "raw_page_available": bool(cleaned_page.get("raw_text")),
+            "title_from_title_page": title_page_title,
+            "title_page_pdf_page": title_page_info.get("pdf_page"),
+            "author_from_title_page": title_page_info.get("author"),
+            "cleaning_reasons": ",".join(cleaned_page.get("reasons") or []),
         },
     )
 
 
 def main():
     all_docs = []
+    title_context = {}
     cache_files = iter_cache_files()
     total_cache_files = len(cache_files)
 
     print(f"扫描到缓存文件：{total_cache_files}", flush=True)
 
     for index, cache_path in enumerate(cache_files, start=1):
-        doc = document_from_cache(cache_path)
+        doc = document_from_cache(cache_path, title_context)
 
         if doc is not None:
             all_docs.append(doc)

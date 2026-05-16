@@ -1,9 +1,11 @@
 import os
 import re
+import json
 
 import fitz
 from paddleocr import PaddleOCR
 from pdf2image import convert_from_path, pdfinfo_from_path
+from clean_ocr_text import clean_ocr_page, clean_text
 
 
 DATA_DIR = "data"
@@ -65,32 +67,41 @@ def should_log_page(page_num):
     return PROGRESS_EVERY > 0 and page_num % PROGRESS_EVERY == 0
 
 
-def clean_text(text):
-    cleaned_lines = []
-
-    for line in text.splitlines():
-        line = re.sub(r"[ \t\r\f\v]+", " ", line).strip()
-        line = re.sub(r"^111(?=[.．、\s])", "III", line)
-        line = re.sub(r"^11(?=[.．、\s])", "II", line)
-
-        if line:
-            cleaned_lines.append(line)
-
-    return "\n".join(cleaned_lines)
-
-
 def get_cache_path(filename, page_num):
     safe_name = filename.replace(".pdf", "")
 
     return os.path.join(OCR_CACHE_DIR, safe_name, f"page_{page_num}.txt")
 
 
-def save_cached_text(filename, page_num, text):
+def get_cache_json_path(filename, page_num):
+    safe_name = filename.replace(".pdf", "")
+
+    return os.path.join(OCR_CACHE_DIR, safe_name, f"page_{page_num}.json")
+
+
+def save_cached_page(filename, page_num, raw_text, book_title=None):
     cache_path = get_cache_path(filename, page_num)
+    json_path = get_cache_json_path(filename, page_num)
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
 
+    cleaned_page = clean_ocr_page(
+        raw_text,
+        source=filename,
+        page_num=page_num,
+        book_title=book_title,
+    )
+
     with open(cache_path, "w", encoding="utf-8") as f:
-        f.write(text)
+        f.write(cleaned_page["cleaned_text"])
+
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(cleaned_page, f, ensure_ascii=False, indent=2)
+
+    return cleaned_page
+
+
+def save_cached_text(filename, page_num, text):
+    return save_cached_page(filename, page_num, text)
 
 
 def extract_text_layer(pdf_path, page_num):
@@ -98,7 +109,7 @@ def extract_text_layer(pdf_path, page_num):
         page = pdf.load_page(page_num - 1)
         text = page.get_text("text")
 
-    return clean_text(text)
+    return text
 
 
 def create_ocr():
@@ -135,9 +146,9 @@ def ocr_pdf_page(ocr, pdf_path, filename, page_num):
                 text = line[1][0]
                 all_text.append(text)
 
-        cleaned_text = clean_text("\n".join(all_text))
-        save_cached_text(filename, page_num, cleaned_text)
-        print(f"OCR完成：{filename} 第{page_num}页，字符数：{len(cleaned_text)}")
+        raw_text = "\n".join(all_text)
+        cleaned_page = save_cached_page(filename, page_num, raw_text)
+        print(f"OCR完成：{filename} 第{page_num}页，字符数：{len(cleaned_page['cleaned_text'])}")
 
         return ocr
 
@@ -148,26 +159,31 @@ def ocr_pdf_page(ocr, pdf_path, filename, page_num):
 
 def cache_pdf_page(ocr, pdf_path, filename, page_num):
     cache_path = get_cache_path(filename, page_num)
+    json_path = get_cache_json_path(filename, page_num)
 
     if os.path.exists(cache_path) and not OVERWRITE_OCR:
+        if not os.path.exists(json_path):
+            with open(cache_path, "r", encoding="utf-8") as f:
+                save_cached_page(filename, page_num, f.read())
         if should_log_page(page_num):
             print(f"缓存已存在，跳过：{filename} 第{page_num}页")
         return ocr
 
     extracted_text = extract_text_layer(pdf_path, page_num)
+    extracted_cleaned_text = clean_text(extracted_text)
 
-    if len(extracted_text) >= TEXT_LAYER_MIN_LENGTH:
-        save_cached_text(filename, page_num, extracted_text)
+    if len(extracted_cleaned_text) >= TEXT_LAYER_MIN_LENGTH:
+        cleaned_page = save_cached_page(filename, page_num, extracted_text)
         if should_log_page(page_num):
-            print(f"文本层完成：{filename} 第{page_num}页，字符数：{len(extracted_text)}")
+            print(f"文本层完成：{filename} 第{page_num}页，字符数：{len(cleaned_page['cleaned_text'])}")
         return ocr
 
     if SKIP_OCR_FALLBACK:
         if should_log_page(page_num):
-            print(f"文本层过短，跳过：{filename} 第{page_num}页，字符数：{len(extracted_text)}")
+            print(f"文本层过短，跳过：{filename} 第{page_num}页，字符数：{len(extracted_cleaned_text)}")
         return ocr
 
-    print(f"文本层过短，转 OCR：{filename} 第{page_num}页，字符数：{len(extracted_text)}")
+    print(f"文本层过短，转 OCR：{filename} 第{page_num}页，字符数：{len(extracted_cleaned_text)}")
     return ocr_pdf_page(ocr, pdf_path, filename, page_num)
 
 
