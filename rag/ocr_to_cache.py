@@ -5,7 +5,15 @@ import json
 import fitz
 from paddleocr import PaddleOCR
 from pdf2image import convert_from_path, pdfinfo_from_path
-from clean_ocr_text import clean_ocr_page, clean_text
+try:
+    from clean_ocr_text import clean_ocr_page, clean_text
+except ModuleNotFoundError:
+    from rag.clean_ocr_text import clean_ocr_page, clean_text
+
+try:
+    from page_number_detection import margin_page_candidates
+except ModuleNotFoundError:
+    from rag.page_number_detection import margin_page_candidates
 
 
 DATA_DIR = "data"
@@ -27,6 +35,7 @@ if POPPLER_PATH and not os.path.exists(POPPLER_PATH):
 # ME_VOLUMES_ONLY=1 only processes me01-me50 style PDFs.
 # SKIP_OCR_FALLBACK=1 skips pages with short/no text instead of running OCR.
 # PROGRESS_EVERY=100 prints page-level progress every N pages. Use 1 for every page.
+# OCR_MARGIN_RATIO=0.12 controls the top/bottom image bands used as header/footer.
 START_PAGE = int(os.getenv("START_PAGE", "1"))
 END_PAGE = os.getenv("END_PAGE")
 END_PAGE = int(END_PAGE) if END_PAGE else None
@@ -47,6 +56,7 @@ USE_GPU = os.getenv("USE_GPU") == "1"
 ME_VOLUMES_ONLY = os.getenv("ME_VOLUMES_ONLY") == "1"
 SKIP_OCR_FALLBACK = os.getenv("SKIP_OCR_FALLBACK") == "1"
 PROGRESS_EVERY = int(os.getenv("PROGRESS_EVERY", "100"))
+OCR_MARGIN_RATIO = float(os.getenv("OCR_MARGIN_RATIO", "0.12"))
 
 DATA_DIR_ABS = os.path.abspath(DATA_DIR)
 OCR_CACHE_DIR_ABS = os.path.abspath(OCR_CACHE_DIR)
@@ -79,7 +89,7 @@ def get_cache_json_path(filename, page_num):
     return os.path.join(OCR_CACHE_DIR, safe_name, f"page_{page_num}.json")
 
 
-def save_cached_page(filename, page_num, raw_text, book_title=None):
+def save_cached_page(filename, page_num, raw_text, book_title=None, layout_meta=None):
     cache_path = get_cache_path(filename, page_num)
     json_path = get_cache_json_path(filename, page_num)
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
@@ -90,6 +100,8 @@ def save_cached_page(filename, page_num, raw_text, book_title=None):
         page_num=page_num,
         book_title=book_title,
     )
+    if layout_meta:
+        cleaned_page.update(layout_meta)
 
     with open(cache_path, "w", encoding="utf-8") as f:
         f.write(cleaned_page["cleaned_text"])
@@ -121,6 +133,68 @@ def create_ocr():
     )
 
 
+def bbox_center_y(bbox):
+    return sum(point[1] for point in bbox) / len(bbox)
+
+
+def bbox_to_list(bbox):
+    return [[float(point[0]), float(point[1])] for point in bbox]
+
+
+def layout_from_ocr_result(result, image_size, page_num):
+    width, height = image_size
+    header_limit = height * OCR_MARGIN_RATIO
+    footer_limit = height * (1 - OCR_MARGIN_RATIO)
+    layout_lines = []
+    header_lines = []
+    body_lines = []
+    footer_lines = []
+
+    if result and result[0]:
+        for line in result[0]:
+            bbox = line[0]
+            text = line[1][0]
+            confidence = float(line[1][1]) if len(line[1]) > 1 else None
+            center_y = bbox_center_y(bbox)
+            if center_y <= header_limit:
+                region = "header"
+                header_lines.append(text)
+            elif center_y >= footer_limit:
+                region = "footer"
+                footer_lines.append(text)
+            else:
+                region = "body"
+                body_lines.append(text)
+
+            layout_lines.append(
+                {
+                    "text": text,
+                    "bbox": bbox_to_list(bbox),
+                    "confidence": confidence,
+                    "region": region,
+                }
+            )
+
+    header_text = "\n".join(header_lines)
+    body_text = "\n".join(body_lines)
+    footer_text = "\n".join(footer_lines)
+
+    return {
+        "image_width": width,
+        "image_height": height,
+        "ocr_margin_ratio": OCR_MARGIN_RATIO,
+        "layout_lines": layout_lines,
+        "header_text": header_text,
+        "body_text": body_text,
+        "footer_text": footer_text,
+        "page_number_candidates": margin_page_candidates(
+            header_text,
+            footer_text,
+            pdf_page=page_num,
+        ),
+    }
+
+
 def ocr_pdf_page(ocr, pdf_path, filename, page_num):
     if ocr is None:
         ocr = create_ocr()
@@ -139,15 +213,15 @@ def ocr_pdf_page(ocr, pdf_path, filename, page_num):
 
     try:
         result = ocr.ocr(image_path, cls=True)
+        layout_meta = layout_from_ocr_result(result, pages[0].size, page_num)
         all_text = []
 
-        if result and result[0]:
-            for line in result[0]:
-                text = line[1][0]
-                all_text.append(text)
+        all_text.extend(layout_meta["header_text"].splitlines())
+        all_text.extend(layout_meta["body_text"].splitlines())
+        all_text.extend(layout_meta["footer_text"].splitlines())
 
         raw_text = "\n".join(all_text)
-        cleaned_page = save_cached_page(filename, page_num, raw_text)
+        cleaned_page = save_cached_page(filename, page_num, raw_text, layout_meta=layout_meta)
         print(f"OCR完成：{filename} 第{page_num}页，字符数：{len(cleaned_page['cleaned_text'])}")
 
         return ocr

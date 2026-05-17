@@ -7,7 +7,14 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from clean_ocr_text import clean_ocr_page
+try:
+    from clean_ocr_text import clean_ocr_page
+except ModuleNotFoundError:
+    from rag.clean_ocr_text import clean_ocr_page
+try:
+    from page_number_detection import margin_page_candidates
+except ModuleNotFoundError:
+    from rag.page_number_detection import margin_page_candidates
 
 
 OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "data/ocr_cache")
@@ -211,28 +218,34 @@ def infer_page_metadata(text, fallback_article, pdf_page=None):
     if footer_page is not None:
         return footer_page, fallback_article
 
+    def candidate_from_margin_line(line):
+        compact = re.sub(r"\s+", "", line.strip())
+        if not compact:
+            return None
+
+        match = re.fullmatch(r"[/\\_. -]*(\d{1,4})[/\\_. -]*", compact)
+        if match:
+            return int(match.group(1)), None
+
+        return None
+
+    lines = [line for line in normalized_text.splitlines() if line.strip()]
+    margin_lines = lines[:4] + lines[-4:]
     candidates = []
 
-    scan_ranges = [
-        normalized_text[:160],
-        normalized_text[max(0, len(normalized_text) - 160):],
-    ]
+    for line in margin_lines:
+        candidate = candidate_from_margin_line(line)
+        if candidate is None:
+            continue
 
-    for segment in scan_ranges:
-        for match in re.finditer(
-            r"(?P<page>\d{1,4})(?P<article>第[一二三四五六七八九十百〇零两]+[章节篇编][^。！？；，]{0,40})?",
-            segment,
-        ):
-            page = int(match.group("page"))
+        page, article = candidate
+        if not is_valid_printed_page(page):
+            continue
 
-            if not is_valid_printed_page(page):
-                continue
+        if pdf_page is not None and not is_plausible_for_pdf_page(page, pdf_page):
+            continue
 
-            if pdf_page is not None and not is_plausible_for_pdf_page(page, pdf_page):
-                continue
-
-            article = match.group("article")
-            candidates.append((page, article))
+        candidates.append((page, article))
 
     if not candidates:
         return None, fallback_article
@@ -242,28 +255,46 @@ def infer_page_metadata(text, fallback_article, pdf_page=None):
 
     return printed_page, article
 
-    for match in re.finditer(
-        r"(?P<page>\d{1,4})(?P<article>第[一二三四五六七八九十百〇零两]+[章节篇编][^。！？；，]{0,40})?",
-        normalized_text,
-    ):
-        if match.start() < max(0, len(normalized_text) - 120):
+
+def infer_page_metadata_from_layout(cleaned_page, fallback_article, pdf_page=None):
+    """Prefer OCR layout metadata when available.
+
+    New OCR cache files keep header/footer text separate. That is safer than
+    guessing from the full page text because body notes often contain page-like
+    numbers.
+    """
+    explicit_candidates = cleaned_page.get("page_number_candidates") or []
+    candidates = []
+
+    for candidate in explicit_candidates:
+        page = candidate.get("printed_page")
+        if page is None:
             continue
-
-        page = int(match.group("page"))
-
-        if page <= 0:
+        try:
+            page = int(page)
+        except (TypeError, ValueError):
             continue
+        if is_valid_printed_page(page) and is_plausible_for_pdf_page(page, pdf_page):
+            candidates.append((page, fallback_article, "ocr_layout"))
 
-        article = match.group("article")
-        candidates.append((page, article))
+    if not candidates and (cleaned_page.get("header_text") or cleaned_page.get("footer_text")):
+        for candidate in margin_page_candidates(
+            cleaned_page.get("header_text", ""),
+            cleaned_page.get("footer_text", ""),
+            pdf_page=pdf_page,
+        ):
+            candidates.append((candidate["printed_page"], fallback_article, "ocr_layout"))
 
-    if not candidates:
-        return None, fallback_article
+    if candidates:
+        printed_page, article, source = candidates[0]
+        return printed_page, article, source
 
-    printed_page, article = candidates[-1]
-    article = sanitize_article(article, fallback_article)
-
-    return printed_page, article
+    printed_page, article = infer_page_metadata(
+        cleaned_page.get("cleaned_text") or cleaned_page.get("raw_text") or "",
+        fallback_article,
+        pdf_page,
+    )
+    return printed_page, article, "text_margin"
 
 
 def load_article_map():
@@ -304,6 +335,12 @@ def article_from_map(source, printed_page):
     hits.sort(key=lambda entry: (entry["end_printed_page"] - entry["start_printed_page"], -len(entry["title"])))
 
     return hits[0]["title"]
+
+
+def printed_page_source_is_untrusted(source):
+    """Some source families expose manuscript/note page marks as bare OCR numbers."""
+    stem = (source or "").lower().replace(".pdf", "")
+    return stem.startswith(("mea", "mes"))
 
 
 def is_me_volume(filename):
@@ -409,10 +446,12 @@ def document_from_cache(cache_path, title_context):
         return None
 
     fallback_article = ARTICLE_MAPPING.get(source, "未知篇目")
-    printed_page, chapter = infer_page_metadata(text, fallback_article, page_num)
+    printed_page, chapter, page_source = infer_page_metadata_from_layout(cleaned_page, fallback_article, page_num)
     if not is_plausible_for_pdf_page(printed_page, page_num):
         printed_page = None
     page = printed_page if printed_page is not None else page_num
+    citation_page = printed_page if printed_page is not None else page_num
+    citation_page_type = "printed_page" if printed_page is not None else "pdf_page"
     section = article_from_map(source, printed_page)
     title_page_info = title_context.get(source) or {}
     title_page_title = title_page_info.get("title")
@@ -429,6 +468,10 @@ def document_from_cache(cache_path, title_context):
             "page": page,
             "printed_page": printed_page,
             "pdf_page": page_num,
+            "citation_page": citation_page,
+            "citation_page_type": citation_page_type,
+            "page_number_source": page_source,
+            "page_number_candidates": cleaned_page.get("page_number_candidates") or [],
             "source": source,
             "ocr": True,
             "page_type": page_type,

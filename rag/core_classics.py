@@ -76,6 +76,10 @@ def classic_entries_for_query(text, path=None):
             "end_page": entry["end_page"],
             "classic_id": classic["id"],
             "classic_title": classic["title"],
+            "classic_author": classic.get("author"),
+            "classic_work_year": classic.get("work_year"),
+            "classic_work_type": classic.get("work_type"),
+            "entry_type": entry.get("entry_type"),
             "priority": entry.get("priority", 99),
         }
         for entry in classic.get("entries") or []

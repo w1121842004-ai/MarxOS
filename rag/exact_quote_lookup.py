@@ -78,7 +78,14 @@ def snippet_around(text, query, window=180):
     return " ".join(text[start:end].split())
 
 
-def metadata_from_page(page, entry, path):
+def entry_covers_pdf_page(entry, source, pdf_page, before=20, after=80):
+    if entry.get("source") != source or pdf_page is None:
+        return False
+
+    return entry["start_page"] - before <= pdf_page <= entry["end_page"] + after
+
+
+def metadata_from_page(page, entry, path, preferred_entries=None):
     source = page.get("source") or (entry or {}).get("source") or f"{path.parent.name}.pdf"
     pdf_page = page.get("page_num")
 
@@ -87,18 +94,26 @@ def metadata_from_page(page, entry, path):
         pdf_page = int(match.group(1)) if match else None
 
     if entry is None:
+        for candidate in preferred_entries or []:
+            if entry_covers_pdf_page(candidate, source, pdf_page):
+                entry = candidate
+                break
+
+    if entry is None:
         for classic in load_core_classics():
             for candidate in classic.get("entries") or []:
-                if candidate["source"] != source or pdf_page is None:
+                if not entry_covers_pdf_page(candidate, source, pdf_page):
                     continue
 
-                if candidate["start_page"] - 20 <= pdf_page <= candidate["end_page"] + 80:
-                    entry = {
-                        **candidate,
-                        "classic_id": classic.get("id"),
-                        "classic_title": classic.get("title"),
-                    }
-                    break
+                entry = {
+                    **candidate,
+                    "classic_id": classic.get("id"),
+                    "classic_title": classic.get("title"),
+                    "classic_author": classic.get("author"),
+                    "classic_work_year": classic.get("work_year"),
+                    "classic_work_type": classic.get("work_type"),
+                }
+                break
 
             if entry is not None:
                 break
@@ -108,13 +123,20 @@ def metadata_from_page(page, entry, path):
         "article": (entry or {}).get("article") or page.get("title_candidate") or (entry or {}).get("classic_title"),
         "section": (entry or {}).get("article") or page.get("title_candidate"),
         "page": pdf_page,
-        "printed_page": pdf_page,
+        "printed_page": None,
         "pdf_page": pdf_page,
+        "citation_page": pdf_page,
+        "citation_page_type": "pdf_page",
         "source": source,
         "ocr": True,
         "match_type": "exact_quote",
+        "confidence": 1.0,
         "classic_id": (entry or {}).get("classic_id"),
         "classic_title": (entry or {}).get("classic_title"),
+        "classic_author": (entry or {}).get("classic_author"),
+        "classic_work_year": (entry or {}).get("classic_work_year"),
+        "classic_work_type": (entry or {}).get("classic_work_type"),
+        "entry_type": (entry or {}).get("entry_type"),
     }
 
     return metadata
@@ -122,6 +144,10 @@ def metadata_from_page(page, entry, path):
 
 def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
     quote = extract_query_quote(query)
+    preferred_entries = classic_entries_for_query(query)
+    preferred_classic_ids = {
+        entry.get("classic_id") for entry in preferred_entries if entry.get("classic_id")
+    }
     hits = []
     seen = set()
 
@@ -139,7 +165,8 @@ def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
         if normalized_quote not in normalize_quote(cleaned_text):
             continue
 
-        metadata = metadata_from_page(page, entry, path)
+        metadata = metadata_from_page(page, entry, path, preferred_entries=preferred_entries)
+        metadata["lookup_scope"] = "core_classic" if scoped and entry else "global"
         key = (metadata["source"], metadata.get("pdf_page"))
         if key in seen:
             continue
@@ -155,6 +182,14 @@ def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
                 ),
             )
         )
+
+    if preferred_classic_ids:
+        trusted_hits = [
+            hit for hit in hits
+            if hit[1].metadata.get("classic_id") in preferred_classic_ids
+        ]
+        if trusted_hits:
+            hits = trusted_hits
 
     hits.sort(key=lambda item: (item[0], item[1].metadata.get("source", ""), item[1].metadata.get("pdf_page") or 0))
 

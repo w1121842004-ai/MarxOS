@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -17,6 +18,13 @@ from rag.core_classics import classic_entries_for_query
 from rag.exact_quote_lookup import exact_quote_lookup
 
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
+
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 VECTORSTORE_DIR = Path("vectorstore/marx_reader_core")
 ARTICLE_MAP_PATH = Path("rag/article_map_core.json")
@@ -31,6 +39,7 @@ class EvalQuestion:
 
 QUESTIONS = [
     EvalQuestion("core_title", "《共产党宣言》收录在哪一卷，从哪一页开始？", "共产党宣言"),
+    EvalQuestion("core_title", "《共产党宣言》收录在哪里？", "共产党宣言"),
     EvalQuestion("core_title", "《资本论》第一卷从哪一页开始？", "资本论"),
     EvalQuestion("core_title", "《哥达纲领批判》收录在哪一卷？", "哥达纲领批判"),
     EvalQuestion("core_title", "《黑格尔法哲学批判》导言收录在哪一卷？", "黑格尔法哲学批判导言"),
@@ -87,6 +96,10 @@ def find_title_matches(article_map: dict, title: str, limit: int = 5) -> list[tu
                         "end_printed_page": entry["end_page"],
                         "level": 0,
                         "parent": f"core_classic:{entry.get('classic_id')}",
+                        "classic_author": entry.get("classic_author"),
+                        "classic_work_year": entry.get("classic_work_year"),
+                        "classic_work_type": entry.get("classic_work_type"),
+                        "entry_type": entry.get("entry_type"),
                     },
                 )
             )
@@ -139,7 +152,16 @@ def format_metadata(metadata: dict) -> str:
         ("page", metadata.get("page")),
         ("printed_page", metadata.get("printed_page")),
         ("pdf_page", metadata.get("pdf_page")),
+        ("citation_page", metadata.get("citation_page")),
+        ("citation_page_type", metadata.get("citation_page_type")),
         ("source", metadata.get("source")),
+        ("match_type", metadata.get("match_type")),
+        ("confidence", metadata.get("confidence")),
+        ("lookup_scope", metadata.get("lookup_scope")),
+        ("classic_author", metadata.get("classic_author")),
+        ("classic_work_year", metadata.get("classic_work_year")),
+        ("classic_work_type", metadata.get("classic_work_type")),
+        ("entry_type", metadata.get("entry_type")),
     ]
     return ", ".join(f"{key}={value}" for key, value in fields if value not in (None, ""))
 
@@ -212,6 +234,18 @@ def evaluate(k: int = 3) -> None:
                 )
             continue
 
+        if item.group == "negative":
+            exact_docs = exact_quote_lookup(item.question, limit=k)
+            if exact_docs:
+                print("Unexpected exact quote match.")
+                docs = exact_docs
+                for rank, doc in enumerate(docs, start=1):
+                    print(f"\n[{rank}] {format_metadata(doc.metadata)}")
+                    print(clean_preview(doc.page_content))
+            else:
+                print("No trusted answer; vector candidates suppressed.")
+            continue
+
         if db is None:
             db = load_vectorstore()
 
@@ -219,9 +253,15 @@ def evaluate(k: int = 3) -> None:
         if exact_docs:
             docs = exact_docs
         else:
+            if item.group == "core_quote":
+                print("No exact quote match; showing vector candidates only.")
             fetch_k = 120 if classic_entries_for_query(item.question) else k
             docs = db.similarity_search(item.question, k=fetch_k)
             docs = rerank_with_core_classic(item.question, docs, k)
+            if item.group == "core_quote":
+                for doc in docs:
+                    doc.metadata["match_type"] = "vector_candidate"
+                    doc.metadata["confidence"] = 0.0
         if not docs:
             print("No retrieval results.")
             continue

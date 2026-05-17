@@ -2,148 +2,444 @@
   {
     "id": "communist_manifesto",
     "title": "共产党宣言",
-    "aliases": ["共产党宣言", "共产主义宣言"],
-    "quotes": ["一个幽灵，共产主义的幽灵，在欧洲游荡", "至今一切社会的历史都是阶级斗争的历史", "工人没有祖国"],
+    "aliases": [
+      "共产党宣言",
+      "共产主义宣言"
+    ],
+    "quotes": [
+      "一个幽灵，共产主义的幽灵，在欧洲游荡",
+      "至今一切社会的历史都是阶级斗争的历史",
+      "工人没有祖国"
+    ],
     "entries": [
-      {"source": "mes01.pdf", "article": "卡·马克思和弗·恩格斯共产党宣言", "start_page": 376, "end_page": 435, "priority": 1},
-      {"source": "mea02.pdf", "article": "卡·马克思和弗·恩格斯共产党宣言", "start_page": 3, "end_page": 67, "priority": 2}
-    ]
+      {
+        "source": "mes01.pdf",
+        "article": "卡·马克思和弗·恩格斯共产党宣言",
+        "start_page": 376,
+        "end_page": 435,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mea02.pdf",
+        "article": "卡·马克思和弗·恩格斯共产党宣言",
+        "start_page": 3,
+        "end_page": 67,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "卡·马克思、弗·恩格斯",
+    "work_year": "1848",
+    "work_type": "纲领文献"
   },
   {
     "id": "capital_vol1",
     "title": "资本论 第一卷",
-    "aliases": ["资本论", "资本论第一卷", "资本论 第一卷", "资本论第1卷"],
-    "quotes": ["劳动首先是人和自然之间的过程"],
+    "aliases": [
+      "资本论",
+      "资本论第一卷",
+      "资本论 第一卷",
+      "资本论第1卷"
+    ],
+    "quotes": [
+      "劳动首先是人和自然之间的过程"
+    ],
     "entries": [
-      {"source": "mea05.pdf", "article": "卡·马克思《资本论》第一卷", "start_page": 7, "end_page": 887, "priority": 1},
-      {"source": "mes02.pdf", "article": "《资本论》第一卷摘选", "start_page": 185, "end_page": 370, "priority": 2}
-    ]
+      {
+        "source": "mea05.pdf",
+        "article": "卡·马克思《资本论》第一卷",
+        "start_page": 7,
+        "end_page": 887,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mes02.pdf",
+        "article": "《资本论》第一卷摘选",
+        "start_page": 185,
+        "end_page": 370,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "卡·马克思",
+    "work_year": "1867",
+    "work_type": "政治经济学著作"
   },
   {
     "id": "critique_gotha_programme",
     "title": "哥达纲领批判",
-    "aliases": ["哥达纲领批判", "德国工人党纲领批注"],
-    "quotes": ["各尽所能，按需分配"],
+    "aliases": [
+      "哥达纲领批判",
+      "德国工人党纲领批注"
+    ],
+    "quotes": [
+      "各尽所能，按需分配"
+    ],
     "entries": [
-      {"source": "mea03.pdf", "article": "卡·马克思哥达纲领批判", "start_page": 424, "end_page": 451, "priority": 1},
-      {"source": "mes04.pdf", "article": "卡·马克思哥达纲领批判", "start_page": 609, "end_page": 627, "priority": 2}
-    ]
+      {
+        "source": "mea03.pdf",
+        "article": "卡·马克思哥达纲领批判",
+        "start_page": 424,
+        "end_page": 451,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mes04.pdf",
+        "article": "卡·马克思哥达纲领批判",
+        "start_page": 609,
+        "end_page": 627,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "卡·马克思",
+    "work_year": "1875",
+    "work_type": "纲领批判"
   },
   {
     "id": "critique_hegel_law_intro",
     "title": "黑格尔法哲学批判 导言",
-    "aliases": ["黑格尔法哲学批判导言", "黑格尔法哲学批判 导言", "《黑格尔法哲学批判》导言"],
-    "quotes": ["宗教是人民的鸦片"],
+    "aliases": [
+      "黑格尔法哲学批判导言",
+      "黑格尔法哲学批判 导言",
+      "《黑格尔法哲学批判》导言"
+    ],
+    "quotes": [
+      "宗教是人民的鸦片"
+    ],
     "entries": [
-      {"source": "mes01.pdf", "article": "卡·马克思《黑格尔法哲学批判》导言", "start_page": 1, "end_page": 16, "priority": 1},
-      {"source": "mea01.pdf", "article": "《黑格尔法哲学批判》导言", "start_page": 3, "end_page": 18, "priority": 2}
-    ]
+      {
+        "source": "mes01.pdf",
+        "article": "卡·马克思《黑格尔法哲学批判》导言",
+        "start_page": 1,
+        "end_page": 16,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mea01.pdf",
+        "article": "《黑格尔法哲学批判》导言",
+        "start_page": 3,
+        "end_page": 18,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "卡·马克思",
+    "work_year": "1843-1844",
+    "work_type": "哲学论文"
   },
   {
     "id": "economic_philosophic_manuscripts_1844",
     "title": "1844年经济学哲学手稿",
-    "aliases": ["1844年经济学哲学手稿", "经济学哲学手稿"],
+    "aliases": [
+      "1844年经济学哲学手稿",
+      "经济学哲学手稿"
+    ],
     "quotes": [],
     "entries": [
-      {"source": "mea01.pdf", "article": "卡·马克思1844年经济学哲学手稿", "start_page": 109, "end_page": 248, "priority": 1},
-      {"source": "mes01.pdf", "article": "卡·马克思1844年经济学哲学手稿（节选）", "start_page": 49, "end_page": 63, "priority": 2}
-    ]
+      {
+        "source": "mea01.pdf",
+        "article": "卡·马克思1844年经济学哲学手稿",
+        "start_page": 109,
+        "end_page": 248,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mes01.pdf",
+        "article": "卡·马克思1844年经济学哲学手稿（节选）",
+        "start_page": 49,
+        "end_page": 63,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "卡·马克思",
+    "work_year": "1844",
+    "work_type": "手稿"
   },
   {
     "id": "german_ideology",
     "title": "德意志意识形态",
-    "aliases": ["德意志意识形态"],
+    "aliases": [
+      "德意志意识形态"
+    ],
     "quotes": [],
     "entries": [
-      {"source": "mes01.pdf", "article": "卡·马克思和弗·恩格斯德意志意识形态（节选）", "start_page": 141, "end_page": 215, "priority": 1},
-      {"source": "mea01.pdf", "article": "《德意志意识形态》第一卷第一章《费尔巴哈》", "start_page": 499, "end_page": 525, "priority": 2}
-    ]
+      {
+        "source": "mes01.pdf",
+        "article": "卡·马克思和弗·恩格斯德意志意识形态（节选）",
+        "start_page": 141,
+        "end_page": 215,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mea01.pdf",
+        "article": "《德意志意识形态》第一卷第一章《费尔巴哈》",
+        "start_page": 499,
+        "end_page": 525,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "卡·马克思、弗·恩格斯",
+    "work_year": "1845-1846",
+    "work_type": "手稿"
   },
   {
     "id": "eighteenth_brumaire",
     "title": "路易·波拿巴的雾月十八日",
-    "aliases": ["路易·波拿巴的雾月十八日", "雾月十八日"],
+    "aliases": [
+      "路易·波拿巴的雾月十八日",
+      "雾月十八日"
+    ],
     "quotes": [],
     "entries": [
-      {"source": "mes01.pdf", "article": "卡·马克思路易·波拿巴的雾月十八日", "start_page": 663, "end_page": 774, "priority": 1},
-      {"source": "mea02.pdf", "article": "卡·马克思路易·波拿巴的雾月十八日", "start_page": 461, "end_page": 578, "priority": 2}
-    ]
+      {
+        "source": "mes01.pdf",
+        "article": "卡·马克思路易·波拿巴的雾月十八日",
+        "start_page": 663,
+        "end_page": 774,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mea02.pdf",
+        "article": "卡·马克思路易·波拿巴的雾月十八日",
+        "start_page": 461,
+        "end_page": 578,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "卡·马克思",
+    "work_year": "1852",
+    "work_type": "历史政治著作"
   },
   {
     "id": "civil_war_france",
     "title": "法兰西内战",
-    "aliases": ["法兰西内战"],
+    "aliases": [
+      "法兰西内战"
+    ],
     "quotes": [],
     "entries": [
-      {"source": "mea03.pdf", "article": "卡·马克思法兰西内战", "start_page": 95, "end_page": 223, "priority": 1}
-    ]
+      {
+        "source": "mea03.pdf",
+        "article": "卡·马克思法兰西内战",
+        "start_page": 95,
+        "end_page": 223,
+        "priority": 1,
+        "entry_type": "primary"
+      }
+    ],
+    "author": "卡·马克思",
+    "work_year": "1871",
+    "work_type": "历史政治著作"
   },
   {
     "id": "anti_duhring",
     "title": "反杜林论",
-    "aliases": ["反杜林论", "欧根·杜林先生在科学中实行的变革"],
-    "quotes": ["自由是对必然的认识"],
+    "aliases": [
+      "反杜林论",
+      "欧根·杜林先生在科学中实行的变革"
+    ],
+    "quotes": [
+      "自由是对必然的认识"
+    ],
     "entries": [
-      {"source": "mea09.pdf", "article": "弗·恩格斯反杜林论", "start_page": 3, "end_page": 398, "priority": 1},
-      {"source": "mes03.pdf", "article": "弗·恩格斯反杜林论（节选）", "start_page": 477, "end_page": 607, "priority": 2}
-    ]
+      {
+        "source": "mea09.pdf",
+        "article": "弗·恩格斯反杜林论",
+        "start_page": 3,
+        "end_page": 398,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mes03.pdf",
+        "article": "弗·恩格斯反杜林论（节选）",
+        "start_page": 477,
+        "end_page": 607,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "弗·恩格斯",
+    "work_year": "1876-1878",
+    "work_type": "理论著作"
   },
   {
     "id": "socialism_utopian_scientific",
     "title": "社会主义从空想到科学的发展",
-    "aliases": ["社会主义从空想到科学的发展", "空想到科学的发展"],
+    "aliases": [
+      "社会主义从空想到科学的发展",
+      "空想到科学的发展"
+    ],
     "quotes": [],
     "entries": [
-      {"source": "mea03.pdf", "article": "弗·恩格斯社会主义从空想到科学的发展", "start_page": 487, "end_page": 567, "priority": 1}
-    ]
+      {
+        "source": "mea03.pdf",
+        "article": "弗·恩格斯社会主义从空想到科学的发展",
+        "start_page": 487,
+        "end_page": 567,
+        "priority": 1,
+        "entry_type": "primary"
+      }
+    ],
+    "author": "弗·恩格斯",
+    "work_year": "1880",
+    "work_type": "理论著作"
   },
   {
     "id": "origin_family_private_property_state",
     "title": "家庭、私有制和国家的起源",
-    "aliases": ["家庭私有制和国家的起源", "家庭、私有制和国家的起源"],
-    "quotes": ["国家是社会在一定发展阶段上的产物"],
+    "aliases": [
+      "家庭私有制和国家的起源",
+      "家庭、私有制和国家的起源"
+    ],
+    "quotes": [
+      "国家是社会在一定发展阶段上的产物"
+    ],
     "entries": [
-      {"source": "mea04.pdf", "article": "弗·恩格斯家庭、私有制和国家的起源", "start_page": 13, "end_page": 198, "priority": 1},
-      {"source": "mes04.pdf", "article": "弗·恩格斯家庭、私有制和国家的起源（节选）", "start_page": 669, "end_page": 709, "priority": 2}
-    ]
+      {
+        "source": "mea04.pdf",
+        "article": "弗·恩格斯家庭、私有制和国家的起源",
+        "start_page": 13,
+        "end_page": 198,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mes04.pdf",
+        "article": "弗·恩格斯家庭、私有制和国家的起源（节选）",
+        "start_page": 669,
+        "end_page": 709,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "弗·恩格斯",
+    "work_year": "1884",
+    "work_type": "理论著作"
   },
   {
     "id": "dialectics_nature",
     "title": "自然辩证法",
-    "aliases": ["自然辩证法"],
+    "aliases": [
+      "自然辩证法"
+    ],
     "quotes": [],
     "entries": [
-      {"source": "mea09.pdf", "article": "弗·恩格斯自然辩证法（节选）", "start_page": 399, "end_page": 563, "priority": 1}
-    ]
+      {
+        "source": "mea09.pdf",
+        "article": "弗·恩格斯自然辩证法（节选）",
+        "start_page": 399,
+        "end_page": 563,
+        "priority": 1,
+        "entry_type": "primary"
+      }
+    ],
+    "author": "弗·恩格斯",
+    "work_year": "1873-1883",
+    "work_type": "自然科学哲学手稿"
   },
   {
     "id": "theses_feuerbach",
     "title": "关于费尔巴哈的提纲",
-    "aliases": ["关于费尔巴哈的提纲", "费尔巴哈的提纲"],
-    "quotes": ["哲学家们只是用不同的方式解释世界，问题在于改变世界"],
+    "aliases": [
+      "关于费尔巴哈的提纲",
+      "费尔巴哈的提纲"
+    ],
+    "quotes": [
+      "哲学家们只是用不同的方式解释世界，问题在于改变世界"
+    ],
     "entries": [
-      {"source": "mes01.pdf", "article": "卡·马克思关于费尔巴哈的提纲", "start_page": 133, "end_page": 140, "priority": 1},
-      {"source": "mea01.pdf", "article": "卡·马克思关于费尔巴哈的提纲", "start_page": 499, "end_page": 506, "priority": 2}
-    ]
+      {
+        "source": "mes01.pdf",
+        "article": "卡·马克思关于费尔巴哈的提纲",
+        "start_page": 133,
+        "end_page": 140,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mea01.pdf",
+        "article": "卡·马克思关于费尔巴哈的提纲",
+        "start_page": 499,
+        "end_page": 506,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "卡·马克思",
+    "work_year": "1845",
+    "work_type": "哲学提纲"
   },
   {
     "id": "wage_labour_capital",
     "title": "雇佣劳动与资本",
-    "aliases": ["雇佣劳动与资本"],
+    "aliases": [
+      "雇佣劳动与资本"
+    ],
     "quotes": [],
     "entries": [
-      {"source": "mes01.pdf", "article": "卡·马克思雇佣劳动与资本", "start_page": 317, "end_page": 359, "priority": 1},
-      {"source": "mea01.pdf", "article": "卡·马克思雇佣劳动与资本", "start_page": 711, "end_page": 742, "priority": 2}
-    ]
+      {
+        "source": "mes01.pdf",
+        "article": "卡·马克思雇佣劳动与资本",
+        "start_page": 317,
+        "end_page": 359,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mea01.pdf",
+        "article": "卡·马克思雇佣劳动与资本",
+        "start_page": 711,
+        "end_page": 742,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "卡·马克思",
+    "work_year": "1847",
+    "work_type": "政治经济学讲稿"
   },
   {
     "id": "value_price_profit",
     "title": "工资、价格和利润",
-    "aliases": ["工资价格和利润", "工资、价格和利润", "价值价格和利润", "价值、价格和利润"],
+    "aliases": [
+      "工资价格和利润",
+      "工资、价格和利润",
+      "价值价格和利润",
+      "价值、价格和利润"
+    ],
     "quotes": [],
     "entries": [
-      {"source": "mes02.pdf", "article": "卡·马克思工资、价格和利润", "start_page": 17, "end_page": 69, "priority": 1},
-      {"source": "mea03.pdf", "article": "卡·马克思工资、价格和利润", "start_page": 78, "end_page": 78, "priority": 2}
-    ]
+      {
+        "source": "mes02.pdf",
+        "article": "卡·马克思工资、价格和利润",
+        "start_page": 17,
+        "end_page": 69,
+        "priority": 1,
+        "entry_type": "primary"
+      },
+      {
+        "source": "mea03.pdf",
+        "article": "卡·马克思工资、价格和利润",
+        "start_page": 78,
+        "end_page": 78,
+        "priority": 2,
+        "entry_type": "parallel"
+      }
+    ],
+    "author": "卡·马克思",
+    "work_year": "1865",
+    "work_type": "政治经济学报告"
   }
 ]
