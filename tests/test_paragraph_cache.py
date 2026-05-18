@@ -6,6 +6,7 @@ from rag.paragraph_cache import (
     is_incomplete_paragraph,
     merge_records,
     paragraph_record,
+    paragraph_record_to_document,
     split_page_paragraphs,
 )
 
@@ -54,6 +55,32 @@ class ParagraphCacheTests(unittest.TestCase):
         self.assertEqual(merged["pdf_page_start"], 10)
         self.assertEqual(merged["pdf_page_end"], 11)
         self.assertTrue(merged["cross_page"])
+
+    def test_paragraph_record_to_document_adds_retrieval_metadata(self):
+        record = {
+            "source": "mea04.pdf",
+            "book": "马克思恩格斯文集 第4卷",
+            "article": "家庭、私有制和国家的起源",
+            "section": "家庭、私有制和国家的起源",
+            "paragraph_text": "国家是社会在一定发展阶段上的产物。",
+            "pdf_page_start": 206,
+            "pdf_page_end": 207,
+            "printed_page_start": 180,
+            "printed_page_end": 181,
+            "citation_page_start": 180,
+            "citation_page_end": 181,
+            "citation_page_type": "printed_page",
+            "paragraph_id": "mea04.pdf#p000410",
+        }
+
+        doc = paragraph_record_to_document(record)
+
+        self.assertEqual(doc.page_content, "国家是社会在一定发展阶段上的产物。")
+        self.assertEqual(doc.metadata["retrieval_unit"], "paragraph")
+        self.assertEqual(doc.metadata["page"], 180)
+        self.assertEqual(doc.metadata["pdf_page"], 206)
+        self.assertEqual(doc.metadata["printed_page"], 180)
+        self.assertEqual(doc.metadata["page_range"], "180-181")
 
 
 if __name__ == "__main__":

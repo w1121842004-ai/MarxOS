@@ -149,6 +149,31 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertIn("CTX-1", context)
         self.assertNotIn("\u3010\u8d44\u6599", context)
 
+    def test_paragraph_retrieval_does_not_use_exact_quote_shortcut(self):
+        query = "\u201c\u56fd\u5bb6\u662f\u793e\u4f1a\u5728\u4e00\u5b9a\u53d1\u5c55\u9636\u6bb5\u4e0a\u7684\u4ea7\u7269\u3002\u201d\u51fa\u81ea\u54ea\u91cc\uff1f"
+        paragraph_doc = Document(
+            page_content="\u56fd\u5bb6\u662f\u793e\u4f1a\u5728\u4e00\u5b9a\u53d1\u5c55\u9636\u6bb5\u4e0a\u7684\u4ea7\u7269\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c4\u5377",
+                "article": "\u5bb6\u5ead\u3001\u79c1\u6709\u5236\u548c\u56fd\u5bb6\u7684\u8d77\u6e90",
+                "source": "mea04.pdf",
+                "page": 180,
+                "pdf_page": 206,
+                "retrieval_unit": "paragraph",
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [paragraph_doc]
+
+        with patch("app.exact_quote_lookup") as exact_quote:
+            docs = app.retrieve_paragraph_documents(query, FakeDb(), k=1)
+
+        exact_quote.assert_not_called()
+        self.assertEqual(docs[0].metadata.get("retrieval_unit"), "paragraph")
+        self.assertEqual(docs[0].metadata.get("match_type"), "paragraph_vector_candidate")
+
     def test_retrieve_documents_demotes_index_like_chunks(self):
         noisy_index_doc = Document(
             page_content="\u5386\u53f2\u552f\u7269\u4e3b\u4e49\u8fd9\u4e00\u672f\u8bed---509\u3001609\u3001637\u3001641\u3002---\u6069\u683c\u65af\u5173\u4e8e\u5386\u53f2\u552f\u7269\u4e3b\u4e49\u7684\u4e66\u4fe1---592-595\u3001612-614\u3002\u7d22\u5f15\u6761\u76ee\u3002",

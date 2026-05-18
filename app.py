@@ -18,12 +18,14 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader_core")
+PARAGRAPH_VECTORSTORE_DIR = os.getenv("PARAGRAPH_VECTORSTORE_DIR", "vectorstore/marx_reader_paragraph")
 OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "data/ocr_cache")
 ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json")
 DEFAULT_PUBLISHER = "人民出版社"
 RERANK_DEBUG_ENV = "MARXOS_DEBUG_RERANK"
 TRACE_ENV = "MARXOS_TRACE"
 TRACE_ONLY_ENV = "MARXOS_TRACE_ONLY"
+DUAL_RETRIEVAL_ENV = "MARXOS_DUAL_RETRIEVAL"
 DEV_MODE_ENV = "MARXOS_DEV_MODE"
 DEV_TOKEN_ENV = "MARXOS_DEV_TOKEN"
 DEV_TOKEN_INPUT_ENV = "MARXOS_DEV_TOKEN_INPUT"
@@ -1389,8 +1391,8 @@ def rerank_documents(query, docs, constraints):
     return [doc for score, doc in ranked]
 
 
-def retrieve_documents(query, db, k=5):
-    if is_quote_lookup_query(query):
+def retrieve_documents(query, db, k=5, allow_exact_quote=True):
+    if allow_exact_quote and is_quote_lookup_query(query):
         exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k)
         if exact_docs:
             return exact_docs
@@ -1415,11 +1417,19 @@ def retrieve_documents(query, db, k=5):
     if classify_query(query) == "concept_explain":
         docs = enrich_concept_metadata(query, docs)
 
-    if is_quote_lookup_query(query):
+    if allow_exact_quote and is_quote_lookup_query(query):
         for doc in docs:
             doc.metadata["match_type"] = "vector_candidate"
             doc.metadata["confidence"] = 0.0
 
+    return docs
+
+
+def retrieve_paragraph_documents(query, db, k=5):
+    docs = retrieve_documents(query, db, k=k, allow_exact_quote=False)
+    for doc in docs:
+        doc.metadata.setdefault("retrieval_unit", "paragraph")
+        doc.metadata.setdefault("match_type", "paragraph_vector_candidate")
     return docs
 
 
@@ -1599,6 +1609,10 @@ def trace_only_enabled():
     return dev_mode_enabled() and env_flag(TRACE_ONLY_ENV)
 
 
+def dual_retrieval_enabled():
+    return dev_mode_enabled() and env_flag(DUAL_RETRIEVAL_ENV)
+
+
 def compact_preview(text, limit=180):
     text = " ".join(clean_text(text, "").split())
     if len(text) <= limit:
@@ -1664,7 +1678,8 @@ def print_prompt_trace(prompt):
     print_trace_line("===== End Trace =====\n")
 
 
-def build_trace_only_answer(query_intent, docs, prompt):
+def build_trace_only_answer(query_intent, docs, prompt, paragraph_docs=None):
+    paragraph_docs = paragraph_docs or []
     lines = [
         "已完成 TRACE_ONLY 调试运行，未调用 DeepSeek。",
         f"intent: {query_intent}",
@@ -1682,6 +1697,17 @@ def build_trace_only_answer(query_intent, docs, prompt):
         )
         lines.append(f"   preview: {compact_preview(doc.page_content, limit=120)}")
 
+    if paragraph_docs:
+        lines.extend(["", "Top paragraphs:"])
+        for index, doc in enumerate(paragraph_docs, start=1):
+            metadata = normalize_metadata(doc.metadata)
+            lines.append(
+                f"{index}. source={metadata.get('source')}, article={metadata.get('article')}, "
+                f"page={metadata.get('page')}, pdf_page={metadata.get('pdf_page')}, "
+                f"citation_page={metadata.get('citation_page')}, type={metadata.get('citation_page_type')}"
+            )
+            lines.append(f"   preview: {compact_preview(doc.page_content, limit=120)}")
+
     lines.extend(["", "Prompt preview:", compact_preview(prompt, limit=700)])
     return "\n".join(lines)
 
@@ -1693,6 +1719,26 @@ def load_vectorstore():
         embeddings,
         allow_dangerous_deserialization=True,
     )
+
+
+def paragraph_vectorstore_exists():
+    return os.path.exists(os.path.join(PARAGRAPH_VECTORSTORE_DIR, "index.faiss"))
+
+
+def load_paragraph_vectorstore():
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    return FAISS.load_local(
+        PARAGRAPH_VECTORSTORE_DIR,
+        embeddings,
+        allow_dangerous_deserialization=True,
+    )
+
+
+def retrieve_dual_documents(query, chunk_db, paragraph_db, k=5):
+    return {
+        "chunk": retrieve_documents(query, chunk_db, k=k),
+        "paragraph": retrieve_paragraph_documents(query, paragraph_db, k=k),
+    }
 
 
 def run_query(query):
@@ -1707,6 +1753,7 @@ def run_query(query):
     query_intent = classify_query(query)
     trace = trace_enabled()
     trace_only = trace_only_enabled()
+    dual_retrieval = dual_retrieval_enabled()
 
     if trace or trace_only:
         print_query_trace(query, query_intent)
@@ -1737,14 +1784,23 @@ def run_query(query):
         print_constraints_trace(constraints)
     db = load_vectorstore()
     docs = retrieve_documents(query, db, k=5)
+    paragraph_docs = []
+    if (trace or trace_only) and dual_retrieval:
+        if paragraph_vectorstore_exists():
+            paragraph_db = load_paragraph_vectorstore()
+            paragraph_docs = retrieve_paragraph_documents(query, paragraph_db, k=5)
+        else:
+            print_trace_line(f"paragraph_vectorstore_missing: {PARAGRAPH_VECTORSTORE_DIR}")
     context = build_context(docs, query_intent)
     prompt = clean_text(build_prompt(query_intent, query, context))
     if trace or trace_only:
         print_docs_trace(docs)
+        if dual_retrieval and paragraph_docs:
+            print_docs_trace(paragraph_docs, label="paragraph_retrieved_docs")
         print_prompt_trace(prompt)
 
     if trace_only:
-        return build_trace_only_answer(query_intent, docs, prompt)
+        return build_trace_only_answer(query_intent, docs, prompt, paragraph_docs=paragraph_docs)
 
     client = OpenAI(
         api_key=os.getenv("DEEPSEEK_API_KEY"),

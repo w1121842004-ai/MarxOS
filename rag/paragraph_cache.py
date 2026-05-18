@@ -5,6 +5,8 @@ import os
 import re
 from pathlib import Path
 
+from langchain_core.documents import Document
+
 from rag.build_vectorstore_from_cache import (
     OCR_CACHE_DIR,
     document_from_cache,
@@ -229,3 +231,29 @@ def read_paragraph_cache(path: str | Path) -> list[dict]:
             if line:
                 records.append(json.loads(line))
     return records
+
+
+def paragraph_record_to_document(record: dict) -> Document:
+    metadata = {
+        key: value
+        for key, value in dict(record).items()
+        if key != "paragraph_text" and value is not None
+    }
+    metadata["retrieval_unit"] = "paragraph"
+    metadata["page"] = record.get("citation_page_start") or record.get("pdf_page_start")
+    metadata["pdf_page"] = record.get("pdf_page_start")
+    metadata["pdf_page_end"] = record.get("pdf_page_end")
+    metadata["printed_page"] = record.get("printed_page_start")
+    metadata["printed_page_end"] = record.get("printed_page_end")
+    metadata["citation_page"] = record.get("citation_page_start")
+    metadata["citation_page_end"] = record.get("citation_page_end")
+
+    if record.get("citation_page_start") != record.get("citation_page_end"):
+        metadata["page_range"] = f"{record.get('citation_page_start')}-{record.get('citation_page_end')}"
+    elif record.get("pdf_page_start") != record.get("pdf_page_end"):
+        metadata["page_range"] = f"PDF {record.get('pdf_page_start')}-{record.get('pdf_page_end')}"
+
+    return Document(
+        page_content=record.get("paragraph_text") or "",
+        metadata=metadata,
+    )
