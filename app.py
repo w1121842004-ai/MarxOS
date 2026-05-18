@@ -7,7 +7,7 @@ import json
 import os
 import re
 import sys
-from rag.core_classics import classic_entries_for_query
+from rag.core_classics import classic_entries_for_query, load_core_classics
 from rag.exact_quote_lookup import exact_quote_lookup
 
 
@@ -1084,6 +1084,137 @@ CONCEPT_PREFERRED_PAGE_RANGES = {
 }
 
 
+CONCEPT_CANONICAL_CLASSIC_IDS = {
+    "资本": "capital_vol1",
+    "商品价值": "capital_vol1",
+    "价值": "capital_vol1",
+    "剩余价值": "capital_vol1",
+    "剩余价值率": "capital_vol1",
+    "劳动过程": "capital_vol1",
+    "价值增殖过程": "capital_vol1",
+    "商品拜物教": "capital_vol1",
+    "拜物教": "capital_vol1",
+    "阶级斗争": "communist_manifesto",
+    "国家": "origin_family_private_property_state",
+    "国家的起源": "origin_family_private_property_state",
+    "国家的产生": "origin_family_private_property_state",
+    "私有制": "origin_family_private_property_state",
+    "家庭": "origin_family_private_property_state",
+    "家庭私有制和国家的起源": "origin_family_private_property_state",
+    "异化劳动": "economic_philosophic_manuscripts_1844",
+    "外化劳动": "economic_philosophic_manuscripts_1844",
+    "费尔巴哈提纲": "theses_feuerbach",
+    "实践": "theses_feuerbach",
+    "唯物辩证法": "anti_duhring",
+    "自然辩证法": "dialectics_nature",
+}
+
+
+def core_classic_by_id(classic_id):
+    for classic in load_core_classics():
+        if classic.get("id") == classic_id:
+            return classic
+    return None
+
+
+def canonical_concept_entries(query):
+    entries = []
+    seen = set()
+
+    for term in active_concept_terms(query):
+        classic_id = CONCEPT_CANONICAL_CLASSIC_IDS.get(term)
+        classic = core_classic_by_id(classic_id) if classic_id else None
+        if not classic:
+            continue
+
+        for entry in classic.get("entries") or []:
+            key = (classic_id, entry.get("source"), entry.get("start_page"), entry.get("end_page"))
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append((term, classic, entry))
+
+    return entries
+
+
+def metadata_printed_page(metadata):
+    for key in ("printed_page", "page"):
+        page = as_int(metadata.get(key))
+        if page is not None:
+            return page
+    return None
+
+
+def concept_article_title_is_weak(query, metadata):
+    article = clean_article_title(metadata.get("section") or metadata.get("article"))
+    book = clean_text(metadata.get("book"), "")
+    article_norm = normalize_for_match(article)
+
+    if not article or is_noisy_article_title(article) or article == book:
+        return True
+
+    for term in active_concept_terms(query):
+        markers = CONCEPT_PREFERRED_MARKERS.get(term, [])
+        if any(normalize_for_match(marker) in article_norm for marker in markers):
+            return False
+
+    return True
+
+
+def canonical_concept_entry_for_metadata(query, metadata):
+    source = metadata.get("source")
+    page = metadata_printed_page(metadata)
+    if not source or page is None:
+        return None
+
+    for term, classic, entry in canonical_concept_entries(query):
+        if source != entry.get("source"):
+            continue
+        start_page = as_int(entry.get("start_page"))
+        end_page = as_int(entry.get("end_page"))
+        if start_page is not None and end_page is not None and start_page <= page <= end_page:
+            return term, classic, entry
+
+    return None
+
+
+def enrich_concept_metadata(query, docs):
+    if not active_concept_terms(query):
+        return docs
+
+    for doc in docs:
+        for key in ("article", "section"):
+            original_title = doc.metadata.get(key)
+            cleaned_title = clean_article_title(original_title)
+            if cleaned_title and original_title and cleaned_title != original_title:
+                doc.metadata.setdefault(f"raw_{key}", original_title)
+                doc.metadata[key] = cleaned_title
+
+        match = canonical_concept_entry_for_metadata(query, doc.metadata)
+        if not match:
+            continue
+
+        _term, classic, entry = match
+        title = classic.get("title")
+        if not title:
+            continue
+
+        doc.metadata.setdefault("classic_id", classic.get("id"))
+        doc.metadata.setdefault("classic_title", title)
+        doc.metadata.setdefault("classic_author", classic.get("author"))
+        doc.metadata.setdefault("classic_work_year", classic.get("work_year"))
+        doc.metadata.setdefault("classic_work_type", classic.get("work_type"))
+        doc.metadata.setdefault("entry_type", entry.get("entry_type"))
+
+        if concept_article_title_is_weak(query, doc.metadata):
+            doc.metadata.setdefault("raw_article", doc.metadata.get("article"))
+            doc.metadata.setdefault("raw_section", doc.metadata.get("section"))
+            doc.metadata["article"] = title
+            doc.metadata["section"] = title
+
+    return docs
+
+
 def metadata_citation_page(metadata):
     for key in ("printed_page", "citation_page", "page"):
         try:
@@ -1280,6 +1411,9 @@ def retrieve_documents(query, db, k=5):
         candidates = db.similarity_search(query, k=fetch_k)
 
     docs = rerank_documents(query, candidates, constraints)[:k]
+
+    if classify_query(query) == "concept_explain":
+        docs = enrich_concept_metadata(query, docs)
 
     if is_quote_lookup_query(query):
         for doc in docs:

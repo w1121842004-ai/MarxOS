@@ -263,6 +263,78 @@ class AppLocalPathTests(unittest.TestCase):
 
         self.assertEqual(docs[0].metadata.get("source"), "mea01.pdf")
 
+    def test_retrieve_documents_replaces_weak_concept_article_with_classic_title(self):
+        dirty_doc = Document(
+            page_content="\u56fd\u5bb6\u548c\u65e7\u7684\u6c0f\u65cf\u7ec4\u7ec7\u4e0d\u540c\u7684\u5730\u65b9\uff0c\u7b2c\u4e00\u70b9\u5c31\u662f\u5b83\u6309\u5730\u533a\u6765\u5212\u5206\u5b83\u7684\u56fd\u6c11\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c4\u5377",
+                "article": "*\u672a\u6765\u7684\u610f\u5927\u5229\u9769\u547d\u548c\u793e\u4f1a\u515a..............468\u2022",
+                "section": "*\u672a\u6765\u7684\u610f\u5927\u5229\u9769\u547d\u548c\u793e\u4f1a\u515a..............468\u2022",
+                "source": "mea04.pdf",
+                "page": 77,
+                "printed_page": 77,
+                "pdf_page": 89,
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [dirty_doc]
+
+        docs = app.retrieve_documents("\u56fd\u5bb6\u7684\u8d77\u6e90\u662f\u4ec0\u4e48\uff1f", FakeDb(), k=1)
+
+        self.assertEqual(docs[0].metadata.get("article"), "\u5bb6\u5ead\u3001\u79c1\u6709\u5236\u548c\u56fd\u5bb6\u7684\u8d77\u6e90")
+        self.assertEqual(docs[0].metadata.get("section"), "\u5bb6\u5ead\u3001\u79c1\u6709\u5236\u548c\u56fd\u5bb6\u7684\u8d77\u6e90")
+        self.assertEqual(docs[0].metadata.get("classic_id"), "origin_family_private_property_state")
+        self.assertEqual(docs[0].metadata.get("raw_article"), "*\u672a\u6765\u7684\u610f\u5927\u5229\u9769\u547d\u548c\u793e\u4f1a\u515a..............468\u2022")
+
+    def test_retrieve_documents_keeps_precise_concept_section_title(self):
+        precise_doc = Document(
+            page_content="\u52b3\u52a8\u8fc7\u7a0b\u662f\u5236\u9020\u4f7f\u7528\u4ef7\u503c\u7684\u6709\u76ee\u7684\u7684\u6d3b\u52a8\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c5\u5377",
+                "article": "\u7b2c\u4e94\u7ae0\u52b3\u52a8\u8fc7\u7a0b\u548c\u4ef7\u503c\u589e\u6b96\u8fc7\u7a0b",
+                "section": "\u7b2c\u4e94\u7ae0\u52b3\u52a8\u8fc7\u7a0b\u548c\u4ef7\u503c\u589e\u6b96\u8fc7\u7a0b",
+                "source": "mea05.pdf",
+                "page": 221,
+                "printed_page": 221,
+                "pdf_page": 271,
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [precise_doc]
+
+        docs = app.retrieve_documents("\u52b3\u52a8\u8fc7\u7a0b\u662f\u4ec0\u4e48\uff1f", FakeDb(), k=1)
+
+        self.assertEqual(docs[0].metadata.get("article"), "\u7b2c\u4e94\u7ae0\u52b3\u52a8\u8fc7\u7a0b\u548c\u4ef7\u503c\u589e\u6b96\u8fc7\u7a0b")
+        self.assertEqual(docs[0].metadata.get("classic_id"), "capital_vol1")
+
+    def test_retrieve_documents_cleans_concept_article_dot_leaders(self):
+        dotted_doc = Document(
+            page_content="\u5269\u4f59\u4ef7\u503c\u7387\u7531\u5269\u4f59\u4ef7\u503c\u540c\u53ef\u53d8\u8d44\u672c\u7684\u6bd4\u7387\u6765\u51b3\u5b9a\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c5\u5377",
+                "article": "2.\u4ef7\u503c\u589e\u6b96\u8fc7\u7a0b.........\u2026.......\u2026...................\u2026",
+                "section": "2.\u4ef7\u503c\u589e\u6b96\u8fc7\u7a0b.........\u2026.......\u2026...................\u2026",
+                "source": "mea05.pdf",
+                "page": 237,
+                "printed_page": 237,
+                "pdf_page": 287,
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [dotted_doc]
+
+        docs = app.retrieve_documents("\u5269\u4f59\u4ef7\u503c\u662f\u4ec0\u4e48\uff1f", FakeDb(), k=1)
+
+        self.assertEqual(docs[0].metadata.get("article"), "2.\u4ef7\u503c\u589e\u6b96\u8fc7\u7a0b")
+        self.assertEqual(docs[0].metadata.get("classic_id"), "capital_vol1")
+        self.assertIn(".........", docs[0].metadata.get("raw_article"))
+
     def test_normalize_metadata_adds_standard_fields_without_dropping_old_fields(self):
         metadata = {
             "book": "马克思恩格斯全集 第46卷A",
