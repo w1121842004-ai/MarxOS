@@ -9,8 +9,11 @@ from rag.core_classics import classic_entries_for_query, load_core_classics
 
 DEFAULT_OCR_CACHE_DIR = Path("data/ocr_cache")
 BOOK_BY_SOURCE = {
-    **{f"mea{i:02d}.pdf": f"马克思恩格斯全集补卷 第{i}卷" for i in range(1, 11)},
-    **{f"mes{i:02d}.pdf": f"马克思恩格斯专题资料 第{i}卷" for i in range(1, 5)},
+    **{f"mea{i:02d}.pdf": f"马克思恩格斯文集 第{i}卷" for i in range(1, 11)},
+    **{f"mes{i:02d}.pdf": f"马克思恩格斯选集 第{i}卷" for i in range(1, 5)},
+}
+PREFERRED_CLASSIC_IDS_BY_QUOTE = {
+    "\u5168\u4e16\u754c\u65e0\u4ea7\u8005\u8054\u5408\u8d77\u6765": {"communist_manifesto"},
 }
 
 
@@ -119,7 +122,7 @@ def metadata_from_page(page, entry, path, preferred_entries=None):
                 break
 
     metadata = {
-        "book": page.get("book_title") or BOOK_BY_SOURCE.get(source, source),
+        "book": BOOK_BY_SOURCE.get(source) or page.get("book_title") or source,
         "article": (entry or {}).get("article") or page.get("title_candidate") or (entry or {}).get("classic_title"),
         "section": (entry or {}).get("article") or page.get("title_candidate"),
         "page": pdf_page,
@@ -137,9 +140,46 @@ def metadata_from_page(page, entry, path, preferred_entries=None):
         "classic_work_year": (entry or {}).get("classic_work_year"),
         "classic_work_type": (entry or {}).get("classic_work_type"),
         "entry_type": (entry or {}).get("entry_type"),
+        "entry_priority": (entry or {}).get("priority"),
     }
 
     return metadata
+
+
+def hit_quality_rank(page, text, normalized_quote):
+    normalized_text = normalize_quote(text)
+    quote_index = normalized_text.find(normalized_quote)
+    quote_ratio = quote_index / max(len(normalized_text), 1) if quote_index >= 0 else 1
+    title_candidate = str(page.get("title_candidate") or "")
+    title_norm = normalize_quote(title_candidate)
+
+    if page.get("page_type") in {"toc", "title_page"}:
+        return 4
+
+    if len(normalized_text) <= len(normalized_quote) + 20:
+        return 4
+
+    if any(marker in title_norm for marker in ["索引", "目录", "注释"]):
+        return 3
+
+    if any(marker in title_norm for marker in ["序言", "说明", "编者"]):
+        return 2
+
+    ending_markers = [
+        normalize_quote(marker)
+        for marker in [
+            "共产党人不屑于隐瞒自己的观点和意图",
+            "无产者在这个革命中失去的只是锁链",
+            "获得的将是整个世界",
+        ]
+    ]
+    if any(marker and marker in normalized_text for marker in ending_markers):
+        return 0
+
+    if quote_ratio < 0.15:
+        return 2
+
+    return 1
 
 
 def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
@@ -148,6 +188,10 @@ def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
     preferred_classic_ids = {
         entry.get("classic_id") for entry in preferred_entries if entry.get("classic_id")
     }
+    for quote, classic_ids in PREFERRED_CLASSIC_IDS_BY_QUOTE.items():
+        if quote and (quote in normalized_quote or normalized_quote in quote):
+            preferred_classic_ids.update(classic_ids)
+
     hits = []
     seen = set()
 
@@ -172,10 +216,11 @@ def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
             continue
 
         seen.add(key)
-        priority = (entry or {}).get("priority", 99)
+        priority = (entry or {}).get("priority", metadata.get("entry_priority") or 99)
+        quality = hit_quality_rank(page, cleaned_text, normalized_quote)
         hits.append(
             (
-                priority,
+                (quality, priority),
                 Document(
                     page_content=snippet_around(cleaned_text, quote),
                     metadata=metadata,

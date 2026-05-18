@@ -62,6 +62,18 @@ def clean_text(text, fallback="未知"):
     return str(repair_mojibake(text)).strip() or fallback
 
 
+def is_unreadable_query(query):
+    query = str(query or "").strip()
+    if not query:
+        return True
+
+    question_marks = query.count("?") + query.count("\uff1f")
+    chinese_chars = sum(1 for char in query if "\u4e00" <= char <= "\u9fff")
+    ascii_letters = sum(1 for char in query if char.isascii() and char.isalpha())
+
+    return question_marks >= 4 and chinese_chars == 0 and ascii_letters == 0
+
+
 def source_stem(metadata):
     source = clean_text(metadata.get("source"), "")
     return source.lower().replace(".pdf", "")
@@ -106,6 +118,14 @@ def normalize_book_parts(metadata):
     if stem == "capital":
         return "马克思", "资本论", "第1卷", "2004年"
 
+    match_mea = re.fullmatch(r"mea(\d{2})", stem)
+    if match_mea:
+        return "", "马克思恩格斯文集", f"第{int(match_mea.group(1))}卷", "2009年"
+
+    match_mes = re.fullmatch(r"mes(\d{2})", stem)
+    if match_mes:
+        return "", "马克思恩格斯选集", f"第{int(match_mes.group(1))}卷", "出版年不详"
+
     volume = volume_from_source(stem)
     if volume:
         return "", "马克思恩格斯全集", volume, VOLUME_PUBLICATION_YEARS.get(stem, "出版年不详")
@@ -114,6 +134,10 @@ def normalize_book_parts(metadata):
     if "马克思恩格斯文集" in book:
         volume = match.group(1).replace("A", "(上)").replace("B", "(下)") if match else ""
         return "", "马克思恩格斯文集", volume, "2009年"
+
+    if "马克思恩格斯选集" in book:
+        volume = match.group(1).replace("A", "(上)").replace("B", "(下)") if match else ""
+        return "", "马克思恩格斯选集", volume, "出版年不详"
 
     if "马克思恩格斯全集" in book:
         volume = match.group(1).replace("A", "(上)").replace("B", "(下)") if match else ""
@@ -133,8 +157,14 @@ def series_from_metadata(metadata, normalized_title):
 
     if stem == "capital" or normalized_title == "资本论":
         return "资本论"
+    if stem.startswith("mea"):
+        return "马克思恩格斯文集"
+    if stem.startswith("mes"):
+        return "马克思恩格斯选集"
     if "马克思恩格斯文集" in book or normalized_title == "马克思恩格斯文集":
         return "马克思恩格斯文集"
+    if "马克思恩格斯选集" in book or normalized_title == "马克思恩格斯选集":
+        return "马克思恩格斯选集"
     if stem.startswith("me") or "马克思恩格斯全集" in book or normalized_title == "马克思恩格斯全集":
         return "马克思恩格斯全集"
 
@@ -150,9 +180,81 @@ def as_int(value):
 
 def clean_article_title(title):
     title = clean_text(title, "")
+    title = re.split(r"[.\u2026•·]{3,}", title, maxsplit=1)[0]
     title = re.sub(r"^[*•·.\s]+", "", title)
     title = re.sub(r"[.·•\]\)）\s]+$", "", title)
+    title = title.strip("“”\"'《》[]【】()（）")
     return title
+
+
+def is_noisy_article_title(title):
+    title = clean_article_title(title)
+    normalized = normalize_for_match(title)
+
+    if not normalized:
+        return True
+
+    if title.count("\u300b") > title.count("\u300a"):
+        return True
+
+    if normalized.isdigit():
+        return True
+
+    if len(normalized) <= 4 and re.fullmatch(r"[0-9A-Za-z]+", normalized):
+        return True
+
+    ascii_chars = sum(1 for char in title if char.isascii() and char.isalnum())
+    chinese_chars = sum(1 for char in title if "\u4e00" <= char <= "\u9fff")
+    if ascii_chars >= 4 and chinese_chars == 0:
+        return True
+
+    if "专题资料" in title or "全集补卷" in title:
+        return True
+
+    if re.search(r"写于[0-9０-９一二三四五六七八九十１８９年月]", title):
+        return True
+
+    if title.startswith(("几乎", "这一点", "因此，", "但是，", "可是，", "如果", "因为", "所以")):
+        return True
+
+    punctuation_count = sum(1 for char in title if char in ".。!！?？,，;；:：…·•-—_[]()（）'\"")
+    if title and punctuation_count / max(len(title), 1) > 0.25:
+        return True
+
+    title_prefixes = (
+        "《",
+        "卡·",
+        "弗·",
+        "马克思",
+        "恩格斯",
+        "第",
+        "关于",
+        "论",
+        "致",
+        "家庭",
+        "社会主义",
+        "共产党",
+        "资本论",
+        "哥达",
+        "反杜林",
+        "路易",
+        "法兰西",
+        "雇佣",
+        "工资",
+        "异化",
+        "私有",
+        "德意志",
+        "黑格尔",
+    )
+    if len(normalized) > 28 and not title.startswith(title_prefixes):
+        return True
+
+    if len(normalized) > 45 and not any(
+        marker in title for marker in ["《", "论", "批判", "宣言", "提纲", "手稿", "资本", "国家", "家庭", "劳动"]
+    ):
+        return True
+
+    return False
 
 
 def article_from_article_map(metadata):
@@ -188,11 +290,13 @@ def article_from_article_map(metadata):
 
 
 def should_fill_article_from_map(metadata):
-    article = clean_text(metadata.get("article"), "")
+    article = clean_article_title(metadata.get("article"))
     book = clean_text(metadata.get("book"), "")
-    section = clean_text(metadata.get("section"), "")
+    section = clean_article_title(metadata.get("section"))
 
     if not article:
+        return True
+    if is_noisy_article_title(article):
         return True
     if article == book:
         return True
@@ -233,6 +337,17 @@ def normalize_metadata(metadata):
         normalized["article"] = mapped_article
         if not normalized.get("section") or normalized.get("section") == normalized.get("book"):
             normalized["section"] = mapped_article
+
+    for key in ["article", "section"]:
+        if key not in normalized:
+            continue
+
+        cleaned_title = clean_article_title(normalized.get(key))
+        if is_noisy_article_title(cleaned_title):
+            normalized[f"raw_{key}"] = normalized.get(key)
+            normalized[key] = None
+        elif cleaned_title:
+            normalized[key] = cleaned_title
 
     if normalized.get("citation_page") is None:
         if normalized.get("printed_page") is not None:
@@ -802,6 +917,144 @@ def score_query_match(normalized_query, haystack):
     return 10 if normalized_query and normalized_query in haystack else 0
 
 
+CONCEPT_FOCUS_TERMS = [
+    "人的本质",
+    "异化劳动",
+    "外化劳动",
+    "剩余价值",
+    "剩余价值率",
+    "劳动过程",
+    "价值增殖过程",
+    "资本",
+    "阶级斗争",
+    "国家",
+    "国家的产生",
+    "历史唯物主义",
+    "唯物主义历史观",
+    "唯物辩证法",
+    "自然辩证法",
+    "商品拜物教",
+    "拜物教",
+    "工资",
+    "利润",
+    "私有制",
+    "家庭",
+    "家庭私有制和国家的起源",
+]
+
+CONCEPT_PREFERRED_MARKERS = {
+    "异化劳动": ["异化劳动和私有财产", "外化劳动"],
+    "外化劳动": ["异化劳动和私有财产", "外化劳动"],
+    "剩余价值": ["剩余价值率", "价值增殖过程", "资本论"],
+    "剩余价值率": ["剩余价值率", "价值增殖过程", "资本论"],
+    "劳动过程": ["劳动过程和价值增殖过程", "劳动过程"],
+    "资本": ["资本论", "资本的生产过程", "货币转化为资本"],
+    "阶级斗争": ["共产党宣言", "阶级斗争"],
+    "国家": ["家庭、私有制和国家的起源", "国家的产生", "社会主义"],
+    "国家的产生": ["家庭、私有制和国家的起源", "国家的产生"],
+    "历史唯物主义": ["唯物主义历史观", "共产党宣言", "费尔巴哈", "路德维希·费尔巴哈"],
+    "唯物主义历史观": ["唯物主义历史观", "共产党宣言", "费尔巴哈"],
+    "唯物辩证法": ["反杜林论", "自然辩证法", "路德维希·费尔巴哈"],
+    "自然辩证法": ["自然辩证法", "反杜林论"],
+    "商品拜物教": ["商品", "拜物教", "资本论"],
+    "拜物教": ["商品", "拜物教", "资本论"],
+    "工资": ["雇佣劳动与资本", "工资、价格和利润", "资本论"],
+    "利润": ["工资、价格和利润", "资本论", "三位一体的公式"],
+    "私有制": ["家庭、私有制和国家的起源", "私有财产"],
+    "家庭": ["家庭、私有制和国家的起源"],
+}
+
+
+def active_concept_terms(query):
+    normalized_query = normalize_for_match(query)
+    terms = []
+    for term in CONCEPT_FOCUS_TERMS:
+        normalized_term = normalize_for_match(term)
+        if normalized_term and normalized_term in normalized_query:
+            terms.append(term)
+
+    return terms
+
+
+def score_concept_focus(query, metadata, content):
+    terms = active_concept_terms(query)
+    if not terms:
+        return 0
+
+    article = clean_text(metadata.get("section") or metadata.get("article"), "")
+    article_norm = normalize_for_match(article)
+    content_norm = normalize_for_match(content)
+    lead_norm = normalize_for_match(content[:300])
+    score = 0
+
+    for term in terms:
+        term_norm = normalize_for_match(term)
+        if not term_norm:
+            continue
+
+        if term_norm in article_norm:
+            score += 35
+        if term_norm in lead_norm:
+            score += 30
+        elif term_norm in content_norm:
+            score += 12
+
+        direct_definition_patterns = [
+            f"什么是{term_norm}",
+            f"{term_norm}是什么",
+        ]
+        loose_definition_patterns = [
+            f"{term_norm}是",
+            f"所谓{term_norm}",
+        ]
+        if any(pattern in lead_norm for pattern in direct_definition_patterns):
+            score += 100
+        elif any(pattern in lead_norm for pattern in loose_definition_patterns):
+            score += 50
+
+        for marker in CONCEPT_PREFERRED_MARKERS.get(term, []):
+            marker_norm = normalize_for_match(marker)
+            if marker_norm and marker_norm in article_norm:
+                score += 22
+            elif marker_norm and marker_norm in lead_norm:
+                score += 14
+
+    return min(score, 180)
+
+
+def score_document_quality(metadata, content):
+    article = clean_text(metadata.get("section") or metadata.get("article"), "")
+    article_norm = normalize_for_match(article)
+    content_norm = normalize_for_match(content)
+    score = 0
+
+    if metadata.get("page_type") in {"toc", "title_page"}:
+        score -= 80
+
+    if any(marker in article_norm for marker in ["目录", "目次", "索引", "注释", "编者注"]):
+        score -= 45
+
+    if "索引" in content_norm:
+        score -= 35
+
+    if content.count("———") >= 3 or content.count("---") >= 3:
+        score -= 35
+
+    if len(content_norm) < 80:
+        score -= 30
+
+    punctuation_count = sum(1 for char in content if char in ".。!！?？,，;；:：…·•-—_[]()（）")
+    if content and punctuation_count / max(len(content), 1) > 0.35:
+        score -= 25
+
+    if article and len(normalize_for_match(article)) > 35 and not any(
+        marker in article for marker in ["《", "论", "批判", "宣言", "提纲", "手稿", "资本", "国家", "家庭", "劳动"]
+    ):
+        score -= 15
+
+    return score
+
+
 def debug_rerank_score(index, doc, score_parts):
     if os.getenv(RERANK_DEBUG_ENV) != "1":
         return
@@ -834,6 +1087,8 @@ def rerank_documents(query, docs, constraints):
             "page_range": score_page_range(metadata, constraints),
             "article_match": score_article_match(metadata, normalized_title, haystack),
             "query_match": score_query_match(normalized_query, haystack),
+            "concept_focus": score_concept_focus(query, metadata, content),
+            "document_quality": score_document_quality(metadata, content),
         }
         score = sum(score_parts.values())
         debug_rerank_score(index, doc, score_parts)
@@ -845,9 +1100,10 @@ def rerank_documents(query, docs, constraints):
 
 
 def retrieve_documents(query, db, k=5):
-    exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k)
-    if exact_docs:
-        return exact_docs
+    if is_quote_lookup_query(query):
+        exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k)
+        if exact_docs:
+            return exact_docs
 
     constraints = constraints_from_query(query)
     fetch_k = 80 if constraints else 30
@@ -874,11 +1130,22 @@ def retrieve_documents(query, db, k=5):
     return docs
 
 
+def final_answer_style_rules():
+    return (
+        "\n\u6700\u7ec8\u56de\u7b54\u98ce\u683c\uff1a\n"
+        "1. \u76f4\u63a5\u56de\u7b54\u95ee\u9898\uff0c\u4e0d\u8981\u95ee\u5019\uff0c\u4e0d\u8981\u81ea\u6211\u4ecb\u7ecd\uff0c\u4e0d\u8981\u8bf4\u201c\u4f60\u597d\u201d\u6216\u201c\u6211\u662f MarxOS\u201d\u3002\n"
+        "2. \u7ed3\u5c3e\u4e0d\u8981\u8ffd\u52a0\u201c\u5982\u679c\u9700\u8981\u201d\u201c\u6211\u53ef\u4ee5\u7ee7\u7eed\u201d\u7b49\u9080\u8bf7\u5f0f\u8bdd\u8bed\u3002\n"
+        "3. \u5f15\u7528\u539f\u8457\u65f6\uff0c\u53ea\u4f7f\u7528\u4e0b\u65b9\u63d0\u4f9b\u7684\u51fa\u5904\u683c\u5f0f\uff0c\u4e0d\u8981\u81ea\u884c\u7f16\u9020\u7bc7\u540d\u6216\u9875\u7801\u3002\n"
+        "4. \u4e0d\u8981\u8f93\u51fa\u201c\u3010\u539f\u8457\u5185\u5bb9\u3011\u201d\u201c\u3010\u68c0\u7d22\u6750\u6599\u3011\u201d\u6216\u201cCTX-1\u201d\u7b49\u5185\u90e8\u680f\u76ee\u540d\u548c\u5185\u90e8\u7f16\u53f7\u3002\n"
+    )
+
+
 def build_quote_prompt(query, context):
     return (
         f"\n\u4f60\u662f MarxOS \u7684\u51fa\u5904\u6838\u5bf9\u5668\u3002\n\n"
         f"\u4efb\u52a1\uff1a\u7528\u6237\u7ed9\u51fa\u4e00\u53e5\u6216\u4e00\u6bb5\u539f\u6587\uff0c"
         f"\u8bf7\u53ea\u6839\u636e\u3010\u68c0\u7d22\u6750\u6599\u3011\u5224\u65ad\u6700\u53ef\u80fd\u51fa\u5904\u3002\n\n"
+        f"{final_answer_style_rules()}\n"
         f"\u56de\u7b54\u8981\u6c42\uff1a\n"
         f"1. \u53ea\u8f93\u51fa\u51fa\u5904\uff0c\u4e0d\u505a\u7406\u8bba\u5206\u6790\u3002\n"
         f"2. \u4f18\u5148\u4f7f\u7528\u68c0\u7d22\u6750\u6599\u4e2d\u7684\u201c\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\u201d"
@@ -899,6 +1166,7 @@ def build_concept_prompt(query, context):
         f"\n\u4f60\u662f MarxOS\uff0c\u4e00\u4e2a\u9a6c\u514b\u601d\u4e3b\u4e49\u5b66\u672f\u52a9\u624b\u3002\n\n"
         f"\u4efb\u52a1\uff1a\u89e3\u91ca\u7528\u6237\u63d0\u51fa\u7684\u6982\u5ff5\u3002"
         f"\u4f18\u5148\u4f9d\u636e\u3010\u539f\u8457\u5185\u5bb9\u3011\uff0c\u518d\u505a\u5fc5\u8981\u7684\u7406\u8bba\u6982\u62ec\u3002\n\n"
+        f"{final_answer_style_rules()}\n"
         f"\u56de\u7b54\u8981\u6c42\uff1a\n"
         f"1. \u5148\u7ed9\u51fa\u7b80\u660e\u5b9a\u4e49\u3002\n"
         f"2. \u8bf4\u660e\u5b83\u5728\u9a6c\u514b\u601d\u4e3b\u4e49\u7406\u8bba\u4e2d\u7684\u4f4d\u7f6e\u3002\n"
@@ -916,6 +1184,7 @@ def build_analysis_prompt(query, context):
         f"\n\u4f60\u662f MarxOS\uff0c\u4e00\u4e2a\u9a6c\u514b\u601d\u4e3b\u4e49\u5b66\u672f\u667a\u80fd\u4f53\u3002\n\n"
         f"\u4efb\u52a1\uff1a\u57fa\u4e8e\u3010\u539f\u8457\u5185\u5bb9\u3011\u548c\u9a6c\u514b\u601d\u4e3b\u4e49\u7406\u8bba\uff0c"
         f"\u5bf9\u7528\u6237\u95ee\u9898\u505a\u7ed3\u6784\u6027\u5206\u6790\u3002\n\n"
+        f"{final_answer_style_rules()}\n"
         f"\u5206\u6790\u6846\u67b6\uff1a\u751f\u4ea7\u529b\u4e0e\u751f\u4ea7\u5173\u7cfb\u3001"
         f"\u7ecf\u6d4e\u57fa\u7840\u4e0e\u4e0a\u5c42\u5efa\u7b51\u3001\u9636\u7ea7\u5173\u7cfb\u3001"
         f"\u8d44\u672c\u903b\u8f91\u3001\u52b3\u52a8\u8fc7\u7a0b\u3002\n\n"
@@ -936,6 +1205,7 @@ def build_default_prompt(query, context):
         f"\u8bf7\u6839\u636e\u3010\u539f\u8457\u5185\u5bb9\u3011\u56de\u7b54\u7528\u6237\u95ee\u9898\u3002"
         f"\u95ee\u9898\u82e5\u53ea\u9700\u8981\u77ed\u7b54\uff0c\u5c31\u77ed\u7b54\uff1b"
         f"\u53ea\u6709\u9700\u8981\u5c55\u5f00\u89e3\u91ca\u65f6\u624d\u5206\u5c42\u5206\u6790\u3002\n"
+        f"{final_answer_style_rules()}\n"
         f"\u4e0d\u8981\u8f93\u51fa\u201c\u68c0\u7d22\u6765\u6e90\u201d\u7b49\u5185\u90e8\u8c03\u8bd5\u4fe1\u606f\u3002\n\n"
         f"\u7981\u6b62\u8f93\u51fa\uff1a\u4e0d\u8981\u5199\u201c\u8d44\u65991\u201d\u201c\u8d44\u65992\u201d"
         f"\u201c\u7247\u6bb51\u201d\u201c\u68c0\u7d22\u6750\u6599\u201d\u7b49\u5185\u90e8\u7f16\u53f7\uff1b"
@@ -992,8 +1262,8 @@ def build_context(docs, query_intent):
             f"{classic_meta_text}"
             f"metadata_fields: book={book}, article={article}, section={section}, page={page}, pdf_page={pdf_page}, source={source}\n"
             f"page_fields: printed_page={printed_page}, pdf_page={pdf_page}, citation_page={citation_page}, citation_page_type={citation_page_type}{page_range_text}\n"
-            f"\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\uff1a({i}){sentence_citation}\n"
-            f"\u6bb5\u843d\u5177\u4f53\u51fa\u5904\u683c\u5f0f\uff1a({i}){detailed_source}\n"
+            f"\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\uff1a{sentence_citation}\n"
+            f"\u6bb5\u843d\u5177\u4f53\u51fa\u5904\u683c\u5f0f\uff1a{detailed_source}\n"
             f"\u539f\u6587\uff1a{clean_text(doc.page_content)}"
         )
 
@@ -1132,6 +1402,14 @@ def load_vectorstore():
 
 
 def run_query(query):
+    query = clean_text(query, "")
+    if is_unreadable_query(query):
+        return (
+            "\u672a\u80fd\u8bfb\u53d6\u5230\u53ef\u7528\u7684\u4e2d\u6587\u95ee\u9898\u3002"
+            "\u5982\u679c\u662f\u5728 PowerShell \u4e2d\u901a\u8fc7\u7ba1\u9053\u6216\u91cd\u5b9a\u5411\u8f93\u5165\uff0c"
+            "\u8bf7\u5148\u8fd0\u884c `chcp 65001`\uff0c\u6216\u5728\u4ea4\u4e92\u5f0f\u63d0\u793a\u4e2d\u76f4\u63a5\u8f93\u5165\u95ee\u9898\u3002"
+        )
+
     query_intent = classify_query(query)
     trace = trace_enabled()
     trace_only = trace_only_enabled()

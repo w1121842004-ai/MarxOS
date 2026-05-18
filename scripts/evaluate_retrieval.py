@@ -37,6 +37,14 @@ class EvalQuestion:
     target_title: str | None = None
 
 
+@dataclass
+class EvalResult:
+    index: int
+    group: str
+    passed: bool
+    reason: str
+
+
 QUESTIONS = [
     EvalQuestion("core_title", "《共产党宣言》收录在哪一卷，从哪一页开始？", "共产党宣言"),
     EvalQuestion("core_title", "《共产党宣言》收录在哪里？", "共产党宣言"),
@@ -212,9 +220,77 @@ def rerank_with_core_classic(query: str, docs: list, limit: int) -> list:
     return [doc for score, doc in ranked[:limit]]
 
 
+def title_match_passed(item: EvalQuestion, matches: list[tuple[str, dict, dict]]) -> tuple[bool, str]:
+    if not matches:
+        return False, "no title matches"
+
+    expected_entries = classic_entries_for_query(item.target_title or item.question)
+    if not expected_entries:
+        return True, "title match found"
+
+    source, _payload, entry = matches[0]
+    expected = expected_entries[0]
+    expected_start = expected.get("start_page")
+    expected_end = expected.get("end_page")
+    actual_start = entry.get("start_printed_page")
+    actual_end = entry.get("end_printed_page")
+
+    if source != expected.get("source"):
+        return False, f"top source {source}, expected {expected.get('source')}"
+
+    if actual_start != expected_start or actual_end != expected_end:
+        return (
+            False,
+            f"top pages {actual_start}-{actual_end}, expected {expected_start}-{expected_end}",
+        )
+
+    return True, f"top source/page ok: {source} {actual_start}-{actual_end}"
+
+
+def quote_match_passed(docs: list) -> tuple[bool, str]:
+    if not docs:
+        return False, "no quote results"
+
+    top_metadata = docs[0].metadata
+    if top_metadata.get("match_type") != "exact_quote":
+        return False, f"top match_type {top_metadata.get('match_type')}"
+
+    if float(top_metadata.get("confidence") or 0) < 1.0:
+        return False, f"top confidence {top_metadata.get('confidence')}"
+
+    source = top_metadata.get("source")
+    page = top_metadata.get("citation_page") or top_metadata.get("page")
+    return True, f"exact quote top hit: {source} page {page}"
+
+
+def print_summary(results: list[EvalResult]) -> None:
+    passed = sum(1 for result in results if result.passed)
+    total = len(results)
+    print("\n===== SUMMARY =====")
+    print(f"Passed: {passed}/{total}")
+
+    by_group: dict[str, list[EvalResult]] = {}
+    for result in results:
+        by_group.setdefault(result.group, []).append(result)
+
+    for group, group_results in by_group.items():
+        group_passed = sum(1 for result in group_results if result.passed)
+        print(f"{group}: {group_passed}/{len(group_results)}")
+
+    failed = [result for result in results if not result.passed]
+    if not failed:
+        print("All evaluation cases passed.")
+        return
+
+    print("\nFailures:")
+    for result in failed:
+        print(f"- #{result.index} {result.group}: {result.reason}")
+
+
 def evaluate(k: int = 3) -> None:
     article_map = load_article_map()
     db = None
+    results: list[EvalResult] = []
 
     for index, item in enumerate(QUESTIONS, start=1):
         print(f"\n===== {index}. {item.group} =====")
@@ -224,6 +300,7 @@ def evaluate(k: int = 3) -> None:
             matches = find_title_matches(article_map, item.target_title or item.question, limit=k)
             if not matches:
                 print("No article-map matches.")
+                results.append(EvalResult(index, item.group, False, "no article-map matches"))
                 continue
 
             for rank, (source, payload, entry) in enumerate(matches, start=1):
@@ -232,6 +309,9 @@ def evaluate(k: int = 3) -> None:
                     f"title={entry.get('title')}, pages={entry.get('start_printed_page')}-{entry.get('end_printed_page')}, "
                     f"level={entry.get('level')}, parent={entry.get('parent')}"
                 )
+
+            passed, reason = title_match_passed(item, matches)
+            results.append(EvalResult(index, item.group, passed, reason))
             continue
 
         if item.group == "negative":
@@ -242,8 +322,10 @@ def evaluate(k: int = 3) -> None:
                 for rank, doc in enumerate(docs, start=1):
                     print(f"\n[{rank}] {format_metadata(doc.metadata)}")
                     print(clean_preview(doc.page_content))
+                results.append(EvalResult(index, item.group, False, "unexpected exact quote match"))
             else:
                 print("No trusted answer; vector candidates suppressed.")
+                results.append(EvalResult(index, item.group, True, "suppressed"))
             continue
 
         if db is None:
@@ -264,11 +346,18 @@ def evaluate(k: int = 3) -> None:
                     doc.metadata["confidence"] = 0.0
         if not docs:
             print("No retrieval results.")
+            results.append(EvalResult(index, item.group, False, "no retrieval results"))
             continue
 
         for rank, doc in enumerate(docs, start=1):
             print(f"\n[{rank}] {format_metadata(doc.metadata)}")
             print(clean_preview(doc.page_content))
+
+        if item.group == "core_quote":
+            passed, reason = quote_match_passed(docs)
+            results.append(EvalResult(index, item.group, passed, reason))
+
+    print_summary(results)
 
 
 if __name__ == "__main__":

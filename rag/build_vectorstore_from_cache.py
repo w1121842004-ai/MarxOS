@@ -118,23 +118,23 @@ BOOK_MAPPING = {
     "me50.pdf": "马克思恩格斯全集 第50卷",
     "me1-39-index.pdf": "马克思恩格斯全集 第1-39卷索引",
     "me40-50-index.pdf": "马克思恩格斯全集 第40-50卷索引",
-    "mea01.pdf": "马克思恩格斯全集补卷 第1卷",
-    "mea02.pdf": "马克思恩格斯全集补卷 第2卷",
-    "mea03.pdf": "马克思恩格斯全集补卷 第3卷",
-    "mea04.pdf": "马克思恩格斯全集补卷 第4卷",
-    "mea05.pdf": "马克思恩格斯全集补卷 第5卷",
-    "mea06.pdf": "马克思恩格斯全集补卷 第6卷",
-    "mea07.pdf": "马克思恩格斯全集补卷 第7卷",
-    "mea08.pdf": "马克思恩格斯全集补卷 第8卷",
-    "mea09.pdf": "马克思恩格斯全集补卷 第9卷",
-    "mea10.pdf": "马克思恩格斯全集补卷 第10卷",
+    "mea01.pdf": "马克思恩格斯文集 第1卷",
+    "mea02.pdf": "马克思恩格斯文集 第2卷",
+    "mea03.pdf": "马克思恩格斯文集 第3卷",
+    "mea04.pdf": "马克思恩格斯文集 第4卷",
+    "mea05.pdf": "马克思恩格斯文集 第5卷",
+    "mea06.pdf": "马克思恩格斯文集 第6卷",
+    "mea07.pdf": "马克思恩格斯文集 第7卷",
+    "mea08.pdf": "马克思恩格斯文集 第8卷",
+    "mea09.pdf": "马克思恩格斯文集 第9卷",
+    "mea10.pdf": "马克思恩格斯文集 第10卷",
     "mega1-mega2.pdf": "马克思恩格斯全集 MEGA1-MEGA2 对照资料",
     "meid.pdf": "马克思恩格斯全集人名索引",
     "men1-39-index.pdf": "马克思恩格斯全集 第1-39卷名目索引",
-    "mes01.pdf": "马克思恩格斯专题资料 第1卷",
-    "mes02.pdf": "马克思恩格斯专题资料 第2卷",
-    "mes03.pdf": "马克思恩格斯专题资料 第3卷",
-    "mes04.pdf": "马克思恩格斯专题资料 第4卷",
+    "mes01.pdf": "马克思恩格斯选集 第1卷",
+    "mes02.pdf": "马克思恩格斯选集 第2卷",
+    "mes03.pdf": "马克思恩格斯选集 第3卷",
+    "mes04.pdf": "马克思恩格斯选集 第4卷",
 }
 
 ARTICLE_MAPPING = {
@@ -343,6 +343,59 @@ def printed_page_source_is_untrusted(source):
     return stem.startswith(("mea", "mes"))
 
 
+def infer_page_from_sequence(
+    source,
+    pdf_page,
+    printed_page,
+    page_source,
+    page_sequence_context,
+    max_gap=3,
+    min_run_for_correction=3,
+):
+    """Fill short page-number gaps from the previous trusted page in the same source."""
+    previous = page_sequence_context.get(source)
+
+    if previous:
+        previous_pdf_page = previous.get("pdf_page")
+        previous_printed_page = previous.get("printed_page")
+        previous_run_length = previous.get("run_length", 1)
+
+        if previous_pdf_page is not None and previous_printed_page is not None:
+            gap = pdf_page - previous_pdf_page
+            expected_page = previous_printed_page + gap
+
+            if 0 < gap <= max_gap and is_valid_printed_page(expected_page):
+                if printed_page is None and is_plausible_for_pdf_page(expected_page, pdf_page):
+                    printed_page = expected_page
+                    page_source = "page_sequence"
+                elif (
+                    printed_page != expected_page
+                    and previous_run_length >= min_run_for_correction
+                    and is_plausible_for_pdf_page(expected_page, pdf_page)
+                ):
+                    printed_page = expected_page
+                    page_source = "page_sequence_corrected"
+
+    if printed_page is not None:
+        run_length = 1
+        if previous:
+            previous_pdf_page = previous.get("pdf_page")
+            previous_printed_page = previous.get("printed_page")
+            previous_run_length = previous.get("run_length", 1)
+            if previous_pdf_page is not None and previous_printed_page is not None:
+                if pdf_page - previous_pdf_page == printed_page - previous_printed_page:
+                    run_length = previous_run_length + 1
+
+        page_sequence_context[source] = {
+            "pdf_page": pdf_page,
+            "printed_page": printed_page,
+            "page_source": page_source,
+            "run_length": run_length,
+        }
+
+    return printed_page, page_source
+
+
 def is_me_volume(filename):
     stem = filename.lower().replace(".pdf", "")
 
@@ -405,7 +458,10 @@ def iter_cache_files():
     )
 
 
-def document_from_cache(cache_path, title_context):
+def document_from_cache(cache_path, title_context, page_sequence_context=None):
+    if page_sequence_context is None:
+        page_sequence_context = {}
+
     page_num = page_num_from_cache_file(cache_path)
 
     if page_num is None:
@@ -431,6 +487,7 @@ def document_from_cache(cache_path, title_context):
     author_candidate = cleaned_page.get("author_candidate")
 
     if page_type == "title_page":
+        page_sequence_context.pop(source, None)
         if title_candidate:
             title_context[source] = {
                 "title": title_candidate,
@@ -449,6 +506,13 @@ def document_from_cache(cache_path, title_context):
     printed_page, chapter, page_source = infer_page_metadata_from_layout(cleaned_page, fallback_article, page_num)
     if not is_plausible_for_pdf_page(printed_page, page_num):
         printed_page = None
+    printed_page, page_source = infer_page_from_sequence(
+        source,
+        page_num,
+        printed_page,
+        page_source,
+        page_sequence_context,
+    )
     page = printed_page if printed_page is not None else page_num
     citation_page = printed_page if printed_page is not None else page_num
     citation_page_type = "printed_page" if printed_page is not None else "pdf_page"
@@ -487,13 +551,14 @@ def document_from_cache(cache_path, title_context):
 def main():
     all_docs = []
     title_context = {}
+    page_sequence_context = {}
     cache_files = iter_cache_files()
     total_cache_files = len(cache_files)
 
     print(f"扫描到缓存文件：{total_cache_files}", flush=True)
 
     for index, cache_path in enumerate(cache_files, start=1):
-        doc = document_from_cache(cache_path, title_context)
+        doc = document_from_cache(cache_path, title_context, page_sequence_context)
 
         if doc is not None:
             all_docs.append(doc)

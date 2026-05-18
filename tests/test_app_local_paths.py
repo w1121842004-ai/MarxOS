@@ -30,6 +30,14 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertIn("\u5171\u4ea7\u515a\u5ba3\u8a00", answer)
         self.assertIn("376-435", answer)
 
+    def test_unreadable_cli_query_does_not_call_vectorstore_or_api(self):
+        with patch("app.load_vectorstore") as load_vectorstore, patch("app.OpenAI") as openai:
+            answer = app.run_query("?????????????")
+
+        load_vectorstore.assert_not_called()
+        openai.assert_not_called()
+        self.assertIn("\u672a\u80fd\u8bfb\u53d6\u5230\u53ef\u7528\u7684\u4e2d\u6587\u95ee\u9898", answer)
+
     def test_unknown_bibliographic_title_returns_no_trusted_answer_locally(self):
         query = "\u300a\u4e00\u4e2a\u4e0d\u5b58\u5728\u7684\u9a6c\u514b\u601d\u8457\u4f5c\u6807\u9898\u300b\u6536\u5f55\u5728\u54ea\u91cc\uff1f"
 
@@ -83,6 +91,16 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertTrue(docs)
         self.assertTrue(all(doc.metadata.get("classic_id") == "critique_gotha_programme" for doc in docs))
 
+    def test_exact_quote_prefers_manifesto_for_workers_of_world_slogan(self):
+        query = "\u201c\u5168\u4e16\u754c\u65e0\u4ea7\u8005\uff0c\u8054\u5408\u8d77\u6765\uff01\u201d\u51fa\u81ea\u54ea\u91cc\uff1f"
+
+        docs = exact_quote_lookup(query, limit=5)
+
+        self.assertTrue(docs)
+        self.assertTrue(all(doc.metadata.get("classic_id") == "communist_manifesto" for doc in docs))
+        self.assertEqual(docs[0].metadata.get("source"), "mes01.pdf")
+        self.assertEqual(docs[0].metadata.get("pdf_page"), 451)
+
     def test_unconfirmed_quote_query_returns_no_trusted_answer_without_vectorstore_or_api(self):
         query = "\u8bf7\u7ed9\u51fa\u201c\u8fd9\u662f\u4e00\u53e5\u968f\u4fbf\u7f16\u9020\u7684\u5f15\u6587\u201d\u7684\u51c6\u786e\u9875\u7801\u3002"
 
@@ -121,6 +139,120 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertIn("CTX-1", context)
         self.assertNotIn("\u3010\u8d44\u6599", context)
 
+    def test_retrieve_documents_demotes_index_like_chunks(self):
+        noisy_index_doc = Document(
+            page_content="\u5386\u53f2\u552f\u7269\u4e3b\u4e49\u8fd9\u4e00\u672f\u8bed---509\u3001609\u3001637\u3001641\u3002---\u6069\u683c\u65af\u5173\u4e8e\u5386\u53f2\u552f\u7269\u4e3b\u4e49\u7684\u4e66\u4fe1---592-595\u3001612-614\u3002\u7d22\u5f15\u6761\u76ee\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u4e13\u9898\u8d44\u6599 \u7b2c4\u5377",
+                "article": "\u540d\u76ee\u7d22\u5f15",
+                "source": "mes04.pdf",
+                "page": 953,
+                "pdf_page": 953,
+                "page_type": "body",
+            },
+        )
+        body_doc = Document(
+            page_content="\u5386\u53f2\u552f\u7269\u4e3b\u4e49\u8981\u4ece\u793e\u4f1a\u7269\u8d28\u751f\u4ea7\u51fa\u53d1\u8bf4\u660e\u5386\u53f2\u53d1\u5c55\uff0c\u628a\u751f\u4ea7\u65b9\u5f0f\u548c\u793e\u4f1a\u7ed3\u6784\u770b\u4f5c\u653f\u6cbb\u548c\u7cbe\u795e\u5386\u53f2\u7684\u57fa\u7840\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u4e13\u9898\u8d44\u6599 \u7b2c1\u5377",
+                "article": "\u5171\u4ea7\u515a\u5ba3\u8a00",
+                "source": "mes01.pdf",
+                "page": 401,
+                "pdf_page": 401,
+                "page_type": "body",
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [noisy_index_doc, body_doc]
+
+        docs = app.retrieve_documents("\u4ec0\u4e48\u662f\u5386\u53f2\u552f\u7269\u4e3b\u4e49\uff1f", FakeDb(), k=2)
+
+        self.assertEqual(docs[0].metadata.get("source"), "mes01.pdf")
+
+    def test_retrieve_documents_boosts_concept_focus_terms(self):
+        loose_doc = Document(
+            page_content="\u8fd9\u91cc\u8ba8\u8bba\u8d44\u672c\u5468\u8f6c\u548c\u4f01\u4e1a\u4e3b\u6536\u5165\uff0c\u5076\u7136\u63d0\u5230\u52b3\u52a8\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c7\u5377",
+                "article": "\u8d44\u672c\u5468\u8f6c",
+                "source": "mea07.pdf",
+                "page": 1,
+                "pdf_page": 1,
+            },
+        )
+        focused_doc = Document(
+            page_content="\u52b3\u52a8\u8fc7\u7a0b\u9996\u5148\u8981\u64c5\u5f00\u6bcf\u4e00\u79cd\u7279\u5b9a\u7684\u793e\u4f1a\u7684\u5f62\u5f0f\u6765\u52a0\u4ee5\u8003\u5bdf\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c5\u5377",
+                "article": "\u7b2c\u4e94\u7ae0\u52b3\u52a8\u8fc7\u7a0b\u548c\u4ef7\u503c\u589e\u6b96\u8fc7\u7a0b",
+                "source": "mea05.pdf",
+                "page": 221,
+                "pdf_page": 271,
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [loose_doc, focused_doc]
+
+        docs = app.retrieve_documents("\u52b3\u52a8\u8fc7\u7a0b\u662f\u4ec0\u4e48\uff1f", FakeDb(), k=2)
+
+        self.assertEqual(docs[0].metadata.get("source"), "mea05.pdf")
+
+    def test_retrieve_documents_does_not_exact_quote_match_plain_concept_query(self):
+        vector_doc = Document(
+            page_content="\u8d44\u672c\u4e0d\u662f\u7269\uff0c\u800c\u662f\u4e00\u5b9a\u7684\u793e\u4f1a\u751f\u4ea7\u5173\u7cfb\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c7\u5377",
+                "article": "\u7b2c\u56db\u5341\u516b\u7ae0\u4e09\u4f4d\u4e00\u4f53\u7684\u516c\u5f0f",
+                "source": "mea07.pdf",
+                "page": 940,
+                "pdf_page": 940,
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [vector_doc]
+
+        with patch("app.exact_quote_lookup") as exact_quote:
+            docs = app.retrieve_documents("\u8d44\u672c\u662f\u4ec0\u4e48\uff1f", FakeDb(), k=1)
+
+        exact_quote.assert_not_called()
+        self.assertEqual(docs[0].metadata.get("source"), "mea07.pdf")
+
+    def test_retrieve_documents_boosts_definition_style_concept_passage(self):
+        broad_doc = Document(
+            page_content="\u8d44\u672c\u5728\u4e0d\u540c\u751f\u4ea7\u9886\u57df\u4e4b\u95f4\u8f6c\u79fb\uff0c\u8ffd\u9010\u66f4\u9ad8\u7684\u5229\u6da6\u7387\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c8\u5377",
+                "article": "\u8d44\u672c\u8bba\u624b\u7a3f\u6458\u9009",
+                "source": "mea08.pdf",
+                "page": 590,
+                "pdf_page": 590,
+            },
+        )
+        definition_doc = Document(
+            page_content="\u4ec0\u4e48\u662f\u8d44\u672c\uff1f\u8d44\u672c\u662f\u79ef\u84c4\u7684\u52b3\u52a8\uff0c\u53ea\u6709\u5f53\u5b83\u7ed9\u6240\u6709\u8005\u5e26\u6765\u6536\u5165\u6216\u5229\u6da6\u7684\u65f6\u5019\u624d\u53eb\u505a\u8d44\u672c\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c1\u5377",
+                "article": "\u8d44\u672c\u7684\u5229\u6da6",
+                "source": "mea01.pdf",
+                "page": 130,
+                "pdf_page": 151,
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [broad_doc, definition_doc]
+
+        docs = app.retrieve_documents("\u8d44\u672c\u662f\u4ec0\u4e48\uff1f", FakeDb(), k=2)
+
+        self.assertEqual(docs[0].metadata.get("source"), "mea01.pdf")
+
     def test_normalize_metadata_adds_standard_fields_without_dropping_old_fields(self):
         metadata = {
             "book": "马克思恩格斯全集 第46卷A",
@@ -139,8 +271,8 @@ class AppLocalPathTests(unittest.TestCase):
 
     def test_normalize_metadata_does_not_fill_article_map_from_pdf_page_only(self):
         metadata = {
-            "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u5168\u96c6\u8865\u5377 \u7b2c1\u5377",
-            "article": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u5168\u96c6\u8865\u5377 \u7b2c1\u5377",
+            "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c1\u5377",
+            "article": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c1\u5377",
             "source": "mea01.pdf",
             "page": 210,
             "pdf_page": 210,
@@ -152,8 +284,8 @@ class AppLocalPathTests(unittest.TestCase):
 
     def test_normalize_metadata_marks_mea_printed_page_low_trust(self):
         metadata = {
-            "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u5168\u96c6\u8865\u5377 \u7b2c1\u5377",
-            "article": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u5168\u96c6\u8865\u5377 \u7b2c1\u5377",
+            "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c1\u5377",
+            "article": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c1\u5377",
             "source": "mea01.pdf",
             "page": 210,
             "printed_page": 210,
@@ -166,6 +298,67 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertEqual(normalized.get("printed_page_trust"), "low")
         self.assertEqual(normalized.get("citation_page"), 240)
         self.assertEqual(normalized.get("citation_page_type"), "pdf_page")
+
+    def test_normalize_metadata_corrects_mea_mes_collection_names_from_source(self):
+        mea = app.normalize_metadata(
+            {
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u5168\u96c6\u8865\u5377 \u7b2c2\u5377",
+                "source": "mea02.pdf",
+                "pdf_page": 86,
+            }
+        )
+        mes = app.normalize_metadata(
+            {
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u4e13\u9898\u8d44\u6599 \u7b2c1\u5377",
+                "source": "mes01.pdf",
+                "pdf_page": 451,
+            }
+        )
+
+        self.assertEqual(mea.get("series"), "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6")
+        self.assertEqual(mea.get("volume"), "\u7b2c2\u5377")
+        self.assertEqual(mes.get("series"), "\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6")
+        self.assertEqual(mes.get("volume"), "\u7b2c1\u5377")
+
+    def test_normalize_metadata_cleans_or_suppresses_noisy_article_titles(self):
+        cleaned = app.normalize_metadata(
+            {
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c1\u5377",
+                "article": "\u79c1\u6709\u8d22\u4ea7\u548c\u5171\u4ea7\u4e3b\u4e49].........................",
+                "source": "mea01.pdf",
+                "pdf_page": 210,
+            }
+        )
+        suppressed = app.normalize_metadata(
+            {
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c6\u5377",
+                "article": "Yy 3uc",
+                "source": "mea06.pdf",
+                "pdf_page": 348,
+            }
+        )
+        fragment = app.normalize_metadata(
+            {
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6 \u7b2c3\u5377",
+                "article": "\u51e0\u4e4e\u53c8\u88ab\u300a\u6279\u5224\u53f2\u300b\u4e2d\u4ee5\u201c\u5386\u53f2\u773c\u5149\u7684\u5e7f\u535a\u8fdc\u5927\u201d\u81ea\u8be9\u7684\u65e0\u77e5\u6240\u8d85",
+                "source": "mes03.pdf",
+                "pdf_page": 684,
+            }
+        )
+        unmatched_bracket = app.normalize_metadata(
+            {
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c7\u5377",
+                "article": "\u8d44\u672c\u8bba\u300b\u7b2c\u4e09\u518c\u589e\u8865",
+                "source": "mea07.pdf",
+                "pdf_page": 933,
+            }
+        )
+
+        self.assertEqual(cleaned.get("article"), "\u79c1\u6709\u8d22\u4ea7\u548c\u5171\u4ea7\u4e3b\u4e49")
+        self.assertIsNone(suppressed.get("article"))
+        self.assertEqual(suppressed.get("raw_article"), "Yy 3uc")
+        self.assertIsNone(fragment.get("article"))
+        self.assertIsNone(unmatched_bracket.get("article"))
 
     def test_format_citation_uses_pdf_label_when_only_pdf_page_exists(self):
         citation = app.format_citation(
@@ -198,6 +391,26 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertIn("\u4e0d\u8981\u5199", analysis_prompt)
         self.assertIn("\u8d44\u65991", analysis_prompt)
         self.assertIn("\u7247\u6bb51", analysis_prompt)
+        self.assertIn("\u3010\u539f\u8457\u5185\u5bb9\u3011", analysis_prompt)
+        self.assertIn("CTX-1", analysis_prompt)
+
+    def test_build_context_citation_formats_are_not_numbered(self):
+        doc = Document(
+            page_content="\u8d44\u672c\u662f\u79ef\u84c4\u7684\u52b3\u52a8\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c1\u5377",
+                "article": "\u8d44\u672c\u7684\u5229\u6da6",
+                "source": "mea01.pdf",
+                "pdf_page": 151,
+            },
+        )
+
+        context = app.build_context([doc], "concept_explain")
+
+        self.assertIn("\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\uff1a\u300a", context)
+        self.assertIn("\u6bb5\u843d\u5177\u4f53\u51fa\u5904\u683c\u5f0f\uff1a\u300a", context)
+        self.assertNotIn("\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\uff1a(1)", context)
+        self.assertNotIn("\u6bb5\u843d\u5177\u4f53\u51fa\u5904\u683c\u5f0f\uff1a(1)", context)
 
     def test_trace_mode_prints_internal_quote_lookup_details(self):
         query = "\u4e00\u4e2a\u5e7d\u7075\uff0c\u5171\u4ea7\u4e3b\u4e49\u7684\u5e7d\u7075\uff0c\u5728\u6b27\u6d32\u6e38\u8361\u3002\u51fa\u81ea\u54ea\u91cc\uff1f"

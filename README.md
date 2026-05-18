@@ -79,10 +79,19 @@ DEEPSEEK_API_KEY=your_deepseek_api_key_here
 venv\Scripts\python.exe app.py
 ```
 
-如需查看内部检索来源：
+如需查看内部检索、引用和 prompt 调试信息：
 
 ```powershell
-$env:MARXOS_DEBUG_SOURCES="1"
+$env:MARXOS_DEV_MODE="1"
+$env:MARXOS_TRACE="1"
+venv\Scripts\python.exe app.py
+```
+
+如需只检查检索链路、不调用 DeepSeek：
+
+```powershell
+$env:MARXOS_DEV_MODE="1"
+$env:MARXOS_TRACE_ONLY="1"
 venv\Scripts\python.exe app.py
 ```
 

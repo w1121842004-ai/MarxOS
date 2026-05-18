@@ -30,6 +30,7 @@ if POPPLER_PATH and not os.path.exists(POPPLER_PATH):
 # TARGET_PDFS=mea01.pdf,mes01.pdf limits the run to selected PDFs.
 # SKIP_PDFS=capital.pdf,foo.pdf skips selected PDFs.
 # OVERWRITE_OCR=1 rebuilds existing cached txt files.
+# FORCE_OCR=1 ignores usable PDF text layers and always runs PaddleOCR.
 # TEXT_LAYER_MIN_LENGTH=80 controls when extracted PDF text is considered usable.
 # USE_GPU=1 enables PaddleOCR GPU mode.
 # ME_VOLUMES_ONLY=1 only processes me01-me50 style PDFs.
@@ -51,6 +52,7 @@ SKIP_PDFS = {
     if name.strip()
 }
 OVERWRITE_OCR = os.getenv("OVERWRITE_OCR") == "1"
+FORCE_OCR = os.getenv("FORCE_OCR") == "1"
 TEXT_LAYER_MIN_LENGTH = int(os.getenv("TEXT_LAYER_MIN_LENGTH", "80"))
 USE_GPU = os.getenv("USE_GPU") == "1"
 ME_VOLUMES_ONLY = os.getenv("ME_VOLUMES_ONLY") == "1"
@@ -242,6 +244,10 @@ def cache_pdf_page(ocr, pdf_path, filename, page_num):
         if should_log_page(page_num):
             print(f"缓存已存在，跳过：{filename} 第{page_num}页")
         return ocr
+
+    if FORCE_OCR:
+        print(f"FORCE_OCR: {filename} page {page_num}")
+        return ocr_pdf_page(ocr, pdf_path, filename, page_num)
 
     extracted_text = extract_text_layer(pdf_path, page_num)
     extracted_cleaned_text = clean_text(extracted_text)

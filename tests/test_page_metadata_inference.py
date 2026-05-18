@@ -2,6 +2,7 @@ import unittest
 
 from rag.build_vectorstore_from_cache import infer_page_metadata
 from rag.build_vectorstore_from_cache import infer_page_metadata_from_layout
+from rag.build_vectorstore_from_cache import infer_page_from_sequence
 
 
 class PageMetadataInferenceTests(unittest.TestCase):
@@ -65,6 +66,75 @@ class PageMetadataInferenceTests(unittest.TestCase):
         self.assertIsNone(printed_page)
         self.assertEqual(article, "fallback")
         self.assertEqual(source, "text_margin")
+
+    def test_sequence_fills_short_gap_after_trusted_page(self):
+        context = {"mea01.pdf": {"pdf_page": 203, "printed_page": 182}}
+
+        printed_page, source = infer_page_from_sequence(
+            "mea01.pdf",
+            204,
+            None,
+            "text_margin",
+            context,
+        )
+
+        self.assertEqual(printed_page, 183)
+        self.assertEqual(source, "page_sequence")
+        self.assertEqual(context["mea01.pdf"]["printed_page"], 183)
+
+    def test_sequence_does_not_fill_large_gap(self):
+        context = {"mea01.pdf": {"pdf_page": 203, "printed_page": 182}}
+
+        printed_page, source = infer_page_from_sequence(
+            "mea01.pdf",
+            210,
+            None,
+            "text_margin",
+            context,
+        )
+
+        self.assertIsNone(printed_page)
+        self.assertEqual(source, "text_margin")
+
+    def test_sequence_corrects_outlier_after_stable_run(self):
+        context = {
+            "mea01.pdf": {
+                "pdf_page": 58,
+                "printed_page": 37,
+                "run_length": 8,
+            }
+        }
+
+        printed_page, source = infer_page_from_sequence(
+            "mea01.pdf",
+            59,
+            8,
+            "ocr_layout",
+            context,
+        )
+
+        self.assertEqual(printed_page, 38)
+        self.assertEqual(source, "page_sequence_corrected")
+
+    def test_sequence_keeps_outlier_before_stable_run(self):
+        context = {
+            "mea01.pdf": {
+                "pdf_page": 20,
+                "printed_page": 5,
+                "run_length": 1,
+            }
+        }
+
+        printed_page, source = infer_page_from_sequence(
+            "mea01.pdf",
+            23,
+            3,
+            "ocr_layout",
+            context,
+        )
+
+        self.assertEqual(printed_page, 3)
+        self.assertEqual(source, "ocr_layout")
 
 
 if __name__ == "__main__":
