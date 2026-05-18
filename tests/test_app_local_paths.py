@@ -383,6 +383,52 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertIn("PDF第9页", citation)
         self.assertNotIn("，第9页", citation)
 
+    def test_citation_page_label_uses_trusted_printed_page(self):
+        metadata = {
+            "book": "测试书",
+            "article": "测试篇",
+            "printed_page": 123,
+            "pdf_page": 456,
+            "source": "test.pdf",
+        }
+
+        self.assertIn("第123页", app.format_citation(metadata))
+        self.assertEqual(app.source_page_label(metadata), "第123页（PDF第456页）")
+
+    def test_citation_page_label_uses_pdf_for_low_trust_printed_page(self):
+        metadata = {
+            "book": "马克思恩格斯文集 第1卷",
+            "article": "马克思恩格斯文集 第1卷",
+            "source": "mea01.pdf",
+            "page": 210,
+            "printed_page": 210,
+            "pdf_page": 240,
+        }
+
+        citation = app.format_citation(metadata)
+
+        self.assertIn("PDF第240页", citation)
+        self.assertNotIn("第210页", citation)
+        self.assertEqual(app.source_page_label(metadata), "PDF第240页（印刷页210低信任）")
+
+    def test_build_context_uses_normalized_citation_page_label(self):
+        doc = Document(
+            page_content="测试段落",
+            metadata={
+                "book": "马克思恩格斯文集 第1卷",
+                "article": "马克思恩格斯文集 第1卷",
+                "source": "mea01.pdf",
+                "page": 210,
+                "printed_page": 210,
+                "pdf_page": 240,
+            },
+        )
+
+        context = app.build_context([doc], "rag_answer")
+
+        self.assertIn("来源：《马克思恩格斯文集 第1卷》马克思恩格斯文集 第1卷，PDF第240页（印刷页210低信任）", context)
+        self.assertNotIn("来源：《马克思恩格斯文集 第1卷》马克思恩格斯文集 第1卷，第210页（PDF第240页）", context)
+
     def test_query_routing_enhanced_concept_and_analysis_patterns(self):
         self.assertEqual(app.classify_query("\u4eba\u7684\u672c\u8d28\u662f\u4ec0\u4e48\uff1f"), "concept_explain")
         self.assertEqual(app.classify_query("如何理解剩余价值这个概念？"), "concept_explain")

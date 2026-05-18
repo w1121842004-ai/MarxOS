@@ -360,22 +360,47 @@ def normalize_metadata(metadata):
     return normalized
 
 
+def citation_page_label(metadata):
+    metadata = normalize_metadata(metadata)
+    citation_page = metadata.get("citation_page")
+    citation_page_type = metadata.get("citation_page_type")
+    printed_page = metadata.get("printed_page")
+    pdf_page = metadata.get("pdf_page")
+
+    if citation_page_type == "printed_page" and citation_page is not None:
+        return f"第{clean_text(citation_page)}页"
+    if citation_page_type == "pdf_page" and citation_page is not None:
+        return f"PDF第{clean_text(citation_page)}页"
+    if printed_page is not None:
+        return f"第{clean_text(printed_page)}页"
+    if pdf_page is not None:
+        return f"PDF第{clean_text(pdf_page)}页"
+    return "未知页码"
+
+
+def source_page_label(metadata):
+    metadata = normalize_metadata(metadata)
+    citation_label = citation_page_label(metadata)
+    printed_page = metadata.get("printed_page")
+    pdf_page = metadata.get("pdf_page")
+    citation_page_type = metadata.get("citation_page_type")
+
+    if citation_page_type == "printed_page" and pdf_page is not None:
+        return f"{citation_label}（PDF第{clean_text(pdf_page)}页）"
+    if citation_page_type == "pdf_page" and printed_page is not None:
+        return f"{citation_label}（印刷页{clean_text(printed_page)}低信任）"
+    return citation_label
+
+
 def format_citation(metadata, include_article=False):
     metadata = normalize_metadata(metadata)
     author, title, volume, year = normalize_book_parts(metadata)
     article = clean_text(metadata.get("section") or metadata.get("article"), "")
-    printed_page = metadata.get("printed_page")
-    citation_page = metadata.get("citation_page")
-    citation_page_type = metadata.get("citation_page_type")
-    page = citation_page if citation_page is not None else (printed_page if printed_page is not None else metadata.get("pdf_page"))
-    page = clean_text(page, "未知页码")
-    pdf_page = clean_text(metadata.get("pdf_page"), page)
-
     author_text = f"{author}：" if author else ""
     volume_text = volume if volume else ""
     article_text = f"，{article}" if include_article and article else ""
     year_text = f"，{year}" if year else ""
-    page_text = f"\u7b2c{page}\u9875" if citation_page_type == "printed_page" or (citation_page_type is None and printed_page is not None) else f"PDF\u7b2c{pdf_page}\u9875"
+    page_text = citation_page_label(metadata)
 
     return f"{author_text}《{title}》{volume_text}{article_text}，北京：人民出版社{year_text}，{page_text}。"
 
@@ -1388,10 +1413,11 @@ def build_context(docs, query_intent):
         section_text = f"\uff0c{section}" if section and section != article else ""
         sentence_citation = format_citation(metadata, include_article=False)
         detailed_source = format_citation(metadata, include_article=True)
+        source_page = source_page_label(metadata)
 
         context_parts.append(
             f"CTX-{i}\n"
-            f"\u6765\u6e90\uff1a\u300a{book}\u300b{article}{section_text}\uff0c\u7b2c{page}\u9875\uff08PDF\u7b2c{pdf_page}\u9875\uff09\uff0csource={source}\n"
+            f"\u6765\u6e90\uff1a\u300a{book}\u300b{article}{section_text}\uff0c{source_page}\uff0csource={source}\n"
             f"{confidence_text}\n"
             f"{classic_meta_text}"
             f"metadata_fields: book={book}, article={article}, section={section}, page={page}, pdf_page={pdf_page}, source={source}\n"
