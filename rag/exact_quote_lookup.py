@@ -165,6 +165,22 @@ def hit_quality_rank(page, text, normalized_quote):
     if any(marker in title_norm for marker in ["序言", "说明", "编者"]):
         return 2
 
+    annotation_markers = [
+        normalize_quote(marker)
+        for marker in [
+            "重要著作",
+            "基本理论的重要著作",
+            "本文节选自",
+            "选编说明",
+            "编者注",
+        ]
+    ]
+    if any(marker and marker in normalized_text[:250] for marker in annotation_markers):
+        return 3
+
+    if re.match(r"^\d+", title_norm) and "是恩格斯" in title_norm:
+        return 3
+
     ending_markers = [
         normalize_quote(marker)
         for marker in [
@@ -249,8 +265,22 @@ def exact_quote_lookup(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, limit=5):
         return []
 
     hits = collect_hits(query, normalized_quote, ocr_cache_dir, scoped=True)
+    global_hits = collect_hits(query, normalized_quote, ocr_cache_dir, scoped=False)
 
-    if not hits:
-        hits = collect_hits(query, normalized_quote, ocr_cache_dir, scoped=False)
+    if global_hits:
+        merged = {}
+        for sort_key, doc in hits + global_hits:
+            key = (doc.metadata.get("source"), doc.metadata.get("pdf_page"))
+            previous = merged.get(key)
+            if previous is None or sort_key < previous[0]:
+                merged[key] = (sort_key, doc)
+        hits = sorted(
+            merged.values(),
+            key=lambda item: (
+                item[0],
+                item[1].metadata.get("source", ""),
+                item[1].metadata.get("pdf_page") or 0,
+            ),
+        )
 
     return [doc for _, doc in hits[:limit]]

@@ -964,11 +964,114 @@ CONCEPT_PREFERRED_MARKERS = {
     "家庭": ["家庭、私有制和国家的起源"],
 }
 
+EXTRA_CONCEPT_FOCUS_TERMS = [
+    "\u5546\u54c1\u4ef7\u503c",
+    "\u4ef7\u503c",
+    "\u56fd\u5bb6\u7684\u8d77\u6e90",
+    "\u8d39\u5c14\u5df4\u54c8\u63d0\u7eb2",
+    "\u5b9e\u8df5",
+]
+
+CONCEPT_PREFERRED_SOURCES = {
+    "\u552f\u7269\u8fa9\u8bc1\u6cd5": {
+        "sources": {"mes03.pdf", "mea09.pdf"},
+        "markers": ["\u53cd\u675c\u6797\u8bba", "\u81ea\u7136\u8fa9\u8bc1\u6cd5", "\u8def\u5fb7\u7ef4\u5e0c\u00b7\u8d39\u5c14\u5df4\u54c8"],
+    },
+    "\u9636\u7ea7\u6597\u4e89": {
+        "sources": {"mes01.pdf", "mea02.pdf"},
+        "markers": ["\u5171\u4ea7\u515a\u5ba3\u8a00"],
+    },
+    "\u56fd\u5bb6": {
+        "sources": {"mea04.pdf", "mes04.pdf"},
+        "markers": ["\u5bb6\u5ead", "\u79c1\u6709\u5236", "\u56fd\u5bb6", "\u8d77\u6e90"],
+    },
+    "\u56fd\u5bb6\u7684\u8d77\u6e90": {
+        "sources": {"mea04.pdf", "mes04.pdf"},
+        "markers": ["\u5bb6\u5ead", "\u79c1\u6709\u5236", "\u56fd\u5bb6", "\u8d77\u6e90"],
+    },
+    "\u5546\u54c1\u4ef7\u503c": {
+        "sources": {"mea05.pdf", "mes02.pdf"},
+        "markers": ["\u8d44\u672c\u8bba", "\u5546\u54c1", "\u4ef7\u503c"],
+    },
+    "\u5269\u4f59\u4ef7\u503c": {
+        "sources": {"mea05.pdf", "mes02.pdf"},
+        "markers": ["\u8d44\u672c\u8bba", "\u5269\u4f59\u4ef7\u503c", "\u4ef7\u503c\u589e\u6b96\u8fc7\u7a0b"],
+    },
+    "\u5f02\u5316\u52b3\u52a8": {
+        "sources": {"mea01.pdf", "mes01.pdf"},
+        "markers": ["1844\u5e74\u7ecf\u6d4e\u5b66\u54f2\u5b66\u624b\u7a3f", "\u5f02\u5316\u52b3\u52a8", "\u5916\u5316\u52b3\u52a8"],
+    },
+    "\u8d39\u5c14\u5df4\u54c8\u63d0\u7eb2": {
+        "sources": {"mes01.pdf", "mea01.pdf"},
+        "markers": ["\u5173\u4e8e\u8d39\u5c14\u5df4\u54c8\u7684\u63d0\u7eb2", "\u8d39\u5c14\u5df4\u54c8", "\u5b9e\u8df5"],
+    },
+    "\u5b9e\u8df5": {
+        "sources": {"mes01.pdf", "mea01.pdf"},
+        "markers": ["\u5173\u4e8e\u8d39\u5c14\u5df4\u54c8\u7684\u63d0\u7eb2", "\u5b9e\u8df5"],
+    },
+}
+
+CONCEPT_DEMOTED_ARTICLE_MARKERS = [
+    "\u4e66\u4fe1",
+    "\u7d22\u5f15",
+    "\u76ee\u5f55",
+    "\u76ee\u6b21",
+    "\u51c6\u5907\u6750\u6599",
+    "\u8865\u5145\u548c\u4fee\u6539",
+    "\u8865\u5145",
+    "\u4e66\u7b80",
+    "\u4e66\u4fe1\u9009\u7f16",
+]
+
+CONCEPT_PREFERRED_PAGE_RANGES = {
+    "\u9636\u7ea7\u6597\u4e89": {
+        "mes01.pdf": (376, 435),
+        "mea02.pdf": (3, 67),
+    },
+    "\u56fd\u5bb6": {
+        "mea04.pdf": (13, 198),
+        "mes04.pdf": (669, 709),
+    },
+    "\u56fd\u5bb6\u7684\u8d77\u6e90": {
+        "mea04.pdf": (13, 198),
+        "mes04.pdf": (669, 709),
+    },
+    "\u5546\u54c1\u4ef7\u503c": {
+        "mea05.pdf": (7, 887),
+        "mes02.pdf": (185, 370),
+    },
+    "\u5269\u4f59\u4ef7\u503c": {
+        "mea05.pdf": (7, 887),
+        "mes02.pdf": (185, 370),
+    },
+    "\u5f02\u5316\u52b3\u52a8": {
+        "mea01.pdf": (109, 248),
+        "mes01.pdf": (49, 63),
+    },
+    "\u8d39\u5c14\u5df4\u54c8\u63d0\u7eb2": {
+        "mes01.pdf": (133, 140),
+        "mea01.pdf": (499, 506),
+    },
+    "\u5b9e\u8df5": {
+        "mes01.pdf": (133, 140),
+        "mea01.pdf": (499, 506),
+    },
+}
+
+
+def metadata_citation_page(metadata):
+    for key in ("printed_page", "citation_page", "page"):
+        try:
+            return int(metadata.get(key))
+        except (TypeError, ValueError):
+            continue
+    return None
+
 
 def active_concept_terms(query):
     normalized_query = normalize_for_match(query)
     terms = []
-    for term in CONCEPT_FOCUS_TERMS:
+    for term in CONCEPT_FOCUS_TERMS + EXTRA_CONCEPT_FOCUS_TERMS:
         normalized_term = normalize_for_match(term)
         if normalized_term and normalized_term in normalized_query:
             terms.append(term)
@@ -991,6 +1094,15 @@ def score_concept_focus(query, metadata, content):
         term_norm = normalize_for_match(term)
         if not term_norm:
             continue
+        citation_page = metadata_citation_page(metadata)
+        preferred_ranges = CONCEPT_PREFERRED_PAGE_RANGES.get(term, {})
+        preferred_range = preferred_ranges.get(metadata.get("source"))
+        if preferred_range and citation_page is not None:
+            start_page, end_page = preferred_range
+            if start_page <= citation_page <= end_page:
+                score += 180
+            else:
+                score -= 35
 
         if term_norm in article_norm:
             score += 35
@@ -1019,7 +1131,23 @@ def score_concept_focus(query, metadata, content):
             elif marker_norm and marker_norm in lead_norm:
                 score += 14
 
-    return min(score, 180)
+        preferred = CONCEPT_PREFERRED_SOURCES.get(term) or {}
+        if metadata.get("source") in preferred.get("sources", set()):
+            score += 25
+
+        for marker in preferred.get("markers", []):
+            marker_norm = normalize_for_match(marker)
+            if marker_norm and marker_norm in article_norm:
+                score += 140
+            elif marker_norm and marker_norm in lead_norm:
+                score += 45
+            elif marker_norm and marker_norm in content_norm:
+                score += 25
+
+    if terms and any(normalize_for_match(marker) in article_norm for marker in CONCEPT_DEMOTED_ARTICLE_MARKERS):
+        score -= 120
+
+    return min(score, 320)
 
 
 def score_document_quality(metadata, content):
@@ -1030,6 +1158,12 @@ def score_document_quality(metadata, content):
 
     if metadata.get("page_type") in {"toc", "title_page"}:
         score -= 80
+
+    if is_noisy_article_title(article):
+        score -= 60
+
+    if any(marker in article_norm for marker in ["名目索引", "人名索引"]):
+        score -= 70
 
     if any(marker in article_norm for marker in ["目录", "目次", "索引", "注释", "编者注"]):
         score -= 45
@@ -1106,7 +1240,7 @@ def retrieve_documents(query, db, k=5):
             return exact_docs
 
     constraints = constraints_from_query(query)
-    fetch_k = 80 if constraints else 30
+    fetch_k = 120 if constraints or active_concept_terms(query) else 30
 
     if constraints.get("sources"):
         candidates = db.similarity_search(query, k=fetch_k)

@@ -14,8 +14,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from rag.core_classics import classic_entries_for_query
+from rag.core_classics import classic_entries_for_query, load_core_classics
 from rag.exact_quote_lookup import exact_quote_lookup
+from app import retrieve_documents
 
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -35,6 +36,9 @@ class EvalQuestion:
     group: str
     question: str
     target_title: str | None = None
+    expected_sources: tuple[str, ...] = ()
+    expected_article_terms: tuple[str, ...] = ()
+    expected_content_terms: tuple[str, ...] = ()
 
 
 @dataclass
@@ -45,7 +49,7 @@ class EvalResult:
     reason: str
 
 
-QUESTIONS = [
+BASE_QUESTIONS = [
     EvalQuestion("core_title", "《共产党宣言》收录在哪一卷，从哪一页开始？", "共产党宣言"),
     EvalQuestion("core_title", "《共产党宣言》收录在哪里？", "共产党宣言"),
     EvalQuestion("core_title", "《资本论》第一卷从哪一页开始？", "资本论"),
@@ -75,6 +79,137 @@ QUESTIONS = [
     EvalQuestion("negative", "《一个不存在的马克思著作标题》收录在哪一卷？"),
     EvalQuestion("negative", "请给出“这是一句随便编造的引文”的准确页码。"),
 ]
+
+
+CONCEPT_QUESTIONS = [
+    EvalQuestion(
+        "concept",
+        "资本是什么？",
+        expected_sources=("mea01.pdf", "mes02.pdf", "mea07.pdf"),
+        expected_article_terms=("资本",),
+        expected_content_terms=("资本",),
+    ),
+    EvalQuestion(
+        "concept",
+        "劳动过程是什么？",
+        expected_sources=("mes02.pdf", "mea05.pdf"),
+        expected_article_terms=("劳动过程",),
+        expected_content_terms=("劳动", "过程"),
+    ),
+    EvalQuestion(
+        "concept",
+        "私有制与家庭起源有什么关系？",
+        expected_sources=("mea04.pdf", "mes04.pdf"),
+        expected_article_terms=("家庭", "私有制", "国家"),
+        expected_content_terms=("家庭", "私有制"),
+    ),
+    EvalQuestion(
+        "concept",
+        "唯物辩证法应该查哪些原文？",
+        expected_sources=("mes03.pdf", "mea09.pdf"),
+        expected_article_terms=("反杜林论", "自然辩证法"),
+    ),
+    EvalQuestion(
+        "concept",
+        "阶级斗争是什么意思？",
+        expected_sources=("mes01.pdf", "mea02.pdf"),
+        expected_content_terms=("阶级", "斗争"),
+    ),
+    EvalQuestion(
+        "concept",
+        "国家的起源是什么？",
+        expected_sources=("mea04.pdf", "mes04.pdf"),
+        expected_content_terms=("国家", "起源"),
+    ),
+    EvalQuestion(
+        "concept",
+        "剩余价值是什么？",
+        expected_sources=("mea05.pdf", "mes02.pdf"),
+        expected_content_terms=("剩余价值",),
+    ),
+    EvalQuestion(
+        "concept",
+        "异化劳动是什么？",
+        expected_sources=("mea01.pdf", "mes01.pdf"),
+        expected_article_terms=("异化劳动", "外化劳动"),
+        expected_content_terms=("异化", "劳动"),
+    ),
+    EvalQuestion(
+        "concept",
+        "费尔巴哈提纲讲实践吗？",
+        expected_sources=("mes01.pdf", "mea01.pdf"),
+        expected_content_terms=("实践",),
+    ),
+]
+
+
+NEGATIVE_QUESTIONS = [
+    EvalQuestion("negative", "请定位“马克思在火星殖民地经济学手稿”这篇文章。"),
+    EvalQuestion("negative", "《不存在的剩余时间论》收录在哪一卷？"),
+    EvalQuestion("negative", "“资本是一只会唱歌的机器”出自哪一页？"),
+    EvalQuestion("negative", "请给出《量子共产主义宣言》的准确印刷页。"),
+    EvalQuestion("negative", "“阶级斗争已经由机器人自动解决”这句原文在哪？"),
+    EvalQuestion("negative", "《恩格斯论互联网平台经济》在哪一卷？"),
+]
+
+
+def generated_core_title_questions() -> list[EvalQuestion]:
+    questions: list[EvalQuestion] = []
+
+    for classic in load_core_classics():
+        title = classic.get("title", "")
+        if not title:
+            continue
+
+        questions.extend(
+            [
+                EvalQuestion("core_title", f"《{title}》在核心库中的准确位置是什么？", title),
+                EvalQuestion("core_title", f"{title} 的印刷页范围是多少？", title),
+            ]
+        )
+
+        aliases = [
+            alias for alias in (classic.get("aliases") or [])
+            if alias and alias != title
+        ]
+        if aliases:
+            questions.append(
+                EvalQuestion("core_title", f"《{aliases[0]}》对应哪一卷和页码？", title)
+            )
+
+    return questions
+
+
+def generated_core_quote_questions() -> list[EvalQuestion]:
+    questions: list[EvalQuestion] = []
+
+    for classic in load_core_classics():
+        for quote in classic.get("quotes") or []:
+            if quote:
+                questions.append(EvalQuestion("core_quote", f"请定位原文：“{quote}”。"))
+
+    return questions
+
+
+def build_questions() -> list[EvalQuestion]:
+    questions = (
+        BASE_QUESTIONS
+        + generated_core_title_questions()
+        + generated_core_quote_questions()
+        + CONCEPT_QUESTIONS
+        + NEGATIVE_QUESTIONS
+    )
+    seen = set()
+    unique_questions = []
+
+    for question in questions:
+        key = (question.group, question.question, question.target_title)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_questions.append(question)
+
+    return unique_questions
 
 
 def normalize_for_match(text: str) -> str:
@@ -263,6 +398,39 @@ def quote_match_passed(docs: list) -> tuple[bool, str]:
     return True, f"exact quote top hit: {source} page {page}"
 
 
+def concept_match_passed(item: EvalQuestion, docs: list) -> tuple[bool, str]:
+    if not docs:
+        return False, "no concept results"
+
+    top_doc = docs[0]
+    metadata = top_doc.metadata
+    source = metadata.get("source")
+    article = str(metadata.get("section") or metadata.get("article") or "")
+    content = str(top_doc.page_content or "")
+    article_norm = normalize_for_match(article)
+    content_norm = normalize_for_match(content)
+
+    if item.expected_sources and source not in item.expected_sources:
+        return False, f"top source {source}, expected one of {item.expected_sources}"
+
+    if item.expected_article_terms:
+        article_terms = [normalize_for_match(term) for term in item.expected_article_terms]
+        if not any(term and term in article_norm for term in article_terms):
+            return False, f"top article {article!r} lacks {item.expected_article_terms}"
+
+    if item.expected_content_terms:
+        content_terms = [normalize_for_match(term) for term in item.expected_content_terms]
+        missing_terms = [
+            raw_term for raw_term, term in zip(item.expected_content_terms, content_terms)
+            if term and term not in content_norm
+        ]
+        if missing_terms:
+            return False, f"top content lacks {tuple(missing_terms)}"
+
+    page = metadata.get("citation_page") or metadata.get("printed_page") or metadata.get("page")
+    return True, f"concept top hit: {source} page {page}"
+
+
 def print_summary(results: list[EvalResult]) -> None:
     passed = sum(1 for result in results if result.passed)
     total = len(results)
@@ -291,8 +459,9 @@ def evaluate(k: int = 3) -> None:
     article_map = load_article_map()
     db = None
     results: list[EvalResult] = []
+    questions = build_questions()
 
-    for index, item in enumerate(QUESTIONS, start=1):
+    for index, item in enumerate(questions, start=1):
         print(f"\n===== {index}. {item.group} =====")
         print(f"Q: {item.question}")
 
@@ -330,6 +499,21 @@ def evaluate(k: int = 3) -> None:
 
         if db is None:
             db = load_vectorstore()
+
+        if item.group == "concept":
+            docs = retrieve_documents(item.question, db, k=k)
+            if not docs:
+                print("No retrieval results.")
+                results.append(EvalResult(index, item.group, False, "no retrieval results"))
+                continue
+
+            for rank, doc in enumerate(docs, start=1):
+                print(f"\n[{rank}] {format_metadata(doc.metadata)}")
+                print(clean_preview(doc.page_content))
+
+            passed, reason = concept_match_passed(item, docs)
+            results.append(EvalResult(index, item.group, passed, reason))
+            continue
 
         exact_docs = exact_quote_lookup(item.question, limit=k)
         if exact_docs:

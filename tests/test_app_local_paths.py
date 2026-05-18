@@ -101,6 +101,16 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertEqual(docs[0].metadata.get("source"), "mes01.pdf")
         self.assertEqual(docs[0].metadata.get("pdf_page"), 451)
 
+    def test_exact_quote_prefers_body_hit_over_annotation(self):
+        query = "\u201c\u56fd\u5bb6\u662f\u793e\u4f1a\u5728\u4e00\u5b9a\u53d1\u5c55\u9636\u6bb5\u4e0a\u7684\u4ea7\u7269\u3002\u201d\u51fa\u81ea\u54ea\u91cc\uff1f"
+
+        docs = exact_quote_lookup(query, limit=5)
+
+        self.assertTrue(docs)
+        self.assertEqual(docs[0].metadata.get("source"), "mea04.pdf")
+        self.assertEqual(docs[0].metadata.get("pdf_page"), 206)
+        self.assertNotEqual(docs[0].metadata.get("pdf_page"), 693)
+
     def test_unconfirmed_quote_query_returns_no_trusted_answer_without_vectorstore_or_api(self):
         query = "\u8bf7\u7ed9\u51fa\u201c\u8fd9\u662f\u4e00\u53e5\u968f\u4fbf\u7f16\u9020\u7684\u5f15\u6587\u201d\u7684\u51c6\u786e\u9875\u7801\u3002"
 
