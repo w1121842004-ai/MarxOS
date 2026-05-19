@@ -126,11 +126,11 @@ def normalize_book_parts(metadata):
 
     match_mes = re.fullmatch(r"mes(\d{2})", stem)
     if match_mes:
-        return "", "马克思恩格斯选集", f"第{int(match_mes.group(1))}卷", "出版年不详"
+        return "", "马克思恩格斯选集", f"第{int(match_mes.group(1))}卷", "2012年"
 
     volume = volume_from_source(stem)
     if volume:
-        return "", "马克思恩格斯全集", volume, VOLUME_PUBLICATION_YEARS.get(stem, "出版年不详")
+        return "", "马克思恩格斯全集", volume, VOLUME_PUBLICATION_YEARS.get(stem, "")
 
     match = re.search(r"(第\d+卷[AB]?)", book)
     if "马克思恩格斯文集" in book:
@@ -139,13 +139,13 @@ def normalize_book_parts(metadata):
 
     if "马克思恩格斯选集" in book:
         volume = match.group(1).replace("A", "(上)").replace("B", "(下)") if match else ""
-        return "", "马克思恩格斯选集", volume, "出版年不详"
+        return "", "马克思恩格斯选集", volume, "2012年"
 
     if "马克思恩格斯全集" in book:
         volume = match.group(1).replace("A", "(上)").replace("B", "(下)") if match else ""
-        return "", "马克思恩格斯全集", volume, "出版年不详"
+        return "", "马克思恩格斯全集", volume, ""
 
-    return "", book, "", "出版年不详"
+    return "", book, "", ""
 
 
 def series_from_metadata(metadata, normalized_title):
@@ -494,11 +494,25 @@ def is_quote_lookup_query(query):
     if extract_bibliographic_title(query):
         return False
 
+    interrogative_markers = [
+        "什么是",
+        "是什么",
+        "何为",
+        "如何",
+        "怎么",
+        "怎样",
+        "为什么",
+        "本质",
+        "意义",
+    ]
+    if any(marker in query for marker in interrogative_markers):
+        return False
+
     quote_keywords = ["引文", "出处", "出自", "哪一页", "哪页", "页码", "原文", "这句话", "这段话"]
     if any(keyword in query for keyword in quote_keywords):
         return True
 
-    return len(query) >= 12 and not re.search(r"[？?]", query)
+    return len(query) >= 24 and not re.search(r"[。！？!?]", query)
 
 
 def is_concept_query(query):
@@ -1000,6 +1014,10 @@ EXTRA_CONCEPT_FOCUS_TERMS = [
 ]
 
 CONCEPT_PREFERRED_SOURCES = {
+    "\u8d44\u672c": {
+        "sources": {"mea01.pdf", "mes02.pdf", "mea07.pdf"},
+        "markers": ["\u8d44\u672c", "\u8d44\u672c\u8bba", "\u8d44\u672c\u7684\u5229\u6da6", "\u8d44\u672c\u5173\u7cfb"],
+    },
     "\u552f\u7269\u8fa9\u8bc1\u6cd5": {
         "sources": {"mes03.pdf", "mea09.pdf"},
         "markers": ["\u53cd\u675c\u6797\u8bba", "\u81ea\u7136\u8fa9\u8bc1\u6cd5", "\u8def\u5fb7\u7ef4\u5e0c\u00b7\u8d39\u5c14\u5df4\u54c8"],
@@ -1051,6 +1069,11 @@ CONCEPT_DEMOTED_ARTICLE_MARKERS = [
 ]
 
 CONCEPT_PREFERRED_PAGE_RANGES = {
+    "\u8d44\u672c": {
+        "mea01.pdf": (109, 248),
+        "mes02.pdf": (185, 370),
+        "mea07.pdf": (397, 488),
+    },
     "\u9636\u7ea7\u6597\u4e89": {
         "mes01.pdf": (376, 435),
         "mea02.pdf": (3, 67),
@@ -1111,6 +1134,14 @@ CONCEPT_CANONICAL_CLASSIC_IDS = {
     "自然辩证法": "dialectics_nature",
 }
 
+CONCEPT_TITLE_FALLBACK_TO_CLASSIC = {
+    "\u56fd\u5bb6",
+    "\u56fd\u5bb6\u7684\u8d77\u6e90",
+    "\u56fd\u5bb6\u7684\u4ea7\u751f",
+    "\u79c1\u6709\u5236",
+    "\u5bb6\u5ead",
+}
+
 
 def core_classic_by_id(classic_id):
     for classic in load_core_classics():
@@ -1163,6 +1194,35 @@ def concept_article_title_is_weak(query, metadata):
     return True
 
 
+def concept_title_from_content(query, metadata, content):
+    article = clean_article_title(metadata.get("section") or metadata.get("article"))
+    article_norm = normalize_for_match(article)
+    content_norm = normalize_for_match(content)
+    lead_norm = normalize_for_match(content[:500])
+
+    for term in active_concept_terms(query):
+        term_norm = normalize_for_match(term)
+        if not term_norm:
+            continue
+        if term in CONCEPT_TITLE_FALLBACK_TO_CLASSIC:
+            continue
+
+        markers = CONCEPT_PREFERRED_MARKERS.get(term, [])
+        preferred = CONCEPT_PREFERRED_SOURCES.get(term) or {}
+        term_markers = [] if term in CONCEPT_TITLE_FALLBACK_TO_CLASSIC else [term]
+        markers = list(dict.fromkeys(markers + term_markers + list(preferred.get("markers", []))))
+
+        for marker in markers:
+            marker_norm = normalize_for_match(marker)
+            if marker_norm and (marker_norm in article_norm or marker_norm in lead_norm):
+                return marker
+
+        if term_norm in content_norm:
+            return term
+
+    return None
+
+
 def canonical_concept_entry_for_metadata(query, metadata):
     source = metadata.get("source")
     page = metadata_printed_page(metadata)
@@ -1209,10 +1269,11 @@ def enrich_concept_metadata(query, docs):
         doc.metadata.setdefault("entry_type", entry.get("entry_type"))
 
         if concept_article_title_is_weak(query, doc.metadata):
+            concept_title = concept_title_from_content(query, doc.metadata, doc.page_content)
             doc.metadata.setdefault("raw_article", doc.metadata.get("article"))
             doc.metadata.setdefault("raw_section", doc.metadata.get("section"))
-            doc.metadata["article"] = title
-            doc.metadata["section"] = title
+            doc.metadata["article"] = concept_title or title
+            doc.metadata["section"] = concept_title or title
 
     return docs
 
@@ -1268,6 +1329,8 @@ def score_concept_focus(query, metadata, content):
             score += 30
         elif term_norm in content_norm:
             score += 12
+        elif term_norm in article_norm:
+            score -= 45
 
         direct_definition_patterns = [
             f"什么是{term_norm}",
@@ -1306,6 +1369,30 @@ def score_concept_focus(query, metadata, content):
         score -= 120
 
     return min(score, 320)
+
+
+def score_concept_source_priority(query, metadata):
+    terms = active_concept_terms(query)
+    if not terms:
+        return 0
+
+    score = 0
+    source = metadata.get("source")
+    citation_page = metadata_citation_page(metadata)
+
+    for term in terms:
+        preferred = CONCEPT_PREFERRED_SOURCES.get(term) or {}
+        preferred_sources = preferred.get("sources", set())
+        if preferred_sources:
+            score += 12 if source in preferred_sources else -12
+
+        preferred_range = CONCEPT_PREFERRED_PAGE_RANGES.get(term, {}).get(source)
+        if preferred_range and citation_page is not None:
+            start_page, end_page = preferred_range
+            if start_page <= citation_page <= end_page:
+                score += 18
+
+    return score
 
 
 def score_document_quality(metadata, content):
@@ -1380,6 +1467,7 @@ def rerank_documents(query, docs, constraints):
             "article_match": score_article_match(metadata, normalized_title, haystack),
             "query_match": score_query_match(normalized_query, haystack),
             "concept_focus": score_concept_focus(query, metadata, content),
+            "concept_source": score_concept_source_priority(query, metadata),
             "document_quality": score_document_quality(metadata, content),
         }
         score = sum(score_parts.values())

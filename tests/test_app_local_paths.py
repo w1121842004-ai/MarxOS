@@ -174,6 +174,63 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertEqual(docs[0].metadata.get("retrieval_unit"), "paragraph")
         self.assertEqual(docs[0].metadata.get("match_type"), "paragraph_vector_candidate")
 
+    def test_paragraph_retrieval_refines_weak_concept_article_from_content(self):
+        paragraph_doc = Document(
+            page_content="\u5f02\u5316\u52b3\u52a8\uff0c\u7531\u4e8e\u4f7f\u81ea\u7136\u754c\u540c\u4eba\u76f8\u5f02\u5316\uff0c\u4e5f\u5c31\u4f7f\u7c7b\u540c\u4eba\u76f8\u5f02\u5316\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c1\u5377",
+                "article": "1844\u5e74\u7ecf\u6d4e\u5b66\u54f2\u5b66\u624b\u7a3f",
+                "section": "1844\u5e74\u7ecf\u6d4e\u5b66\u54f2\u5b66\u624b\u7a3f",
+                "source": "mea01.pdf",
+                "page": 161,
+                "printed_page": 161,
+                "pdf_page": 182,
+                "retrieval_unit": "paragraph",
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [paragraph_doc]
+
+        docs = app.retrieve_paragraph_documents("\u5f02\u5316\u52b3\u52a8\u662f\u4ec0\u4e48\uff1f", FakeDb(), k=1)
+
+        self.assertEqual(docs[0].metadata.get("article"), "\u5f02\u5316\u52b3\u52a8")
+        self.assertEqual(docs[0].metadata.get("section"), "\u5f02\u5316\u52b3\u52a8")
+        self.assertEqual(docs[0].metadata.get("raw_article"), "1844\u5e74\u7ecf\u6d4e\u5b66\u54f2\u5b66\u624b\u7a3f")
+
+    def test_retrieve_documents_prefers_capital_concept_core_sources(self):
+        loose_doc = Document(
+            page_content="\u8d44\u672c\u662f\u5546\u4e1a\u89c2\u5ff5\uff0c\u5e76\u4e14\u8fd9\u91cc\u6536\u5f55\u4e86\u5f88\u591a\u8d44\u672c\u5b9a\u4e49\u6458\u5f55\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c8\u5377",
+                "article": "\u8d44\u672c\u6458\u5f55",
+                "source": "mea08.pdf",
+                "page": 393,
+                "printed_page": 393,
+                "pdf_page": 497,
+            },
+        )
+        core_doc = Document(
+            page_content="\u8fd9\u91cc\u8bf4\u660e\u8d44\u672c\u4ef7\u503c\u4f5c\u4e3a\u8d44\u672c\u4ef7\u503c\u800c\u5b58\u5728\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c7\u5377",
+                "article": "\u8d44\u672c\u5173\u7cfb",
+                "source": "mea07.pdf",
+                "page": 445,
+                "printed_page": 445,
+                "pdf_page": 522,
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [loose_doc, core_doc]
+
+        docs = app.retrieve_documents("\u8d44\u672c\u662f\u4ec0\u4e48\uff1f", FakeDb(), k=1)
+
+        self.assertEqual(docs[0].metadata.get("source"), "mea07.pdf")
+
     def test_retrieve_documents_demotes_index_like_chunks(self):
         noisy_index_doc = Document(
             page_content="\u5386\u53f2\u552f\u7269\u4e3b\u4e49\u8fd9\u4e00\u672f\u8bed---509\u3001609\u3001637\u3001641\u3002---\u6069\u683c\u65af\u5173\u4e8e\u5386\u53f2\u552f\u7269\u4e3b\u4e49\u7684\u4e66\u4fe1---592-595\u3001612-614\u3002\u7d22\u5f15\u6761\u76ee\u3002",
@@ -641,6 +698,11 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertIn("TRACE_ONLY", answer)
         self.assertIn("intent: concept_explain", answer)
         self.assertIn("source=test.pdf", answer)
+
+    def test_query_with_interrogative_wording_is_not_routed_to_quote_lookup(self):
+        query = "\u5f53\u524d\uff0cAI\u65f6\u4ee3\u7684\u201c\u70bc\u4e39\u201d\u5176\u80cc\u540e\u7684\u672c\u8d28\u662f\u4ec0\u4e48"
+
+        self.assertEqual(app.classify_query(query), "concept_explain")
 
 
 if __name__ == "__main__":
