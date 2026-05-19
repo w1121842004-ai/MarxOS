@@ -79,6 +79,25 @@ DEEPSEEK_API_KEY=your_deepseek_api_key_here
 venv\Scripts\python.exe app.py
 ```
 
+运行网页端（本地）：
+
+```powershell
+venv\Scripts\python.exe web_app.py
+```
+
+启动后访问：
+
+```text
+http://127.0.0.1:7860
+```
+
+如端口冲突，可切换端口：
+
+```powershell
+$env:MARXOS_WEB_PORT="7861"
+venv\Scripts\python.exe web_app.py
+```
+
 如需查看内部检索、引用和 prompt 调试信息：
 
 ```powershell

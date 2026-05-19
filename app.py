@@ -535,6 +535,19 @@ def is_concept_query(query):
 
 def is_analysis_query(query):
     query = clean_text(query, "")
+    communism_patterns = [
+        "共产主义是不是",
+        "共产主义是否",
+        "共产主义会不会",
+        "共产主义能不能",
+        "共产主义能否",
+        "共产主义一定会实现",
+        "共产主义必然实现",
+        "共产主义会实现",
+    ]
+    if any(pattern in query for pattern in communism_patterns):
+        return True
+
     return any(
         keyword in query
         for keyword in [
@@ -881,6 +894,7 @@ def constraints_from_query(query):
         title = title or entries[0].get("classic_title")
         return {
             "title": title,
+            "strict_title": True,
             "entries": entries,
             "sources": {entry["source"] for entry in entries},
             "page_ranges": {
@@ -981,6 +995,7 @@ CONCEPT_FOCUS_TERMS = [
     "私有制",
     "家庭",
     "家庭私有制和国家的起源",
+    "共产主义",
 ]
 
 CONCEPT_PREFERRED_MARKERS = {
@@ -991,6 +1006,7 @@ CONCEPT_PREFERRED_MARKERS = {
     "劳动过程": ["劳动过程和价值增殖过程", "劳动过程"],
     "资本": ["资本论", "资本的生产过程", "货币转化为资本"],
     "阶级斗争": ["共产党宣言", "阶级斗争"],
+    "共产主义": ["共产党宣言", "哥达纲领批判", "社会主义从空想到科学的发展"],
     "国家": ["家庭、私有制和国家的起源", "国家的产生", "社会主义"],
     "国家的产生": ["家庭、私有制和国家的起源", "国家的产生"],
     "历史唯物主义": ["唯物主义历史观", "共产党宣言", "费尔巴哈", "路德维希·费尔巴哈"],
@@ -1025,6 +1041,10 @@ CONCEPT_PREFERRED_SOURCES = {
     "\u9636\u7ea7\u6597\u4e89": {
         "sources": {"mes01.pdf", "mea02.pdf"},
         "markers": ["\u5171\u4ea7\u515a\u5ba3\u8a00"],
+    },
+    "\u5171\u4ea7\u4e3b\u4e49": {
+        "sources": {"mes01.pdf", "mes03.pdf", "mea03.pdf"},
+        "markers": ["\u5171\u4ea7\u515a\u5ba3\u8a00", "\u54e5\u8fbe\u7eb2\u9886\u6279\u5224", "\u793e\u4f1a\u4e3b\u4e49\u4ece\u7a7a\u60f3\u5230\u79d1\u5b66\u7684\u53d1\u5c55"],
     },
     "\u56fd\u5bb6": {
         "sources": {"mea04.pdf", "mes04.pdf"},
@@ -1078,6 +1098,11 @@ CONCEPT_PREFERRED_PAGE_RANGES = {
         "mes01.pdf": (376, 435),
         "mea02.pdf": (3, 67),
     },
+    "\u5171\u4ea7\u4e3b\u4e49": {
+        "mes01.pdf": (376, 435),
+        "mes03.pdf": (430, 532),
+        "mea03.pdf": (481, 553),
+    },
     "\u56fd\u5bb6": {
         "mea04.pdf": (13, 198),
         "mes04.pdf": (669, 709),
@@ -1120,6 +1145,7 @@ CONCEPT_CANONICAL_CLASSIC_IDS = {
     "商品拜物教": "capital_vol1",
     "拜物教": "capital_vol1",
     "阶级斗争": "communist_manifesto",
+    "共产主义": "communist_manifesto",
     "国家": "origin_family_private_property_state",
     "国家的起源": "origin_family_private_property_state",
     "国家的产生": "origin_family_private_property_state",
@@ -1368,6 +1394,12 @@ def score_concept_focus(query, metadata, content):
     if terms and any(normalize_for_match(marker) in article_norm for marker in CONCEPT_DEMOTED_ARTICLE_MARKERS):
         score -= 120
 
+    query_norm = normalize_for_match(query)
+    if "共产主义" in terms:
+        malthus_norm = normalize_for_match("马尔萨斯")
+        if malthus_norm in article_norm and malthus_norm not in query_norm:
+            score -= 60
+
     return min(score, 320)
 
 
@@ -1495,7 +1527,26 @@ def retrieve_documents(query, db, k=5, allow_exact_quote=True):
             if metadata_matches_constraints(doc.metadata, constraints)
         ]
 
+        # For explicit title-constrained queries, prefer candidates that are
+        # inside the mapped page ranges to avoid prefaces/index pages hijacking
+        # answers with incorrect citations.
+        if constraints.get("title") and constraints.get("page_ranges"):
+            ranged_candidates = [
+                doc for doc in candidates
+                if page_in_expected_range(doc.metadata, constraints)
+            ]
+            if ranged_candidates:
+                candidates = ranged_candidates
+
+        if constraints.get("strict_title") and constraints.get("page_ranges"):
+            candidates = [
+                doc for doc in candidates
+                if page_in_expected_range(doc.metadata, constraints)
+            ]
+
         if not candidates:
+            if constraints.get("strict_title"):
+                return []
             candidates = db.similarity_search(query, k=fetch_k)
     else:
         candidates = db.similarity_search(query, k=fetch_k)
@@ -1580,9 +1631,11 @@ def build_analysis_prompt(query, context):
         f"\u7ecf\u6d4e\u57fa\u7840\u4e0e\u4e0a\u5c42\u5efa\u7b51\u3001\u9636\u7ea7\u5173\u7cfb\u3001"
         f"\u8d44\u672c\u903b\u8f91\u3001\u52b3\u52a8\u8fc7\u7a0b\u3002\n\n"
         f"\u56de\u7b54\u8981\u6c42\uff1a\n"
-        f"1. \u4f18\u5148\u4f9d\u636e\u539f\u8457\u5185\u5bb9\u3002\n"
-        f"2. \u56f4\u7ed5\u6982\u5ff5\u3001\u903b\u8f91\u548c\u73b0\u5b9e\u6307\u5411\u5c55\u5f00\uff0c\u4e0d\u7a7a\u558a\u53e3\u53f7\u3002\n"
-        f"3. \u5982\u5f15\u7528\u539f\u8457\uff0c\u7ed9\u51fa\u7b80\u77ed\u51fa\u5904\u3002\n\n"
+        f"1. \u4f18\u5148\u4f9d\u636e\u539f\u8457\u5185\u5bb9\uff0c\u4e14\u81f3\u5c11\u4f7f\u7528\u4e24\u6761\u4e0d\u540c\u6750\u6599\u652f\u6491\u5173\u952e\u5224\u65ad\u3002\n"
+        f"2. \u56de\u7b54\u5206\u4e09\u5c42\uff1a\u5148\u7ed9\u7ed3\u8bba\uff0c\u518d\u7ed9\u7406\u8bba\u673a\u5236\uff0c\u6700\u540e\u7ed9\u73b0\u5b9e\u6307\u5411\u6216\u5386\u53f2\u6761\u4ef6\u3002\n"
+        f"3. \u5141\u8bb8\u5448\u73b0\u5185\u90e8\u5f20\u529b\uff1a\u53ef\u6307\u51fa\u5b9e\u73b0\u6761\u4ef6\u3001\u9636\u6bb5\u5dee\u5f02\u6216\u5386\u53f2\u9650\u5236\uff0c\u800c\u975e\u53ea\u7ed9\u5355\u7ebf\u7ed3\u8bba\u3002\n"
+        f"4. \u81f3\u5c11\u7ed9\u51fa\u4e24\u5904\u7b80\u77ed\u51fa\u5904\uff1b\u82e5\u6750\u6599\u4e0d\u8db3\u4ee5\u652f\u6301\u67d0\u5224\u65ad\uff0c\u8981\u660e\u786e\u8bf4\u660e\u4e0d\u786e\u5b9a\u5904\u3002\n"
+        f"5. \u56f4\u7ed5\u6982\u5ff5\u3001\u903b\u8f91\u548c\u73b0\u5b9e\u6307\u5411\u5c55\u5f00\uff0c\u4e0d\u7a7a\u558a\u53e3\u53f7\u3002\n\n"
         f"\u7981\u6b62\u8f93\u51fa\uff1a\u4e0d\u8981\u5199\u201c\u8d44\u65991\u201d\u201c\u8d44\u65992\u201d"
         f"\u201c\u7247\u6bb51\u201d\u201c\u68c0\u7d22\u6750\u6599\u201d\u7b49\u5185\u90e8\u7f16\u53f7\uff1b"
         f"\u9700\u8981\u5f15\u7528\u65f6\uff0c\u53ea\u4f7f\u7528\u51fa\u5904\u6587\u672c\u3002\n\n"
@@ -1602,6 +1655,20 @@ def build_default_prompt(query, context):
         f"\u201c\u7247\u6bb51\u201d\u201c\u68c0\u7d22\u6750\u6599\u201d\u7b49\u5185\u90e8\u7f16\u53f7\uff1b"
         f"\u9700\u8981\u5f15\u7528\u65f6\uff0c\u53ea\u4f7f\u7528\u51fa\u5904\u6587\u672c\u3002\n\n"
         f"# \u539f\u8457\u5185\u5bb9\n{context}\n\n# \u7528\u6237\u95ee\u9898\n{query}\n"
+    )
+
+
+def build_constraint_guard(constraints):
+    sources = sorted(constraints.get("sources") or [])
+    if not sources:
+        return ""
+
+    source_text = "、".join(sources)
+    return (
+        "\n引用约束（必须严格遵守）：\n"
+        f"1. 本题只允许引用以下来源：{source_text}。\n"
+        "2. 不得写出任何不在该列表中的卷次、书名或来源。\n"
+        "3. 若材料不足，请明确写“当前材料不足以支持该卷次判断”，不要补写其他卷次。\n"
     )
 
 
@@ -1872,6 +1939,12 @@ def run_query(query):
         print_constraints_trace(constraints)
     db = load_vectorstore()
     docs = retrieve_documents(query, db, k=5)
+    if constraints.get("strict_title") and not docs:
+        title = constraints.get("title") or "该文"
+        return (
+            f"当前语料库未检索到《{title}》的正文页段，因此本轮不输出跨篇替代性引文。"
+            "请先补齐该文在本地库中的页段映射或OCR文本后再回答。"
+        )
     paragraph_docs = []
     if (trace or trace_only) and dual_retrieval:
         if paragraph_vectorstore_exists():
@@ -1880,7 +1953,7 @@ def run_query(query):
         else:
             print_trace_line(f"paragraph_vectorstore_missing: {PARAGRAPH_VECTORSTORE_DIR}")
     context = build_context(docs, query_intent)
-    prompt = clean_text(build_prompt(query_intent, query, context))
+    prompt = clean_text(build_prompt(query_intent, query, context) + build_constraint_guard(constraints))
     if trace or trace_only:
         print_docs_trace(docs)
         if dual_retrieval and paragraph_docs:

@@ -83,13 +83,12 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertEqual(docs[0].metadata.get("classic_id"), "theses_feuerbach")
         self.assertIn("\u5173\u4e8e\u8d39\u5c14\u5df4\u54c8\u7684\u63d0\u7eb2", docs[0].metadata.get("article"))
 
-    def test_exact_quote_suppresses_reference_hits_when_core_classic_is_known(self):
+    def test_exact_quote_returns_empty_when_gotha_quote_is_not_confirmed_in_current_scope(self):
         query = "\u5404\u5c3d\u6240\u80fd\uff0c\u6309\u9700\u5206\u914d\u3002\u51fa\u81ea\u54ea\u91cc\uff1f"
 
         docs = exact_quote_lookup(query, limit=5)
 
-        self.assertTrue(docs)
-        self.assertTrue(all(doc.metadata.get("classic_id") == "critique_gotha_programme" for doc in docs))
+        self.assertEqual(docs, [])
 
     def test_exact_quote_prefers_manifesto_for_workers_of_world_slogan(self):
         query = "\u201c\u5168\u4e16\u754c\u65e0\u4ea7\u8005\uff0c\u8054\u5408\u8d77\u6765\uff01\u201d\u51fa\u81ea\u54ea\u91cc\uff1f"
@@ -703,6 +702,75 @@ class AppLocalPathTests(unittest.TestCase):
         query = "\u5f53\u524d\uff0cAI\u65f6\u4ee3\u7684\u201c\u70bc\u4e39\u201d\u5176\u80cc\u540e\u7684\u672c\u8d28\u662f\u4ec0\u4e48"
 
         self.assertEqual(app.classify_query(query), "concept_explain")
+
+    def test_query_about_communism_realization_routes_to_theory_analysis(self):
+        query = "\u5171\u4ea7\u4e3b\u4e49\u662f\u4e0d\u662f\u4e00\u5b9a\u4f1a\u5b9e\u73b0\uff1f"
+
+        self.assertEqual(app.classify_query(query), "theory_analysis")
+
+    def test_retrieve_documents_prefers_manifesto_over_malthus_for_communism(self):
+        malthus_doc = Document(
+            page_content="\u5173\u4e8e\u9a6c\u5c14\u8428\u65af\u4eba\u53e3\u8bba\u7684\u8ba8\u8bba\u6761\u76ee\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c10\u5377",
+                "article": "\u9a6c\u5c14\u8428\u65af\u4eba\u53e3\u8bba",
+                "source": "mea10.pdf",
+                "page": 120,
+                "printed_page": 120,
+                "pdf_page": 120,
+            },
+        )
+        manifesto_doc = Document(
+            page_content="\u5171\u4ea7\u4e3b\u4e49\u4e0d\u662f\u5e94\u5f53\u5b9e\u73b0\u7684\u72b6\u6001\uff0c\u800c\u662f\u6d88\u706d\u73b0\u5b58\u72b6\u6001\u7684\u73b0\u5b9e\u8fd0\u52a8\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6 \u7b2c1\u5377",
+                "article": "\u5171\u4ea7\u515a\u5ba3\u8a00",
+                "source": "mes01.pdf",
+                "page": 401,
+                "printed_page": 401,
+                "pdf_page": 401,
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [malthus_doc, manifesto_doc]
+
+        docs = app.retrieve_documents("\u5171\u4ea7\u4e3b\u4e49\u662f\u4e0d\u662f\u4e00\u5b9a\u4f1a\u5b9e\u73b0\uff1f", FakeDb(), k=1)
+
+        self.assertEqual(docs[0].metadata.get("source"), "mes01.pdf")
+
+    def test_title_constrained_query_prefers_candidates_in_expected_page_range(self):
+        out_of_range_doc = Document(
+            page_content="\u524d\u8a00\u4e2d\u63d0\u5230\u54e5\u8fbe\u7eb2\u9886\u6279\u5224\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6 \u7b2c4\u5377",
+                "article": "\u9a6c\u514b\u601d\u4e3b\u4e49\u7406\u8bba\u7814\u7a76\u548c\u5efa\u8bbe\u5de5\u7a0b\u91cd\u70b9\u9879\u76ee",
+                "source": "mes04.pdf",
+                "page": 17,
+                "printed_page": 17,
+                "pdf_page": 17,
+            },
+        )
+        in_range_doc = Document(
+            page_content="\u5728\u8fd9\u90e8\u8457\u4f5c\u4e2d\u5206\u6790\u4e86\u5171\u4ea7\u4e3b\u4e49\u793e\u4f1a\u4e24\u4e2a\u53d1\u5c55\u9636\u6bb5\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6 \u7b2c4\u5377",
+                "article": "\u5361\u00b7\u9a6c\u514b\u601d\u54e5\u8fbe\u7eb2\u9886\u6279\u5224",
+                "source": "mes04.pdf",
+                "page": 615,
+                "printed_page": 615,
+                "pdf_page": 615,
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [out_of_range_doc, in_range_doc]
+
+        docs = app.retrieve_documents("\u9a6c\u514b\u601d\u5728\u300a\u54e5\u8fbe\u7eb2\u9886\u6279\u5224\u300b\u4e2d\u5982\u4f55\u5206\u6790\u5171\u4ea7\u4e3b\u4e49\u7684", FakeDb(), k=1)
+
+        self.assertEqual(docs[0].metadata.get("page"), 615)
 
 
 if __name__ == "__main__":

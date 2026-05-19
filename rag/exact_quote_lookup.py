@@ -15,6 +15,7 @@ BOOK_BY_SOURCE = {
 PREFERRED_CLASSIC_IDS_BY_QUOTE = {
     "\u5168\u4e16\u754c\u65e0\u4ea7\u8005\u8054\u5408\u8d77\u6765": {"communist_manifesto"},
 }
+STRICT_SCOPED_CLASSIC_IDS = {"critique_gotha_programme"}
 
 
 def normalize_quote(text):
@@ -264,7 +265,17 @@ def exact_quote_lookup(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, limit=5):
     if len(normalized_quote) < 5:
         return []
 
+    preferred_entries = classic_entries_for_query(query)
     hits = collect_hits(query, normalized_quote, ocr_cache_dir, scoped=True)
+
+    # For selected classics with known noisy cross-book contamination, require
+    # scoped confirmation and avoid global fallback.
+    preferred_ids = {
+        entry.get("classic_id") for entry in preferred_entries if entry.get("classic_id")
+    }
+    if preferred_ids & STRICT_SCOPED_CLASSIC_IDS and not hits:
+        return []
+
     global_hits = collect_hits(query, normalized_quote, ocr_cache_dir, scoped=False)
 
     if global_hits:

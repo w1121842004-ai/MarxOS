@@ -79,20 +79,12 @@
     ],
     "entries": [
       {
-        "source": "mea03.pdf",
-        "article": "卡·马克思哥达纲领批判",
-        "start_page": 424,
-        "end_page": 451,
-        "priority": 1,
-        "entry_type": "primary"
-      },
-      {
         "source": "mes04.pdf",
-        "article": "卡·马克思哥达纲领批判",
+        "article": "???????????",
         "start_page": 609,
         "end_page": 627,
-        "priority": 2,
-        "entry_type": "parallel"
+        "priority": 1,
+        "entry_type": "primary"
       }
     ],
     "author": "卡·马克思",
