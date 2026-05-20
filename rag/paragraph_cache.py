@@ -19,8 +19,15 @@ CORE_PARAGRAPH_SOURCES = [
     *(f"mes{i:02d}.pdf" for i in range(1, 5)),
 ]
 
-SENTENCE_END_RE = re.compile(r"[。！？；!?;][”’」』）)]?$")
-HEADING_PREFIX_RE = re.compile(r"^(第[一二三四五六七八九十百零〇\d]+[章节篇部编]|[一二三四五六七八九十]+[、.．])")
+SENTENCE_END_RE = re.compile(r"[\u3002\uff01\uff1f!?;\uff1b][\u201d\u2019\u3001\uff09\)]?$")
+HEADING_PREFIX_RE = re.compile(
+    r"^("
+    r"[\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\u767e]+[\u3001\.\uff0e]"
+    r"|[\uff08\(]?[\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\u767e]+[\uff09\)]"
+    r"|\d+[\u3001\.\uff0e]"
+    r"|\u7b2c[\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\u767e\d]+[\u7ae0\u8282\u5377\u7bc7]"
+    r")"
+)
 
 
 def compact_text(text: str) -> str:
@@ -57,6 +64,12 @@ def is_noise_line(line: str, metadata: dict) -> bool:
     if len(compact) <= 2 and not re.search(r"[\u4e00-\u9fff]", compact):
         return True
 
+    if re.fullmatch(r"[!！\.。·•…_\-\s]{4,}", line):
+        return True
+
+    if re.search(r"[!！]{5,}", line):
+        return True
+
     titles = [
         metadata.get("section"),
         metadata.get("article"),
@@ -80,7 +93,7 @@ def line_starts_new_paragraph(line: str) -> bool:
     if HEADING_PREFIX_RE.match(stripped):
         return True
 
-    return bool(re.match(r"^[“\"《（(]?[一二三四五六七八九十]+[、.．]", stripped))
+    return bool(re.match(r"^[\u25cf\u25cb\u2022\-]\s*", stripped))
 
 
 def line_ends_paragraph(line: str) -> bool:
@@ -128,7 +141,37 @@ def is_incomplete_paragraph(text: str) -> bool:
     return not bool(SENTENCE_END_RE.search(text))
 
 
-def paragraph_record(source: str, doc, text: str, index_on_page: int) -> dict:
+def locate_paragraph_on_page(page_text: str, paragraph_text: str, cursor: int = 0) -> tuple[int | None, int | None, int | None, int | None]:
+    raw_lines = str(page_text or "").splitlines()
+    compact_to_raw = []
+    compact_chars = []
+    raw_offset = 0
+
+    for line_index, line in enumerate(raw_lines, start=1):
+        for char_index, char in enumerate(line):
+            if char.strip():
+                compact_chars.append(char)
+                compact_to_raw.append((raw_offset + char_index, line_index))
+        raw_offset += len(line) + 1
+
+    compact_page = "".join(compact_chars)
+    compact_para = compact_text(paragraph_text)
+    if not compact_page or not compact_para:
+        return None, None, None, None
+
+    start = compact_page.find(compact_para, max(cursor, 0))
+    if start < 0:
+        start = compact_page.find(compact_para)
+    if start < 0:
+        return None, None, None, None
+
+    end = start + len(compact_para) - 1
+    char_start, line_start = compact_to_raw[start]
+    char_end, line_end = compact_to_raw[min(end, len(compact_to_raw) - 1)]
+    return char_start, char_end + 1, line_start, line_end
+
+
+def paragraph_record(source: str, doc, text: str, index_on_page: int, char_start=None, char_end=None, line_start=None, line_end=None) -> dict:
     metadata = dict(doc.metadata)
     pdf_page = metadata.get("pdf_page")
     citation_page = metadata.get("citation_page")
@@ -141,6 +184,10 @@ def paragraph_record(source: str, doc, text: str, index_on_page: int) -> dict:
         "paragraph_text": text,
         "paragraph_char_count": len(text),
         "paragraph_index_on_page": index_on_page,
+        "char_start": char_start,
+        "char_end": char_end,
+        "line_start": line_start,
+        "line_end": line_end,
         "pdf_page_start": pdf_page,
         "pdf_page_end": pdf_page,
         "printed_page_start": metadata.get("printed_page"),
@@ -161,6 +208,8 @@ def merge_records(left: dict, right: dict) -> dict:
     merged["printed_page_end"] = right.get("printed_page_end")
     merged["citation_page_end"] = right.get("citation_page_end")
     merged["page_span"] = list(dict.fromkeys((left.get("page_span") or []) + (right.get("page_span") or [])))
+    merged["char_end"] = right.get("char_end")
+    merged["line_end"] = right.get("line_end")
     merged["cross_page"] = True
     return merged
 
@@ -175,12 +224,29 @@ def build_paragraph_records_for_source(source: str, ocr_cache_dir: str | Path = 
         doc = document_from_cache(str(cache_path), title_context, page_sequence_context)
         if doc is None:
             continue
+        cleaning_reasons = str(doc.metadata.get("cleaning_reasons") or "")
+        if "many_line_end_pages" in cleaning_reasons and doc.metadata.get("printed_page") is None:
+            continue
 
         paragraphs = split_page_paragraphs(doc.page_content, doc.metadata)
-        page_records = [
-            paragraph_record(source, doc, paragraph, index)
-            for index, paragraph in enumerate(paragraphs, start=1)
-        ]
+        page_records = []
+        cursor = 0
+        for index, paragraph in enumerate(paragraphs, start=1):
+            char_start, char_end, line_start, line_end = locate_paragraph_on_page(doc.page_content, paragraph, cursor)
+            if char_end is not None:
+                cursor = char_end
+            page_records.append(
+                paragraph_record(
+                    source,
+                    doc,
+                    paragraph,
+                    index,
+                    char_start=char_start,
+                    char_end=char_end,
+                    line_start=line_start,
+                    line_end=line_end,
+                )
+            )
 
         if pending and page_records:
             page_records[0] = merge_records(pending, page_records[0])
@@ -247,6 +313,10 @@ def paragraph_record_to_document(record: dict) -> Document:
     metadata["printed_page_end"] = record.get("printed_page_end")
     metadata["citation_page"] = record.get("citation_page_start")
     metadata["citation_page_end"] = record.get("citation_page_end")
+    metadata["char_start"] = record.get("char_start")
+    metadata["char_end"] = record.get("char_end")
+    metadata["line_start"] = record.get("line_start")
+    metadata["line_end"] = record.get("line_end")
 
     if record.get("citation_page_start") != record.get("citation_page_end"):
         metadata["page_range"] = f"{record.get('citation_page_start')}-{record.get('citation_page_end')}"

@@ -1,0 +1,391 @@
+[
+  {
+    "id": 1,
+    "question": "哲学家们只是用不同的方式解释世界，问题在于改变世界。",
+    "expected_work": "关于费尔巴哈的提纲",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "德意志意识形态",
+      "共产党宣言"
+    ],
+    "notes": "高频误检句子"
+  },
+  {
+    "id": 2,
+    "question": "全世界无产者，联合起来！",
+    "expected_work": "共产党宣言",
+    "expected_author": "马克思 恩格斯",
+    "hard_negative": [
+      "共产主义原理",
+      "资本论"
+    ]
+  },
+  {
+    "id": 3,
+    "question": "每个人的自由发展是一切人的自由发展的条件。",
+    "expected_work": "共产党宣言",
+    "expected_author": "马克思 恩格斯",
+    "hard_negative": [
+      "哥达纲领批判"
+    ]
+  },
+  {
+    "id": 4,
+    "question": "宗教是人民的鸦片。",
+    "expected_work": "黑格尔法哲学批判导言",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "德意志意识形态",
+      "论犹太人问题"
+    ],
+    "notes": "极易误检"
+  },
+  {
+    "id": 5,
+    "question": "劳动创造了人本身。",
+    "expected_work": "劳动在从猿到人转变过程中的作用",
+    "expected_author": "恩格斯",
+    "hard_negative": [
+      "自然辩证法"
+    ]
+  },
+  {
+    "id": 6,
+    "question": "资本来到世间，从头到脚，每个毛孔都滴着血和肮脏的东西。",
+    "expected_work": "资本论 第一卷",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "雇佣劳动与资本"
+    ]
+  },
+  {
+    "id": 7,
+    "question": "商品是天生的平等派。",
+    "expected_work": "资本论 第一卷",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 8,
+    "question": "人的本质不是单个人所固有的抽象物。",
+    "expected_work": "关于费尔巴哈的提纲",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "德意志意识形态"
+    ]
+  },
+  {
+    "id": 9,
+    "question": "意识在任何时候都只能是被意识到了的存在。",
+    "expected_work": "德意志意识形态",
+    "expected_author": "马克思 恩格斯"
+  },
+  {
+    "id": 10,
+    "question": "不是人们的意识决定人们的存在，而是人们的社会存在决定人们的意识。",
+    "expected_work": "政治经济学批判序言",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "德意志意识形态"
+    ],
+    "notes": "极易误判"
+  },
+  {
+    "id": 11,
+    "question": "马克思在哪里论述了商品拜物教？",
+    "expected_work": "资本论 第一卷 第一章",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "1844年经济学哲学手稿"
+    ]
+  },
+  {
+    "id": 12,
+    "question": "异化劳动主要出自哪部著作？",
+    "expected_work": "1844年经济学哲学手稿",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "德意志意识形态"
+    ]
+  },
+  {
+    "id": 13,
+    "question": "马克思在哪部著作中系统提出唯物史观？",
+    "expected_work": "德意志意识形态",
+    "expected_author": "马克思 恩格斯",
+    "hard_negative": [
+      "关于费尔巴哈的提纲",
+      "政治经济学批判序言"
+    ]
+  },
+  {
+    "id": 14,
+    "question": "经济基础决定上层建筑主要出自哪里？",
+    "expected_work": "政治经济学批判序言",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "德意志意识形态"
+    ]
+  },
+  {
+    "id": 15,
+    "question": "无产阶级专政经典论述主要出自哪里？",
+    "expected_work": "哥达纲领批判",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "共产党宣言"
+    ]
+  },
+  {
+    "id": 16,
+    "question": "按劳分配与按需分配经典来源是哪部著作？",
+    "expected_work": "哥达纲领批判",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 17,
+    "question": "马克思在哪部著作中分析了剩余价值？",
+    "expected_work": "资本论",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "工资、价格和利润"
+    ]
+  },
+  {
+    "id": 18,
+    "question": "阶级斗争是历史发展的动力主要在哪部著作中经典表达？",
+    "expected_work": "共产党宣言",
+    "expected_author": "马克思 恩格斯"
+  },
+  {
+    "id": 19,
+    "question": "马克思在哪部著作中批判蒲鲁东？",
+    "expected_work": "哲学的贫困",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "贫困的哲学"
+    ],
+    "notes": "测试相似标题"
+  },
+  {
+    "id": 20,
+    "question": "恩格斯在哪部著作中阐述科学社会主义？",
+    "expected_work": "社会主义从空想到科学的发展",
+    "expected_author": "恩格斯",
+    "hard_negative": [
+      "反杜林论"
+    ]
+  },
+  {
+    "id": 21,
+    "question": "马克思关于劳动异化的四重规定是什么？",
+    "expected_work": "1844年经济学哲学手稿",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 22,
+    "question": "资产阶级在历史上曾经起过非常革命的作用出自哪里？",
+    "expected_work": "共产党宣言",
+    "expected_author": "马克思 恩格斯"
+  },
+  {
+    "id": 23,
+    "question": "马克思在哪部作品中分析机器大工业？",
+    "expected_work": "资本论 第一卷",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 24,
+    "question": "自由王国只是在必要王国终止的地方才开始。",
+    "expected_work": "资本论 第三卷",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 25,
+    "question": "法的关系根源于物质生活关系出自哪里？",
+    "expected_work": "政治经济学批判序言",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 26,
+    "question": "劳动不是一切财富的源泉出自哪里？",
+    "expected_work": "哥达纲领批判",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "资本论"
+    ]
+  },
+  {
+    "id": 27,
+    "question": "历史不过是追求着自己目的的人的活动而已。",
+    "expected_work": "神圣家族",
+    "expected_author": "马克思 恩格斯"
+  },
+  {
+    "id": 28,
+    "question": "恩格斯在哪部著作中讨论家庭、私有制和国家起源？",
+    "expected_work": "家庭、私有制和国家的起源",
+    "expected_author": "恩格斯"
+  },
+  {
+    "id": 29,
+    "question": "马克思在哪部作品中讨论巴黎公社？",
+    "expected_work": "法兰西内战",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 30,
+    "question": "暴力是每一个孕育着新社会的旧社会的助产婆。",
+    "expected_work": "资本论 第一卷",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 31,
+    "question": "人的本质是一切社会关系的总和。",
+    "expected_work": "关于费尔巴哈的提纲",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "德意志意识形态"
+    ],
+    "notes": "最高频误检"
+  },
+  {
+    "id": 32,
+    "question": "共产主义不是应当确立的状况，而是现实的运动。",
+    "expected_work": "德意志意识形态",
+    "expected_author": "马克思 恩格斯"
+  },
+  {
+    "id": 33,
+    "question": "资产阶级的灭亡和无产阶级的胜利是同样不可避免的。",
+    "expected_work": "共产党宣言",
+    "expected_author": "马克思 恩格斯"
+  },
+  {
+    "id": 34,
+    "question": "货币天然不是金银，但金银天然是货币。",
+    "expected_work": "资本论",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 35,
+    "question": "生产力决定生产关系最经典出处是什么？",
+    "expected_work": "政治经济学批判序言",
+    "expected_author": "马克思",
+    "hard_negative": [
+      "德意志意识形态"
+    ]
+  },
+  {
+    "id": 36,
+    "question": "请给出宗教是人民的鸦片所在篇目与卷册。",
+    "expected_work": "黑格尔法哲学批判导言",
+    "expected_author": "马克思",
+    "expected_metadata": [
+      "卷号",
+      "页码",
+      "作者"
+    ]
+  },
+  {
+    "id": 37,
+    "question": "请定位全世界无产者，联合起来所在章节。",
+    "expected_work": "共产党宣言 第四章结尾",
+    "expected_author": "马克思 恩格斯"
+  },
+  {
+    "id": 38,
+    "question": "商品拜物教在哪一章？",
+    "expected_work": "资本论 第一卷 第一章 第四节",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 39,
+    "question": "请定位自由王国原文。",
+    "expected_work": "资本论 第三卷",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 40,
+    "question": "人的本质是一切社会关系的总和，请返回完整上下文。",
+    "expected_work": "关于费尔巴哈的提纲",
+    "expected_author": "马克思"
+  },
+  {
+    "id": 41,
+    "question": "马克思在哪部著作中提出两个结合？",
+    "expected_work": "不存在",
+    "expected_author": "无",
+    "notes": "模型必须拒答"
+  },
+  {
+    "id": 42,
+    "question": "资本论中是否提出社会主义核心价值观？",
+    "expected_work": "不存在",
+    "expected_author": "无"
+  },
+  {
+    "id": 43,
+    "question": "马克思在哪部著作中提出新质生产力？",
+    "expected_work": "不存在",
+    "expected_author": "无"
+  },
+  {
+    "id": 44,
+    "question": "实践是检验真理的唯一标准是马克思原话吗？",
+    "expected_work": "不是马克思直接原话",
+    "expected_author": "无"
+  },
+  {
+    "id": 45,
+    "question": "以人民为中心是否出自马克思原著？",
+    "expected_work": "不是原文表达",
+    "expected_author": "无"
+  },
+  {
+    "id": 46,
+    "question": "比较1844手稿与德意志意识形态中异化概念差异。",
+    "expected_work": [
+      "1844年经济学哲学手稿",
+      "德意志意识形态"
+    ],
+    "expected_author": "马克思"
+  },
+  {
+    "id": 47,
+    "question": "马克思对国家消亡问题在哪些著作中有论述？",
+    "expected_work": [
+      "哥达纲领批判",
+      "法兰西内战",
+      "德意志意识形态"
+    ],
+    "expected_author": "马克思"
+  },
+  {
+    "id": 48,
+    "question": "比较共产党宣言与哥达纲领批判的共产主义阶段论差异。",
+    "expected_work": [
+      "共产党宣言",
+      "哥达纲领批判"
+    ],
+    "expected_author": "马克思 恩格斯"
+  },
+  {
+    "id": 49,
+    "question": "马克思早期人本主义与晚期政治经济学之间的关系。",
+    "expected_work": [
+      "1844年经济学哲学手稿",
+      "资本论"
+    ],
+    "expected_author": "马克思"
+  },
+  {
+    "id": 50,
+    "question": "马克思关于机器和劳动的观点在哪些著作中出现？",
+    "expected_work": [
+      "1844年经济学哲学手稿",
+      "资本论",
+      "政治经济学批判大纲"
+    ],
+    "expected_author": "马克思"
+  }
+]

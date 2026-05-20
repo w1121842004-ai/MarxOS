@@ -33,13 +33,13 @@ CASES = [
         "name": "quote_manifesto_ghost",
         "query": "“一个幽灵，共产主义的幽灵，在欧洲游荡。”出自哪里？",
         "expected_intent": "quote_lookup",
-        "must_contain": ["共产党宣言", "2012年", "PDF第"],
+        "must_contain": ["共产党宣言", "2012年", "第"],
     },
     {
         "name": "quote_workers_unite",
         "query": "“全世界无产者，联合起来！”出自哪一页？",
         "expected_intent": "quote_lookup",
-        "must_contain": ["共产党宣言", "2012年", "PDF第451页"],
+        "must_contain": ["共产党宣言", "2012年", "第435页"],
     },
     {
         "name": "biblio_manifesto",

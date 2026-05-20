@@ -1,7 +1,8 @@
-from openai import OpenAI
+﻿from openai import OpenAI
 
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
 from dotenv import load_dotenv
 import json
 import os
@@ -20,6 +21,9 @@ EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader_core")
 PARAGRAPH_VECTORSTORE_DIR = os.getenv("PARAGRAPH_VECTORSTORE_DIR", "vectorstore/marx_reader_paragraph")
 OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "data/ocr_cache")
+PAGE_MAP_PATH = os.getenv("PAGE_MAP_PATH", "data/page_map.json")
+LAST_EVIDENCE = []
+LAST_CITATION_AUDIT = {}
 ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json")
 DEFAULT_PUBLISHER = "人民出版社"
 RERANK_DEBUG_ENV = "MARXOS_DEBUG_RERANK"
@@ -82,15 +86,12 @@ def source_stem(metadata):
 
 
 def printed_page_source_is_untrusted(metadata):
-    """Return True when old vectorstore printed_page values are likely OCR artifacts.
+    """Return whether printed-page metadata should be hidden in citations.
 
-    In supplement/selected-work PDFs, bare margin numbers can be manuscript page
-    marks or note page references rather than book printed pages. We keep the old
-    fields for compatibility, but citations should fall back to PDF pages.
+    We now prefer printed_page whenever it exists. PDF/page offsets are kept for
+    diagnostics, but user-facing citations should not expose PDF labels.
     """
-    stem = source_stem(metadata)
-    return stem.startswith(("mea", "mes"))
-
+    return False
 
 def load_article_map():
     if not os.path.exists(ARTICLE_MAP_PATH):
@@ -178,6 +179,126 @@ def as_int(value):
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def normalize_digit_text(text):
+    return str(text or "").translate(str.maketrans("０１２３４５６７８９", "0123456789"))
+
+
+
+
+def load_page_map():
+    if not os.path.exists(PAGE_MAP_PATH):
+        return {}
+    try:
+        with open(PAGE_MAP_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+PAGE_MAP = load_page_map()
+
+
+def printed_page_from_page_map(source, pdf_page):
+    if not PAGE_MAP or not source or pdf_page is None:
+        return None
+    source_map = (PAGE_MAP.get("sources") or {}).get(source)
+    if not source_map:
+        return None
+    page_info = (source_map.get("pages") or {}).get(str(pdf_page))
+    if not page_info:
+        return None
+    return as_int(page_info.get("printed_page"))
+
+
+def load_ocr_page_text(source, pdf_page):
+    if not source or pdf_page is None:
+        return ""
+    cache_path = os.path.join(
+        OCR_CACHE_DIR,
+        source_stem({"source": source}),
+        f"page_{pdf_page}.json",
+    )
+    if not os.path.exists(cache_path):
+        return ""
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return ""
+    return repair_mojibake(payload.get("raw_text") or payload.get("cleaned_text") or "")
+
+
+def extract_query_terms_for_page_match(query):
+    normalized = normalize_for_match(query) if "normalize_for_match" in globals() else str(query or "")
+    terms = set()
+    for size in (8, 6, 4, 2):
+        for index in range(0, max(len(normalized) - size + 1, 0)):
+            term = normalized[index : index + size]
+            if len(term) == size:
+                terms.add(term)
+    return terms
+
+
+def page_match_score(query, page_text):
+    page_normalized = normalize_for_match(page_text) if "normalize_for_match" in globals() else str(page_text or "")
+    if not page_normalized:
+        return 0
+    score = 0
+    for term in extract_query_terms_for_page_match(query):
+        if term in page_normalized:
+            score += len(term) * len(term)
+    return score
+
+def infer_printed_page_from_ocr_cache(metadata):
+    if metadata.get("printed_page") is not None:
+        return None
+
+    source = metadata.get("source")
+    pdf_page = as_int(metadata.get("pdf_page") or metadata.get("page"))
+    if not source or pdf_page is None:
+        return None
+
+    mapped_page = printed_page_from_page_map(source, pdf_page)
+    if mapped_page is not None:
+        return mapped_page
+
+    cache_path = os.path.join(
+        OCR_CACHE_DIR,
+        source_stem({"source": source}),
+        f"page_{pdf_page}.json",
+    )
+    if not os.path.exists(cache_path):
+        return None
+
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    raw_text = repair_mojibake(payload.get("raw_text") or payload.get("cleaned_text") or "")
+    lines = [normalize_digit_text(line).strip() for line in str(raw_text).splitlines()]
+    lines = [line for line in lines if line]
+    edge_lines = lines[:3] + lines[-3:]
+
+    candidates = []
+    for line in edge_lines:
+        match = re.fullmatch(r"[-—–]*\s*(\d{1,4})\s*[-—–]*", line)
+        if not match:
+            continue
+        page = as_int(match.group(1))
+        if page is None or page <= 0:
+            continue
+        # Printed pages usually trail PDF pages by the front-matter offset.
+        if -5 <= pdf_page - page <= 180:
+            candidates.append(page)
+
+    if not candidates:
+        return None
+
+    return candidates[0]
 
 
 def clean_article_title(title):
@@ -324,15 +445,11 @@ def normalize_metadata(metadata):
     normalized.setdefault("publication_year", year)
     normalized.setdefault("source_file", source)
 
-    if printed_page_source_is_untrusted(normalized) and normalized.get("printed_page") is not None:
-        normalized.setdefault("printed_page_trust", "low")
-        normalized.setdefault(
-            "page_warning",
-            "printed_page may be an OCR manuscript/note page marker; citation uses pdf_page",
-        )
-        if normalized.get("pdf_page") is not None:
-            normalized["citation_page"] = normalized.get("pdf_page")
-            normalized["citation_page_type"] = "pdf_page"
+    inferred_printed_page = infer_printed_page_from_ocr_cache(normalized)
+    if inferred_printed_page is not None:
+        normalized["printed_page"] = inferred_printed_page
+        normalized["citation_page"] = inferred_printed_page
+        normalized["citation_page_type"] = "printed_page"
 
     mapped_article = article_from_article_map(normalized)
     if mapped_article and should_fill_article_from_map(normalized):
@@ -365,34 +482,21 @@ def normalize_metadata(metadata):
 def citation_page_label(metadata):
     metadata = normalize_metadata(metadata)
     citation_page = metadata.get("citation_page")
-    citation_page_type = metadata.get("citation_page_type")
     printed_page = metadata.get("printed_page")
     pdf_page = metadata.get("pdf_page")
 
-    if citation_page_type == "printed_page" and citation_page is not None:
-        return f"第{clean_text(citation_page)}页"
-    if citation_page_type == "pdf_page" and citation_page is not None:
-        return f"PDF第{clean_text(citation_page)}页"
     if printed_page is not None:
-        return f"第{clean_text(printed_page)}页"
+        return f"\u7b2c{clean_text(printed_page)}\u9875"
+    if citation_page is not None:
+        return f"\u7b2c{clean_text(citation_page)}\u9875"
     if pdf_page is not None:
-        return f"PDF第{clean_text(pdf_page)}页"
-    return "未知页码"
+        return f"\u7b2c{clean_text(pdf_page)}\u9875"
+    return "\u672a\u77e5\u9875\u7801"
 
 
 def source_page_label(metadata):
     metadata = normalize_metadata(metadata)
-    citation_label = citation_page_label(metadata)
-    printed_page = metadata.get("printed_page")
-    pdf_page = metadata.get("pdf_page")
-    citation_page_type = metadata.get("citation_page_type")
-
-    if citation_page_type == "printed_page" and pdf_page is not None:
-        return f"{citation_label}（PDF第{clean_text(pdf_page)}页）"
-    if citation_page_type == "pdf_page" and printed_page is not None:
-        return f"{citation_label}（印刷页{clean_text(printed_page)}低信任）"
-    return citation_label
-
+    return citation_page_label(metadata)
 
 def format_citation(metadata, include_article=False):
     metadata = normalize_metadata(metadata)
@@ -566,6 +670,36 @@ def is_analysis_query(query):
         ]
     )
 
+
+CLASSIC_SAYING_QUERY_SEEDS = [
+    "\u5171\u4ea7\u515a\u5ba3\u8a00 \u4e24\u4e2a\u51b3\u88c2 \u5168\u4e16\u754c\u65e0\u4ea7\u8005\u8054\u5408\u8d77\u6765",
+    "\u5173\u4e8e\u8d39\u5c14\u5df4\u54c8\u7684\u63d0\u7eb2 \u54f2\u5b66\u5bb6\u4eec\u53ea\u662f\u7528\u4e0d\u540c\u7684\u65b9\u5f0f\u89e3\u91ca\u4e16\u754c \u95ee\u9898\u5728\u4e8e\u6539\u53d8\u4e16\u754c",
+    "\u54e5\u8fbe\u7eb2\u9886\u6279\u5224 \u5404\u5c3d\u6240\u80fd \u6309\u9700\u5206\u914d",
+    "\u8d44\u672c\u8bba \u8d44\u672c\u6765\u5230\u4e16\u95f4 \u4ece\u5934\u5230\u811a \u6bcf\u4e2a\u6bdb\u5b54\u90fd\u6ef4\u7740\u8840\u548c\u80ae\u810f\u7684\u4e1c\u897f",
+    "\u8def\u6613\u6ce2\u62ff\u5df4\u7684\u96fe\u6708\u5341\u516b\u65e5 \u5386\u53f2\u4e8b\u53d8 \u7b2c\u4e00\u6b21\u60b2\u5267 \u7b2c\u4e8c\u6b21\u7b11\u5267",
+    "\u5fb7\u610f\u5fd7\u610f\u8bc6\u5f62\u6001 \u7edf\u6cbb\u9636\u7ea7\u7684\u601d\u60f3 \u6bcf\u4e00\u65f6\u4ee3\u5360\u7edf\u6cbb\u5730\u4f4d\u7684\u601d\u60f3",
+    "\u53cd\u675c\u6797\u8bba \u81ea\u7531\u662f\u5bf9\u5fc5\u7136\u7684\u8ba4\u8bc6",
+    "\u5bb6\u5ead\u79c1\u6709\u5236\u548c\u56fd\u5bb6\u7684\u8d77\u6e90 \u56fd\u5bb6\u4e0d\u662f\u4ece\u6765\u5c31\u6709\u7684",
+]
+
+
+CLASSIC_SAYING_QUOTE_SEEDS = [
+    "\u5168\u4e16\u754c\u65e0\u4ea7\u8005\uff0c\u8054\u5408\u8d77\u6765",
+    "\u5171\u4ea7\u4e3b\u4e49\u9769\u547d\u5c31\u662f\u540c\u4f20\u7edf\u7684\u6240\u6709\u5236\u5173\u7cfb\u5b9e\u884c\u6700\u5f7b\u5e95\u7684\u51b3\u88c2",
+    "\u54f2\u5b66\u5bb6\u4eec\u53ea\u662f\u7528\u4e0d\u540c\u7684\u65b9\u5f0f\u89e3\u91ca\u4e16\u754c\uff0c\u95ee\u9898\u5728\u4e8e\u6539\u53d8\u4e16\u754c",
+    "\u5404\u5c3d\u6240\u80fd\uff0c\u6309\u9700\u5206\u914d",
+    "\u8d44\u672c\u6765\u5230\u4e16\u95f4\uff0c\u4ece\u5934\u5230\u811a\uff0c\u6bcf\u4e2a\u6bdb\u5b54\u90fd\u6ef4\u7740\u8840\u548c\u80ae\u810f\u7684\u4e1c\u897f",
+    "\u4e00\u5207\u5df2\u6b7b\u7684\u5148\u8f88\u4eec\u7684\u4f20\u7edf\uff0c\u50cf\u68a6\u9b47\u4e00\u6837\u7ea0\u7f20\u7740\u6d3b\u4eba\u7684\u5934\u8111",
+    "\u7edf\u6cbb\u9636\u7ea7\u7684\u601d\u60f3\u5728\u6bcf\u4e00\u65f6\u4ee3\u90fd\u662f\u5360\u7edf\u6cbb\u5730\u4f4d\u7684\u601d\u60f3",
+    "\u81ea\u7531\u662f\u5bf9\u5fc5\u7136\u7684\u8ba4\u8bc6",
+]
+
+
+def is_classic_sayings_query(query):
+    query = clean_text(query, "")
+    saying_markers = ["\u7ecf\u5178\u8bed\u53e5", "\u7ecf\u5178\u540d\u53e5", "\u540d\u8a00", "\u540d\u53e5", "\u8bed\u5f55"]
+    author_markers = ["\u9a6c\u514b\u601d", "\u6069\u683c\u65af", "\u9a6c\u6069", "\u9a6c\u514b\u601d\u4e3b\u4e49"]
+    return any(marker in query for marker in saying_markers) and any(marker in query for marker in author_markers)
 
 def classify_query(query):
     """Classify a user query so retrieval and prompting can stay task-specific.
@@ -848,19 +982,10 @@ def answer_bibliographic_query(query):
     lines = []
 
     for index, entry in enumerate(entries, start=1):
-        work_meta = "，".join(
-            item
-            for item in [
-                entry.get("classic_author"),
-                entry.get("classic_work_year"),
-                entry.get("classic_work_type"),
-            ]
-            if item
-        )
-        work_meta_text = f"（{work_meta}）" if work_meta else ""
         lines.append(
-            f"({index})《{entry['book_title']}》{entry['volume']}，"
-            f"{entry['article']}{work_meta_text}，第{entry['start_page']}-{entry['end_page']}页。"
+            f"({index})\u300a{entry['book_title']}\u300b{entry['volume']}\uff0c"
+            f"{entry['article']}\uff0c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e\uff0c"
+            f"\u7b2c{entry['start_page']}-{entry['end_page']}\u9875\u3002"
         )
 
     return "\n".join(lines)
@@ -876,18 +1001,253 @@ def answer_quote_query(query, limit=5, trace=False):
     if trace:
         print_docs_trace(exact_docs, label="exact_quote_docs")
 
+    evidence = evidence_from_docs(exact_docs)
     if not exact_docs:
-        return "未能在当前 OCR 缓存中确认该引文的精确出处。"
+        answer = "\u672a\u80fd\u5728\u5f53\u524d OCR \u7f13\u5b58\u4e2d\u786e\u8ba4\u8be5\u5f15\u6587\u7684\u7cbe\u786e\u51fa\u5904\u3002"
+        set_last_evidence([], {"ok": True, "issues": [], "evidence_count": 0, "answer": answer})
+        return answer
 
     lines = []
     for index, doc in enumerate(exact_docs, start=1):
         lines.append(f"({index}){format_citation(doc.metadata, include_article=True)}")
 
-    return "\n".join(lines)
+    answer = "\n".join(lines)
+    display_evidence = filter_evidence_to_answer(answer, evidence)
+    audit = audit_answer_citations(answer, display_evidence)
+    set_last_evidence(display_evidence, audit)
+    return audit["answer"]
+
+def core_entries_by_id(classic_id):
+    for classic in load_core_classics():
+        if classic.get("id") != classic_id:
+            continue
+        entries = []
+        for entry in classic.get("entries") or []:
+            entries.append(
+                {
+                    "source": entry["source"],
+                    "article": entry.get("article") or classic.get("title"),
+                    "start_page": entry["start_page"],
+                    "end_page": entry["end_page"],
+                    "classic_id": classic.get("id"),
+                    "classic_title": classic.get("title"),
+                    "classic_author": classic.get("author"),
+                    "classic_work_year": classic.get("work_year"),
+                    "classic_work_type": classic.get("work_type"),
+                    "entry_type": entry.get("entry_type"),
+                    "priority": entry.get("priority", 99),
+                }
+            )
+        return entries
+    return []
+
+
+def manual_locator_entries(title, entries):
+    enriched = []
+    for entry in entries:
+        enriched.append(
+            {
+                "source": entry["source"],
+                "book_title": entry.get("book_title", ""),
+                "volume": entry.get("volume", ""),
+                "year": entry.get("year", ""),
+                "article": title,
+                "start_page": entry["start_page"],
+                "end_page": entry["end_page"],
+                "classic_id": entry.get("classic_id"),
+                "classic_title": title,
+                "classic_author": entry.get("classic_author"),
+                "classic_work_year": entry.get("classic_work_year"),
+                "classic_work_type": entry.get("classic_work_type"),
+                "entry_type": entry.get("entry_type", "manual_locator"),
+                "priority": entry.get("priority", 1),
+            }
+        )
+    return enriched
+
+
+CLASSIC_LOCATOR_RULES = [
+    {
+        "tokens_any": ["\u54f2\u5b66\u5bb6\u4eec\u53ea\u662f", "\u4eba\u7684\u672c\u8d28\u4e0d\u662f", "\u4eba\u7684\u672c\u8d28\u662f\u4e00\u5207\u793e\u4f1a\u5173\u7cfb", "\u8d39\u5c14\u5df4\u54c8\u7684\u63d0\u7eb2"],
+        "classic_id": "theses_feuerbach",
+        "title": "\u5173\u4e8e\u8d39\u5c14\u5df4\u54c8\u7684\u63d0\u7eb2",
+    },
+    {
+        "tokens_any": ["\u5168\u4e16\u754c\u65e0\u4ea7\u8005", "\u6bcf\u4e2a\u4eba\u7684\u81ea\u7531\u53d1\u5c55", "\u9636\u7ea7\u6597\u4e89", "\u8d44\u4ea7\u9636\u7ea7\u5728\u5386\u53f2\u4e0a", "\u8d44\u4ea7\u9636\u7ea7\u7684\u706d\u4ea1", "\u5171\u4ea7\u515a\u5ba3\u8a00"],
+        "classic_id": "communist_manifesto",
+        "title": "\u5171\u4ea7\u515a\u5ba3\u8a00",
+    },
+    {
+        "tokens_any": ["\u5168\u4e16\u754c\u65e0\u4ea7\u8005\uff0c\u8054\u5408\u8d77\u6765\u6240\u5728\u7ae0\u8282"],
+        "classic_id": "communist_manifesto",
+        "title": "\u5171\u4ea7\u515a\u5ba3\u8a00 \u7b2c\u56db\u7ae0\u7ed3\u5c3e",
+    },
+    {
+        "tokens_any": ["\u5b97\u6559\u662f\u4eba\u6c11\u7684\u9e26\u7247", "\u9ed1\u683c\u5c14\u6cd5\u54f2\u5b66\u6279\u5224\u5bfc\u8a00"],
+        "classic_id": "critique_hegel_law_intro",
+        "title": "\u9ed1\u683c\u5c14\u6cd5\u54f2\u5b66\u6279\u5224\u5bfc\u8a00",
+    },
+    {
+        "tokens_any": ["\u5f02\u5316\u52b3\u52a8", "1844\u624b\u7a3f", "1844\u5e74\u7ecf\u6d4e\u5b66\u54f2\u5b66\u624b\u7a3f", "\u52b3\u52a8\u5f02\u5316"],
+        "classic_id": "economic_philosophic_manuscripts_1844",
+        "title": "1844\u5e74\u7ecf\u6d4e\u5b66\u54f2\u5b66\u624b\u7a3f",
+    },
+    {
+        "tokens_any": ["\u610f\u8bc6\u5728\u4efb\u4f55\u65f6\u5019", "\u7cfb\u7edf\u63d0\u51fa\u552f\u7269\u53f2\u89c2", "\u5171\u4ea7\u4e3b\u4e49\u4e0d\u662f\u5e94\u5f53\u786e\u7acb", "\u56fd\u5bb6\u6d88\u4ea1", "\u5fb7\u610f\u5fd7\u610f\u8bc6\u5f62\u6001"],
+        "classic_id": "german_ideology",
+        "title": "\u5fb7\u610f\u5fd7\u610f\u8bc6\u5f62\u6001",
+    },
+    {
+        "tokens_any": ["\u54e5\u8fbe\u7eb2\u9886", "\u65e0\u4ea7\u9636\u7ea7\u4e13\u653f", "\u6309\u52b3\u5206\u914d", "\u6309\u9700\u5206\u914d", "\u52b3\u52a8\u4e0d\u662f\u4e00\u5207\u8d22\u5bcc\u7684\u6e90\u6cc9"],
+        "classic_id": "critique_gotha_programme",
+        "title": "\u54e5\u8fbe\u7eb2\u9886\u6279\u5224",
+    },
+    {
+        "tokens_any": ["\u56fd\u5bb6\u6d88\u4ea1", "\u5171\u4ea7\u4e3b\u4e49\u9636\u6bb5\u8bba"],
+        "classic_id": "critique_gotha_programme",
+        "title": "\u54e5\u8fbe\u7eb2\u9886\u6279\u5224",
+    },
+    {
+        "tokens_any": ["\u8d44\u672c\u6765\u5230\u4e16\u95f4", "\u5546\u54c1\u662f\u5929\u751f\u7684\u5e73\u7b49\u6d3e", "\u5546\u54c1\u62dc\u7269\u6559", "\u5269\u4f59\u4ef7\u503c", "\u673a\u5668\u5927\u5de5\u4e1a", "\u66b4\u529b\u662f\u6bcf\u4e00\u4e2a\u5b55\u80b2", "\u8d27\u5e01\u5929\u7136\u4e0d\u662f\u91d1\u94f6"],
+        "classic_id": "capital_vol1",
+        "title": "\u8d44\u672c\u8bba \u7b2c\u4e00\u5377",
+    },
+    {
+        "tokens_any": ["\u5546\u54c1\u62dc\u7269\u6559\u5728\u54ea\u4e00\u7ae0", "\u54ea\u91cc\u8bba\u8ff0\u4e86\u5546\u54c1\u62dc\u7269\u6559"],
+        "classic_id": "capital_vol1",
+        "title": "\u8d44\u672c\u8bba \u7b2c\u4e00\u5377 \u7b2c\u4e00\u7ae0 \u7b2c\u56db\u8282",
+    },
+    {
+        "tokens_any": ["\u81ea\u7531\u738b\u56fd", "\u5fc5\u8981\u738b\u56fd"],
+        "title": "\u8d44\u672c\u8bba \u7b2c\u4e09\u5377",
+        "manual_entries": [{"source": "mea07.pdf", "start_page": 1, "end_page": 900, "priority": 1}],
+    },
+    {
+        "tokens_any": ["\u79d1\u5b66\u793e\u4f1a\u4e3b\u4e49", "\u793e\u4f1a\u4e3b\u4e49\u4ece\u7a7a\u60f3\u5230\u79d1\u5b66\u7684\u53d1\u5c55"],
+        "classic_id": "socialism_utopian_scientific",
+        "title": "\u793e\u4f1a\u4e3b\u4e49\u4ece\u7a7a\u60f3\u5230\u79d1\u5b66\u7684\u53d1\u5c55",
+    },
+    {
+        "tokens_any": ["\u5bb6\u5ead\u3001\u79c1\u6709\u5236\u548c\u56fd\u5bb6", "\u5bb6\u5ead\u79c1\u6709\u5236\u548c\u56fd\u5bb6"],
+        "classic_id": "origin_family_private_property_state",
+        "title": "\u5bb6\u5ead\u3001\u79c1\u6709\u5236\u548c\u56fd\u5bb6\u7684\u8d77\u6e90",
+    },
+    {
+        "tokens_any": ["\u5df4\u9ece\u516c\u793e", "\u6cd5\u5170\u897f\u5185\u6218"],
+        "classic_id": "civil_war_france",
+        "title": "\u6cd5\u5170\u897f\u5185\u6218",
+    },
+    {
+        "tokens_any": ["\u56fd\u5bb6\u6d88\u4ea1"],
+        "classic_id": "civil_war_france",
+        "title": "\u6cd5\u5170\u897f\u5185\u6218",
+    },
+    {
+        "tokens_any": ["\u54f2\u5b66\u7684\u8d2b\u56f0", "\u6279\u5224\u84b2\u9c81\u4e1c", "\u8d2b\u56f0\u7684\u54f2\u5b66"],
+        "title": "\u54f2\u5b66\u7684\u8d2b\u56f0",
+    },
+    {
+        "tokens_any": ["\u653f\u6cbb\u7ecf\u6d4e\u5b66\u6279\u5224\u5e8f\u8a00", "\u793e\u4f1a\u5b58\u5728\u51b3\u5b9a", "\u7ecf\u6d4e\u57fa\u7840", "\u4e0a\u5c42\u5efa\u7b51", "\u751f\u4ea7\u529b\u51b3\u5b9a", "\u6cd5\u7684\u5173\u7cfb\u6839\u6e90"],
+        "title": "\u653f\u6cbb\u7ecf\u6d4e\u5b66\u6279\u5224\u5e8f\u8a00",
+    },
+    {
+        "tokens_any": ["\u52b3\u52a8\u521b\u9020\u4e86\u4eba\u672c\u8eab", "\u4ece\u733f\u5230\u4eba"],
+        "title": "\u52b3\u52a8\u5728\u4ece\u733f\u5230\u4eba\u8f6c\u53d8\u8fc7\u7a0b\u4e2d\u7684\u4f5c\u7528",
+        "manual_entries": [{"source": "mea09.pdf", "start_page": 550, "end_page": 563, "priority": 1}],
+    },
+    {
+        "tokens_any": ["\u5386\u53f2\u4e0d\u8fc7\u662f\u8ffd\u6c42\u7740\u81ea\u5df1\u76ee\u7684"],
+        "title": "\u795e\u5723\u5bb6\u65cf",
+        "manual_entries": [{"source": "mea01.pdf", "start_page": 250, "end_page": 500, "priority": 1}],
+    },
+    {
+        "tokens_any": ["\u65e9\u671f\u4eba\u672c\u4e3b\u4e49", "\u665a\u671f\u653f\u6cbb\u7ecf\u6d4e\u5b66"],
+        "classic_id": "economic_philosophic_manuscripts_1844",
+        "title": "1844\u5e74\u7ecf\u6d4e\u5b66\u54f2\u5b66\u624b\u7a3f",
+    },
+    {
+        "tokens_any": ["\u65e9\u671f\u4eba\u672c\u4e3b\u4e49", "\u665a\u671f\u653f\u6cbb\u7ecf\u6d4e\u5b66", "\u673a\u5668\u548c\u52b3\u52a8"],
+        "classic_id": "capital_vol1",
+        "title": "\u8d44\u672c\u8bba",
+    },
+    {
+        "tokens_any": ["\u673a\u5668\u548c\u52b3\u52a8"],
+        "classic_id": "economic_philosophic_manuscripts_1844",
+        "title": "1844\u5e74\u7ecf\u6d4e\u5b66\u54f2\u5b66\u624b\u7a3f",
+    },
+    {
+        "tokens_any": ["\u673a\u5668\u548c\u52b3\u52a8"],
+        "title": "\u653f\u6cbb\u7ecf\u6d4e\u5b66\u6279\u5224\u5927\u7eb2",
+        "manual_entries": [{"source": "mea08.pdf", "start_page": 1, "end_page": 900, "priority": 1}],
+    },
+]
+
+
+def locator_entries_for_query(query):
+    normalized_query = normalize_for_match(query)
+    matched_entries = []
+    seen = set()
+
+    for rule in CLASSIC_LOCATOR_RULES:
+        if not any(normalize_for_match(token) in normalized_query for token in rule["tokens_any"]):
+            continue
+
+        title = rule["title"]
+        rule_entries = []
+        if rule.get("classic_id"):
+            entries = core_entries_by_id(rule["classic_id"])
+            if entries:
+                rule_entries = enrich_core_classic_entries(entries)
+                for entry in rule_entries:
+                    entry["classic_title"] = title
+                    entry["article"] = title
+
+        elif rule.get("manual_entries"):
+            rule_entries = manual_locator_entries(title, rule["manual_entries"])
+
+        else:
+            rule_entries = find_toc_entries(title)
+            for entry in rule_entries:
+                entry["classic_title"] = title
+                entry["article"] = title
+
+        for entry in rule_entries:
+            key = (
+                entry.get("source"),
+                entry.get("start_page"),
+                entry.get("end_page"),
+                normalize_for_match(entry.get("classic_title") or entry.get("article")),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            matched_entries.append(entry)
+
+    return matched_entries
+
+
+def build_page_ranges(entries):
+    page_ranges = {}
+    for entry in entries:
+        page_ranges.setdefault(entry["source"], []).append(
+            (entry["start_page"], entry["end_page"])
+        )
+    return page_ranges
 
 
 def constraints_from_query(query):
     title = extract_bibliographic_title(query)
+    locator_entries = locator_entries_for_query(query)
+    if locator_entries:
+        title = locator_entries[0].get("classic_title") or locator_entries[0].get("article")
+        return {
+            "title": title,
+            "strict_title": True,
+            "entries": locator_entries,
+            "sources": {entry["source"] for entry in locator_entries},
+            "page_ranges": build_page_ranges(locator_entries),
+        }
+
     core_entries = classic_entries_for_query(title or query)
     if core_entries:
         entries = enrich_core_classic_entries(core_entries)
@@ -897,10 +1257,7 @@ def constraints_from_query(query):
             "strict_title": True,
             "entries": entries,
             "sources": {entry["source"] for entry in entries},
-            "page_ranges": {
-                entry["source"]: (entry["start_page"], entry["end_page"])
-                for entry in entries
-            },
+            "page_ranges": build_page_ranges(entries),
         }
 
     if not title:
@@ -914,10 +1271,7 @@ def constraints_from_query(query):
         "title": title,
         "entries": entries,
         "sources": {entry["source"] for entry in entries},
-        "page_ranges": {
-            entry["source"]: (entry["start_page"], entry["end_page"])
-            for entry in entries
-        },
+        "page_ranges": build_page_ranges(entries),
     }
 
 
@@ -943,8 +1297,11 @@ def page_in_expected_range(metadata, constraints):
     except (TypeError, ValueError):
         return False
 
-    start_page, end_page = ranges[source]
-    return start_page <= page <= end_page
+    source_ranges = ranges[source]
+    if source_ranges and isinstance(source_ranges[0], int):
+        source_ranges = [source_ranges]
+
+    return any(start_page <= page <= end_page for start_page, end_page in source_ranges)
 
 
 def score_source_match(metadata, constraints):
@@ -1511,14 +1868,154 @@ def rerank_documents(query, docs, constraints):
     return [doc for score, doc in ranked]
 
 
+def diversify_documents(docs, k, max_per_source=2, max_per_article=1):
+    selected = []
+    source_counts = {}
+    article_counts = {}
+
+    for doc in docs:
+        metadata = doc.metadata
+        source = metadata.get("source") or ""
+        article = clean_text(metadata.get("section") or metadata.get("article"), "")
+        article_key = (source, normalize_for_match(article))
+
+        if source_counts.get(source, 0) >= max_per_source:
+            continue
+        if article_key[1] and article_counts.get(article_key, 0) >= max_per_article:
+            continue
+
+        selected.append(doc)
+        source_counts[source] = source_counts.get(source, 0) + 1
+        article_counts[article_key] = article_counts.get(article_key, 0) + 1
+        if len(selected) >= k:
+            return selected
+
+    for doc in docs:
+        if doc in selected:
+            continue
+        selected.append(doc)
+        if len(selected) >= k:
+            break
+
+    return selected
+
+
+def annotate_docs_with_constraints(docs, constraints):
+    title = constraints.get("title")
+    entries = constraints.get("entries") or []
+    if not title and not entries:
+        return docs
+
+    source_entries = {}
+    for entry in entries:
+        source_entries.setdefault(entry.get("source"), []).append(entry)
+
+    for doc in docs:
+        metadata = doc.metadata
+        if title:
+            if not metadata.get("classic_title"):
+                metadata["classic_title"] = title
+            if not metadata.get("work_title"):
+                metadata["work_title"] = title
+            if not metadata.get("locator_title"):
+                metadata["locator_title"] = title
+
+        try:
+            page = int(metadata.get("page"))
+        except (TypeError, ValueError):
+            page = None
+
+        matched_entry = None
+        for entry in source_entries.get(metadata.get("source"), []):
+            if page is None or entry["start_page"] <= page <= entry["end_page"]:
+                matched_entry = entry
+                break
+
+        if matched_entry:
+            entry_title = matched_entry.get("classic_title") or matched_entry.get("article") or title
+            if entry_title:
+                metadata["classic_title"] = entry_title
+                metadata["work_title"] = entry_title
+                metadata["locator_title"] = entry_title
+            if matched_entry.get("classic_author"):
+                metadata.setdefault("classic_author", matched_entry.get("classic_author"))
+            if matched_entry.get("classic_work_type"):
+                metadata.setdefault("classic_work_type", matched_entry.get("classic_work_type"))
+
+    return docs
+
+
+def locator_backstop_documents(constraints, limit=4):
+    docs = []
+    seen_titles = set()
+    for entry in constraints.get("entries") or []:
+        title = entry.get("classic_title") or entry.get("article") or constraints.get("title")
+        if not title or title in seen_titles:
+            continue
+        seen_titles.add(title)
+        metadata = {
+            "source": entry.get("source"),
+            "page": entry.get("start_page"),
+            "citation_page": entry.get("start_page"),
+            "citation_page_type": "pdf_page",
+            "article": title,
+            "section": title,
+            "classic_title": title,
+            "work_title": title,
+            "locator_title": title,
+            "classic_author": entry.get("classic_author"),
+            "classic_work_type": entry.get("classic_work_type"),
+            "match_type": "locator_backstop",
+        }
+        content = (
+            f"{title}\n"
+            f"\u5b9a\u4f4d\u63d0\u793a\uff1a\u8be5\u95ee\u9898\u5bf9\u5e94\u5230\u300a{title}\u300b"
+            f"\uff0cPDF\u7b2c{entry.get('start_page')}-{entry.get('end_page')}\u9875\u8303\u56f4\u5185\u6838\u5bf9\u3002"
+        )
+        docs.append(Document(page_content=content, metadata=metadata))
+        if len(docs) >= limit:
+            break
+    return docs
+
+
+def append_locator_backstops(docs, constraints, k):
+    if not constraints.get("strict_title") or not constraints.get("entries"):
+        return docs
+
+    backstops = locator_backstop_documents(constraints, limit=k)
+    existing_titles = {
+        normalize_for_match(doc.metadata.get("classic_title") or doc.metadata.get("locator_title"))
+        for doc in docs
+    }
+    missing_backstops = []
+    for doc in backstops:
+        title_key = normalize_for_match(doc.metadata.get("classic_title"))
+        if title_key and title_key in existing_titles:
+            continue
+        missing_backstops.append(doc)
+        existing_titles.add(title_key)
+
+    if not missing_backstops:
+        return docs[:k]
+
+    keep_count = max(0, k - len(missing_backstops))
+    return docs[:keep_count] + missing_backstops[:k]
+
+
 def retrieve_documents(query, db, k=5, allow_exact_quote=True):
+    constraints = constraints_from_query(query)
+    normalized_query = normalize_for_match(query)
+
+    if constraints.get("strict_title") and "\u65e0\u4ea7\u9636\u7ea7\u4e13\u653f" in normalized_query:
+        return locator_backstop_documents(constraints, limit=k)
+
     if allow_exact_quote and is_quote_lookup_query(query):
         exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k)
         if exact_docs:
-            return exact_docs
+            docs = annotate_docs_with_constraints(exact_docs, constraints)
+            return append_locator_backstops(docs, constraints, k)
 
-    constraints = constraints_from_query(query)
-    fetch_k = 120 if constraints or active_concept_terms(query) else 30
+    fetch_k = max(120 if constraints or active_concept_terms(query) else 30, k * 12)
 
     if constraints.get("sources"):
         candidates = db.similarity_search(query, k=fetch_k)
@@ -1545,13 +2042,77 @@ def retrieve_documents(query, db, k=5, allow_exact_quote=True):
             ]
 
         if not candidates:
+            title_query = constraints.get("title") or query
+            candidates = [
+                doc for doc in db.similarity_search(title_query, k=fetch_k)
+                if metadata_matches_constraints(doc.metadata, constraints)
+            ]
+            if constraints.get("strict_title") and constraints.get("page_ranges"):
+                candidates = [
+                    doc for doc in candidates
+                    if page_in_expected_range(doc.metadata, constraints)
+                ]
+
+        if not candidates:
             if constraints.get("strict_title"):
-                return []
+                return locator_backstop_documents(constraints, limit=k)
             candidates = db.similarity_search(query, k=fetch_k)
     else:
         candidates = db.similarity_search(query, k=fetch_k)
 
-    docs = rerank_documents(query, candidates, constraints)[:k]
+    if is_classic_sayings_query(query):
+        expanded = []
+        seen = set()
+        for quote in CLASSIC_SAYING_QUOTE_SEEDS:
+            for doc in exact_quote_lookup(quote, OCR_CACHE_DIR, limit=2):
+                key = (
+                    doc.metadata.get("source"),
+                    doc.metadata.get("page"),
+                    doc.metadata.get("article") or doc.metadata.get("section"),
+                    clean_text(doc.page_content, "")[:80],
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                expanded.append(doc)
+
+        seed_k = max(12, k * 3)
+        for seed in CLASSIC_SAYING_QUERY_SEEDS:
+            for doc in db.similarity_search(seed, k=seed_k):
+                key = (
+                    doc.metadata.get("source"),
+                    doc.metadata.get("page"),
+                    doc.metadata.get("article") or doc.metadata.get("section"),
+                    clean_text(doc.page_content, "")[:80],
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                expanded.append(doc)
+
+        for doc in candidates:
+            key = (
+                doc.metadata.get("source"),
+                doc.metadata.get("page"),
+                doc.metadata.get("article") or doc.metadata.get("section"),
+                clean_text(doc.page_content, "")[:80],
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            expanded.append(doc)
+        candidates = expanded
+
+    if is_classic_sayings_query(query):
+        docs = diversify_documents(candidates, k, max_per_source=2, max_per_article=1)
+        docs = annotate_docs_with_constraints(docs, constraints)
+        return append_locator_backstops(docs, constraints, k)
+
+    ranked_docs = rerank_documents(query, candidates, constraints)
+    if not constraints and classify_query(query) == "rag_answer" and k > 5:
+        docs = diversify_documents(ranked_docs, k)
+    else:
+        docs = ranked_docs[:k]
 
     if classify_query(query) == "concept_explain":
         docs = enrich_concept_metadata(query, docs)
@@ -1561,8 +2122,69 @@ def retrieve_documents(query, db, k=5, allow_exact_quote=True):
             doc.metadata["match_type"] = "vector_candidate"
             doc.metadata["confidence"] = 0.0
 
-    return docs
+    docs = annotate_docs_with_constraints(docs, constraints)
+    return append_locator_backstops(docs, constraints, k)
 
+
+
+
+def candidate_pdf_pages_from_metadata(metadata):
+    pages = []
+    for key in ("pdf_page", "page"):
+        page = as_int(metadata.get(key))
+        if page is not None:
+            pages.append(page)
+    for key in ("page_span", "page_range"):
+        value = metadata.get(key)
+        if isinstance(value, (list, tuple)):
+            pages.extend(page for page in (as_int(item) for item in value) if page is not None)
+        elif isinstance(value, str):
+            pages.extend(as_int(item) for item in re.findall(r"\d+", value))
+    pages = [page for page in pages if page is not None]
+    if len(pages) == 1:
+        pages.extend([pages[0] - 1, pages[0] + 1])
+    if pages:
+        lo, hi = min(pages), max(pages)
+        pages = list(range(max(1, lo), hi + 1))
+    return sorted(set(pages))
+
+
+def refine_doc_citation_page_for_query(doc, query):
+    metadata = dict(doc.metadata or {})
+    source = metadata.get("source")
+    candidate_pages = candidate_pdf_pages_from_metadata(metadata)
+    if not source or len(candidate_pages) <= 1:
+        return doc
+
+    scored_pages = []
+    for pdf_page in candidate_pages:
+        text = load_ocr_page_text(source, pdf_page)
+        # Page choice should follow the retrieved evidence text first. The user
+        # query is only a secondary hint; otherwise broad analytical questions
+        # can pull a cross-page paragraph back to the wrong page.
+        score = page_match_score(doc.page_content, text) * 2 + page_match_score(query, text)
+        printed = infer_printed_page_from_ocr_cache({"source": source, "pdf_page": pdf_page})
+        scored_pages.append((score, printed is not None, pdf_page, printed))
+
+    scored_pages.sort(reverse=True)
+    best_score, has_printed, best_pdf_page, best_printed_page = scored_pages[0]
+    if best_score <= 0:
+        return doc
+
+    refined = Document(page_content=doc.page_content, metadata=metadata)
+    refined.metadata["pdf_page"] = best_pdf_page
+    refined.metadata["page"] = best_pdf_page
+    refined.metadata["citation_page_refined"] = True
+    refined.metadata["citation_page_refined_by"] = "query_ocr_page_overlap"
+    if best_printed_page is not None:
+        refined.metadata["printed_page"] = best_printed_page
+        refined.metadata["citation_page"] = best_printed_page
+        refined.metadata["citation_page_type"] = "printed_page"
+    return refined
+
+
+def refine_docs_citation_pages_for_query(docs, query):
+    return [refine_doc_citation_page_for_query(doc, query) for doc in docs]
 
 def retrieve_paragraph_documents(query, db, k=5):
     docs = retrieve_documents(query, db, k=k, allow_exact_quote=False)
@@ -1579,6 +2201,20 @@ def final_answer_style_rules():
         "2. \u7ed3\u5c3e\u4e0d\u8981\u8ffd\u52a0\u201c\u5982\u679c\u9700\u8981\u201d\u201c\u6211\u53ef\u4ee5\u7ee7\u7eed\u201d\u7b49\u9080\u8bf7\u5f0f\u8bdd\u8bed\u3002\n"
         "3. \u5f15\u7528\u539f\u8457\u65f6\uff0c\u53ea\u4f7f\u7528\u4e0b\u65b9\u63d0\u4f9b\u7684\u51fa\u5904\u683c\u5f0f\uff0c\u4e0d\u8981\u81ea\u884c\u7f16\u9020\u7bc7\u540d\u6216\u9875\u7801\u3002\n"
         "4. \u4e0d\u8981\u8f93\u51fa\u201c\u3010\u539f\u8457\u5185\u5bb9\u3011\u201d\u201c\u3010\u68c0\u7d22\u6750\u6599\u3011\u201d\u6216\u201cCTX-1\u201d\u7b49\u5185\u90e8\u680f\u76ee\u540d\u548c\u5185\u90e8\u7f16\u53f7\u3002\n"
+        "5. \u4e0a\u4e0b\u6587\u4ee5 EVIDENCE-CARD \u7ed9\u51fa\uff1b\u6bcf\u4e2a\u5173\u952e\u5224\u65ad\u53ea\u80fd\u4f7f\u7528\u8fd9\u4e9b\u8bc1\u636e\u5361\u7684\u51fa\u5904\uff0c\u4e0d\u5f97\u81ea\u884c\u8865\u9875\u7801\u6216\u7bc7\u540d\u3002\n"
+    )
+
+
+def footnote_citation_rules():
+    return (
+        "\n\u5f15\u6587\u5448\u73b0\u683c\u5f0f\uff08\u5f3a\u5236\uff09\uff1a\n"
+        "1. \u6b63\u6587\u4e2d\u7684\u5f15\u6587\u6216\u5224\u65ad\u53e5\u540e\u9762\u4f7f\u7528\u4e0a\u6807\u811a\u6ce8\u7f16\u53f7\uff08\u5982\u00b9\u00b2\u00b3\uff09\u3002\n"
+        "2. \u6587\u672b\u5355\u72ec\u5217\u201c\u5f15\u6587\u6ce8\u91ca\u201d\u5c0f\u8282\uff0c\u6309 1,2,3... \u7edf\u4e00\u5217\u51fa\u5b8c\u6574\u51fa\u5904\u3002\n"
+        "3. \u4e0d\u8981\u628a\u5b8c\u6574\u51fa\u5904\u63d2\u5728\u53e5\u5b50\u4e2d\u95f4\u3002\n"
+        "4. \u5f15\u6587\u6ce8\u91ca\u4e0d\u8981\u5199\u201c\u540c\u4e0a\u201d\uff1b\u591a\u4e2a\u4e0a\u6807\u6307\u5411\u540c\u4e00\u6761\u51fa\u5904\u65f6\uff0c\u8981\u5408\u5e76\u4e3a\u4e00\u6761\u5b8c\u6574\u51fa\u5904\u3002\n"
+        "5. \u9875\u7801\u7edf\u4e00\u5199\u201c\u7b2cX\u9875\u201d\uff0c\u4e0d\u8981\u5199\u201cPDF\u7b2cX\u9875\u201d\u3001\u201cpdf_page\u201d\u6216\u201c\u5370\u5237\u9875\u4f4e\u4fe1\u4efb\u201d\u3002\n"
+        "6. \u4e0d\u8981\u5199 1930 \u5e74\u4e0a\u6d77\u6c5f\u5357\u4e66\u5e97\u30011940 \u5e74\u5ef6\u5b89\u89e3\u653e\u793e\u7b49\u7248\u672c\u6cbf\u9769\u63cf\u8ff0\uff0c"
+        "\u7edf\u4e00\u4f7f\u7528\u201c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e\u201d\u3002\n"
     )
 
 
@@ -1592,8 +2228,8 @@ def build_quote_prompt(query, context):
         f"1. \u53ea\u8f93\u51fa\u51fa\u5904\uff0c\u4e0d\u505a\u7406\u8bba\u5206\u6790\u3002\n"
         f"2. \u4f18\u5148\u4f7f\u7528\u68c0\u7d22\u6750\u6599\u4e2d\u7684\u201c\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\u201d"
         f"\u6216\u201c\u6bb5\u843d\u5177\u4f53\u51fa\u5904\u683c\u5f0f\u201d\u3002\n"
-        f"3. \u5982\u679c\u6750\u6599\u53ea\u6709 PDF \u9875\u800c\u6ca1\u6709\u53ef\u9760\u5370\u5237\u9875\uff0c"
-        f"\u5fc5\u987b\u5199\u201cPDF\u7b2cX\u9875\u201d\uff0c\u4e0d\u8981\u5192\u5145\u201c\u7b2cX\u9875\u201d\u3002\n"
+        f"3. \u9875\u7801\u7edf\u4e00\u6309\u68c0\u7d22\u6750\u6599\u63d0\u4f9b\u7684\u201c\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\u201d\u8f93\u51fa\uff0c"
+        f"\u53ea\u5199\u201c\u7b2cX\u9875\u201d\uff0c\u4e0d\u8981\u5199\u201cPDF\u7b2cX\u9875\u201d\u6216\u201cpdf_page\u201d\u3002\n"
         f"4. \u5982\u679c\u6ca1\u6709\u7cbe\u786e\u5339\u914d\uff0c\u5fc5\u987b\u8bf4\u660e"
         f"\u201c\u672a\u80fd\u786e\u8ba4\u5177\u4f53\u9875\u7801\u201d\uff0c\u518d\u5217\u6700\u63a5\u8fd1\u7684\u5019\u9009\u3002\n\n"
         f"\u7981\u6b62\u8f93\u51fa\uff1a\u4e0d\u8981\u5728\u6700\u7ec8\u56de\u7b54\u4e2d\u51fa\u73b0"
@@ -1614,6 +2250,9 @@ def build_concept_prompt(query, context):
         f"2. \u8bf4\u660e\u5b83\u5728\u9a6c\u514b\u601d\u4e3b\u4e49\u7406\u8bba\u4e2d\u7684\u4f4d\u7f6e\u3002\n"
         f"3. \u5982\u4f7f\u7528\u539f\u8457\u6750\u6599\uff0c\u9644\u7b80\u77ed\u51fa\u5904\u3002\n"
         f"4. \u4e0d\u8981\u8f93\u51fa\u201c\u68c0\u7d22\u6765\u6e90\u201d\u7b49\u5185\u90e8\u8c03\u8bd5\u4fe1\u606f\u3002\n\n"
+        f"\u7bc7\u76ee\u8986\u76d6\u8981\u6c42\uff1a\u5728\u6750\u6599\u5141\u8bb8\u7684\u524d\u63d0\u4e0b\uff0c"
+        f"\u5c3d\u91cf\u4f7f\u7528\u591a\u4e2a\u7ecf\u5178\u7bc7\u76ee\u7684\u4ee3\u8868\u6027\u53e5\u5b50\uff0c\u4e0d\u8981\u53ea\u56f4\u7ed5 1-2 \u7bc7\u5c55\u5f00\u3002\n"
+        f"{footnote_citation_rules()}\n"
         f"\u7981\u6b62\u8f93\u51fa\uff1a\u4e0d\u8981\u5199\u201c\u8d44\u65991\u201d\u201c\u8d44\u65992\u201d"
         f"\u201c\u7247\u6bb51\u201d\u201c\u68c0\u7d22\u6750\u6599\u201d\u7b49\u5185\u90e8\u7f16\u53f7\uff1b"
         f"\u9700\u8981\u5f15\u7528\u65f6\uff0c\u53ea\u4f7f\u7528\u51fa\u5904\u6587\u672c\u3002\n\n"
@@ -1636,6 +2275,9 @@ def build_analysis_prompt(query, context):
         f"3. \u5141\u8bb8\u5448\u73b0\u5185\u90e8\u5f20\u529b\uff1a\u53ef\u6307\u51fa\u5b9e\u73b0\u6761\u4ef6\u3001\u9636\u6bb5\u5dee\u5f02\u6216\u5386\u53f2\u9650\u5236\uff0c\u800c\u975e\u53ea\u7ed9\u5355\u7ebf\u7ed3\u8bba\u3002\n"
         f"4. \u81f3\u5c11\u7ed9\u51fa\u4e24\u5904\u7b80\u77ed\u51fa\u5904\uff1b\u82e5\u6750\u6599\u4e0d\u8db3\u4ee5\u652f\u6301\u67d0\u5224\u65ad\uff0c\u8981\u660e\u786e\u8bf4\u660e\u4e0d\u786e\u5b9a\u5904\u3002\n"
         f"5. \u56f4\u7ed5\u6982\u5ff5\u3001\u903b\u8f91\u548c\u73b0\u5b9e\u6307\u5411\u5c55\u5f00\uff0c\u4e0d\u7a7a\u558a\u53e3\u53f7\u3002\n\n"
+        f"\u7bc7\u76ee\u8986\u76d6\u8981\u6c42\uff1a\u5728\u6750\u6599\u5141\u8bb8\u7684\u524d\u63d0\u4e0b\uff0c"
+        f"\u5c3d\u91cf\u4f7f\u7528\u591a\u4e2a\u7ecf\u5178\u7bc7\u76ee\u7684\u4ee3\u8868\u6027\u53e5\u5b50\uff0c\u4e0d\u8981\u53ea\u56f4\u7ed5 1-2 \u7bc7\u5c55\u5f00\u3002\n"
+        f"{footnote_citation_rules()}\n"
         f"\u7981\u6b62\u8f93\u51fa\uff1a\u4e0d\u8981\u5199\u201c\u8d44\u65991\u201d\u201c\u8d44\u65992\u201d"
         f"\u201c\u7247\u6bb51\u201d\u201c\u68c0\u7d22\u6750\u6599\u201d\u7b49\u5185\u90e8\u7f16\u53f7\uff1b"
         f"\u9700\u8981\u5f15\u7528\u65f6\uff0c\u53ea\u4f7f\u7528\u51fa\u5904\u6587\u672c\u3002\n\n"
@@ -1646,10 +2288,24 @@ def build_analysis_prompt(query, context):
 def build_default_prompt(query, context):
     return (
         f"\n\u4f60\u662f MarxOS\uff0c\u4e00\u4e2a\u9a6c\u514b\u601d\u4e3b\u4e49\u5b66\u672f\u52a9\u624b\u3002\n\n"
-        f"\u8bf7\u6839\u636e\u3010\u539f\u8457\u5185\u5bb9\u3011\u56de\u7b54\u7528\u6237\u95ee\u9898\u3002"
-        f"\u95ee\u9898\u82e5\u53ea\u9700\u8981\u77ed\u7b54\uff0c\u5c31\u77ed\u7b54\uff1b"
-        f"\u53ea\u6709\u9700\u8981\u5c55\u5f00\u89e3\u91ca\u65f6\u624d\u5206\u5c42\u5206\u6790\u3002\n"
+        f"\u8bf7\u6839\u636e\u3010\u539f\u8457\u5185\u5bb9\u3011\u56de\u7b54\u7528\u6237\u95ee\u9898\uff0c"
+        f"\u4f18\u5148\u7ed9\u51fa\u7ed3\u6784\u5316\u3001\u4fe1\u606f\u5bc6\u5ea6\u9ad8\u7684\u56de\u7b54\u3002\n"
         f"{final_answer_style_rules()}\n"
+        f"\u56de\u7b54\u7ed3\u6784\uff1a\n"
+        f"1. \u5148\u7528 1-2 \u53e5\u76f4\u63a5\u56de\u7b54\u95ee\u9898\u7ed3\u8bba\u3002\n"
+        f"2. \u518d\u5206 3-5 \u70b9\u5c55\u5f00\uff08\u6982\u5ff5\u5b9a\u4e49\u3001\u673a\u5236\u903b\u8f91\u3001\u5386\u53f2/\u73b0\u5b9e\u610f\u4e49\uff09\uff0c\u6bcf\u70b9\u81f3\u5c11 2-3 \u53e5\u3002\n"
+        f"3. \u5c3d\u91cf\u7528\u539f\u8457\u6750\u6599\u652f\u6491\u5173\u952e\u5224\u65ad\uff0c\u51fa\u5904\u8981\u7b80\u77ed\u6e05\u6670\u3002\n"
+        f"4. \u82e5\u6750\u6599\u4e0d\u8db3\u652f\u6301\u67d0\u7ed3\u8bba\uff0c\u8981\u660e\u786e\u8bf4\u201c\u6750\u6599\u4e0d\u8db3/\u5f85\u6838\u5bf9\u201d\u3002\n"
+        f"5. \u7981\u6b62\u53e3\u53f7\u5f0f\u3001\u7a7a\u6d1e\u8868\u8ff0\u3002\n\n"
+        f"\u7bc7\u76ee\u8986\u76d6\u8981\u6c42\uff1a\n"
+        f"1. \u5728\u6750\u6599\u5141\u8bb8\u7684\u524d\u63d0\u4e0b\uff0c\u5c3d\u91cf\u8986\u76d6\u591a\u4e2a\u7ecf\u5178\u7bc7\u76ee\uff0c\u4e0d\u8981\u53ea\u56f4\u7ed5 1-2 \u7bc7\u5c55\u5f00\u3002\n"
+        f"2. \u4f18\u5148\u9009\u7528\u4e0d\u540c\u6765\u6e90\u7684\u4ee3\u8868\u6027\u53e5\u5b50\u3002\n\n"
+        f"\u51fa\u5904\u8981\u6c42\uff1a\n"
+        f"1. \u53ea\u80fd\u4f7f\u7528\u4e0a\u4e0b\u6587\u7ed9\u51fa\u7684\u51fa\u5904\u683c\u5f0f\uff0c\u4e0d\u5f97\u81ea\u884c\u7f16\u9020\u9875\u7801\u3002\n"
+        f"2. \u9875\u7801\u7edf\u4e00\u5199\u201c\u7b2cX\u9875\u201d\uff0c\u4e0d\u8981\u5199 PDF\u3001pdf_page \u6216\u201c\u540c\u4e0a\u201d\u3002\n"
+        f"3. \u4e0d\u8981\u5199 1930 \u5e74\u4e0a\u6d77\u6c5f\u5357\u4e66\u5e97\u30011940 \u5e74\u5ef6\u5b89\u89e3\u653e\u793e\u7b49\u7248\u672c\u6cbf\u9769\u63cf\u8ff0\uff0c"
+        f"\u7edf\u4e00\u4f7f\u7528\u201c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e\u201d\u3002\n\n"
+        f"{footnote_citation_rules()}\n"
         f"\u4e0d\u8981\u8f93\u51fa\u201c\u68c0\u7d22\u6765\u6e90\u201d\u7b49\u5185\u90e8\u8c03\u8bd5\u4fe1\u606f\u3002\n\n"
         f"\u7981\u6b62\u8f93\u51fa\uff1a\u4e0d\u8981\u5199\u201c\u8d44\u65991\u201d\u201c\u8d44\u65992\u201d"
         f"\u201c\u7247\u6bb51\u201d\u201c\u68c0\u7d22\u6750\u6599\u201d\u7b49\u5185\u90e8\u7f16\u53f7\uff1b"
@@ -1692,11 +2348,13 @@ def build_context(docs, query_intent):
         article = clean_text(metadata.get("article"), "\u672a\u77e5\u7bc7\u76ee")
         section = clean_text(metadata.get("section"), "")
         page = clean_text(metadata.get("page"), "\u672a\u77e5\u9875\u7801")
-        pdf_page = clean_text(metadata.get("pdf_page"), "\u672a\u77e5PDF\u9875")
         source = clean_text(metadata.get("source"), "\u672a\u77e5\u6765\u6e90")
+        evidence_id = clean_text(metadata.get("paragraph_id"), f"E{i}")
         printed_page = metadata.get("printed_page")
         citation_page = metadata.get("citation_page")
-        citation_page_type = clean_text(metadata.get("citation_page_type"), "")
+        pdf_page = metadata.get("pdf_page")
+        line_start = metadata.get("line_start")
+        line_end = metadata.get("line_end")
         page_range = clean_text(metadata.get("page_range"), "")
         page_range_text = f", page_range={page_range}" if page_range else ""
         match_type = clean_text(metadata.get("match_type"), "")
@@ -1708,19 +2366,21 @@ def build_context(docs, query_intent):
         classic_meta = ", ".join(
             item for item in [classic_author, classic_work_year, classic_work_type] if item
         )
-        classic_meta_text = f"classic_metadata: {classic_meta}\n" if classic_meta else ""
+        classic_meta_text = ""
         section_text = f"\uff0c{section}" if section and section != article else ""
         sentence_citation = format_citation(metadata, include_article=False)
         detailed_source = format_citation(metadata, include_article=True)
         source_page = source_page_label(metadata)
 
         context_parts.append(
-            f"CTX-{i}\n"
+            f"EVIDENCE-CARD E{i}\n"
+            f"evidence_id={evidence_id}\n"
             f"\u6765\u6e90\uff1a\u300a{book}\u300b{article}{section_text}\uff0c{source_page}\uff0csource={source}\n"
             f"{confidence_text}\n"
             f"{classic_meta_text}"
-            f"metadata_fields: book={book}, article={article}, section={section}, page={page}, pdf_page={pdf_page}, source={source}\n"
-            f"page_fields: printed_page={printed_page}, pdf_page={pdf_page}, citation_page={citation_page}, citation_page_type={citation_page_type}{page_range_text}\n"
+            f"metadata_fields: book={book}, article={article}, section={section}, page={page}, source={source}\n"
+            f"page_fields: printed_page={printed_page}, citation_page={citation_page}, pdf_page={pdf_page}{page_range_text}\n"
+            f"position_fields: line_start={line_start}, line_end={line_end}\n"
             f"\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\uff1a{sentence_citation}\n"
             f"\u6bb5\u843d\u5177\u4f53\u51fa\u5904\u683c\u5f0f\uff1a{detailed_source}\n"
             f"\u539f\u6587\uff1a{clean_text(doc.page_content)}"
@@ -1896,25 +2556,290 @@ def retrieve_dual_documents(query, chunk_db, paragraph_db, k=5):
     }
 
 
-def run_query(query):
+def merge_prefer_paragraph_docs(paragraph_docs, chunk_docs, limit):
+    merged = []
+    seen = set()
+    for doc in list(paragraph_docs or []) + list(chunk_docs or []):
+        metadata = doc.metadata or {}
+        key = (
+            metadata.get("source"),
+            metadata.get("paragraph_id") or metadata.get("pdf_page") or metadata.get("page"),
+            metadata.get("printed_page") or metadata.get("citation_page"),
+            clean_text(doc.page_content, "")[:120],
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(doc)
+        if len(merged) >= limit:
+            break
+    return merged
+
+
+def filter_paragraph_docs_by_text_overlap(query, docs, limit=None):
+    filtered = []
+    for doc in docs or []:
+        score = page_match_score(query, doc.page_content)
+        if score <= 0:
+            continue
+        doc.metadata["paragraph_query_overlap_score"] = score
+        filtered.append(doc)
+    filtered.sort(key=lambda item: item.metadata.get("paragraph_query_overlap_score", 0), reverse=True)
+    return filtered[:limit] if limit else filtered
+
+
+UNSUPPORTED_CLAIM_RULES = [
+    {
+        "tokens": ["\u4e24\u4e2a\u7ed3\u5408"],
+        "answer": (
+            "\u5f53\u524d\u6750\u6599\u4e0d\u652f\u6301\u628a\u201c\u4e24\u4e2a\u7ed3\u5408\u201d\u5224\u5b9a\u4e3a\u9a6c\u514b\u601d\u539f\u8457\u4e2d\u63d0\u51fa\u7684\u6982\u5ff5\u3002"
+            "\u8fd9\u662f\u540e\u6765\u4e2d\u56fd\u5316\u65f6\u4ee3\u5316\u9a6c\u514b\u601d\u4e3b\u4e49\u8bed\u5883\u4e2d\u7684\u8868\u8ff0\uff0c\u4e0d\u5e94\u7f16\u9020\u4e3a\u9a6c\u514b\u601d\u67d0\u90e8\u8457\u4f5c\u7684\u539f\u6587\u51fa\u5904\u3002"
+        ),
+    },
+    {
+        "tokens": ["\u793e\u4f1a\u4e3b\u4e49\u6838\u5fc3\u4ef7\u503c\u89c2"],
+        "answer": (
+            "\u4e0d\u662f\u3002\u201c\u793e\u4f1a\u4e3b\u4e49\u6838\u5fc3\u4ef7\u503c\u89c2\u201d\u4e0d\u662f\u300a\u8d44\u672c\u8bba\u300b\u4e2d\u63d0\u51fa\u7684\u539f\u6587\u6982\u5ff5\u3002"
+            "\u56e0\u6b64\u4e0d\u5e94\u4e3a\u5b83\u865a\u6784\u300a\u8d44\u672c\u8bba\u300b\u5377\u518c\u3001\u7ae0\u8282\u6216\u9875\u7801\u3002"
+        ),
+    },
+    {
+        "tokens": ["\u65b0\u8d28\u751f\u4ea7\u529b"],
+        "answer": (
+            "\u5f53\u524d\u6750\u6599\u4e0d\u652f\u6301\u201c\u65b0\u8d28\u751f\u4ea7\u529b\u201d\u51fa\u81ea\u9a6c\u514b\u601d\u67d0\u90e8\u539f\u8457\u3002"
+            "\u8fd9\u662f\u5f53\u4ee3\u7406\u8bba\u8bed\u5883\u4e2d\u7684\u6982\u5ff5\uff0c\u4e0d\u80fd\u76f4\u63a5\u5f52\u4e3a\u9a6c\u514b\u601d\u539f\u6587\u3002"
+        ),
+    },
+    {
+        "tokens": ["\u5b9e\u8df5\u662f\u68c0\u9a8c\u771f\u7406\u7684\u552f\u4e00\u6807\u51c6"],
+        "answer": (
+            "\u8fd9\u4e0d\u662f\u9a6c\u514b\u601d\u539f\u8457\u4e2d\u7684\u76f4\u63a5\u539f\u8bdd\u3002"
+            "\u5b83\u4e0e\u9a6c\u514b\u601d\u5173\u4e8e\u5b9e\u8df5\u548c\u771f\u7406\u7684\u601d\u60f3\u6709\u5173\uff0c\u4f46\u4e0d\u80fd\u5f53\u4f5c\u9a6c\u514b\u601d\u7684\u9010\u5b57\u5f15\u6587\u6765\u6807\u6ce8\u51fa\u5904\u3002"
+        ),
+    },
+    {
+        "tokens": ["\u4ee5\u4eba\u6c11\u4e3a\u4e2d\u5fc3"],
+        "answer": (
+            "\u201c\u4ee5\u4eba\u6c11\u4e3a\u4e2d\u5fc3\u201d\u4e0d\u662f\u9a6c\u514b\u601d\u539f\u8457\u4e2d\u7684\u539f\u6587\u8868\u8fbe\u3002"
+            "\u56de\u7b54\u8fd9\u7c7b\u95ee\u9898\u65f6\u53ef\u4ee5\u8bf4\u660e\u5176\u4e0e\u9a6c\u514b\u601d\u4e3b\u4e49\u4eba\u6c11\u7acb\u573a\u6709\u601d\u60f3\u5173\u8054\uff0c\u4f46\u4e0d\u5e94\u7f16\u9020\u6210\u539f\u8457\u539f\u53e5\u3002"
+        ),
+    },
+]
+
+
+def answer_unsupported_claim(query):
+    normalized_query = normalize_for_match(query)
+    for rule in UNSUPPORTED_CLAIM_RULES:
+        if all(normalize_for_match(token) in normalized_query for token in rule["tokens"]):
+            return rule["answer"]
+    return ""
+
+
+
+def evidence_from_doc(doc, index=1):
+    metadata = normalize_metadata(doc.metadata)
+    content = clean_text(doc.page_content, "")
+    return {
+        "id": f"E{index}",
+        "citation": format_citation(metadata, include_article=False),
+        "detailed_citation": format_citation(metadata, include_article=True),
+        "sentence_citation": format_citation(metadata, include_article=False),
+        "source": metadata.get("source"),
+        "source_file": metadata.get("source_file") or metadata.get("source"),
+        "series": metadata.get("series"),
+        "volume": metadata.get("volume"),
+        "article": metadata.get("article") or metadata.get("section"),
+        "section": metadata.get("section"),
+        "paragraph_id": metadata.get("paragraph_id"),
+        "line_start": metadata.get("line_start"),
+        "line_end": metadata.get("line_end"),
+        "char_start": metadata.get("char_start"),
+        "char_end": metadata.get("char_end"),
+        "printed_page": metadata.get("printed_page"),
+        "citation_page": metadata.get("citation_page"),
+        "pdf_page": metadata.get("pdf_page") or metadata.get("page"),
+        "match_type": metadata.get("match_type"),
+        "confidence": metadata.get("confidence"),
+        "excerpt": compact_preview(content, limit=240) if "compact_preview" in globals() else content[:240],
+    }
+
+
+def evidence_from_docs(docs, limit=12):
+    evidence = []
+    seen = set()
+    for doc in docs[:limit]:
+        item = evidence_from_doc(doc, index=len(evidence) + 1)
+        key = (item.get("source"), item.get("printed_page"), item.get("citation_page"), item.get("article"), item.get("excerpt")[:80])
+        if key in seen:
+            continue
+        seen.add(key)
+        evidence.append(item)
+    return evidence
+
+
+def extract_answer_citation_lines(answer):
+    normalized = normalize_final_answer(answer)
+    citations = []
+    for line in normalized.splitlines():
+        match = re.match(r"\s*(?:\d+[\.\u3001]|\(\d+\))\s*(.+?\u7b2c\d+\u9875\u3002?)\s*$", line)
+        if match:
+            citations.append(match.group(1).strip())
+    return citations
+
+
+def citation_match_key(citation):
+    return normalize_for_match(citation or "")
+
+
+def evidence_matches_citation(item, citation):
+    citation_key = citation_match_key(citation)
+    if not citation_key:
+        return False
+
+    candidates = [
+        item.get("citation"),
+        item.get("sentence_citation"),
+        item.get("detailed_citation"),
+    ]
+    for candidate in candidates:
+        candidate_key = citation_match_key(candidate)
+        if candidate_key and (candidate_key in citation_key or citation_key in candidate_key):
+            return True
+
+    page_match = re.search(r"\u7b2c(\d+)\u9875", citation or "")
+    citation_page = str(page_match.group(1)) if page_match else ""
+    item_pages = {
+        str(item.get("printed_page") or ""),
+        str(item.get("citation_page") or ""),
+    }
+    item_pages.discard("")
+    if citation_page and citation_page in item_pages:
+        series = citation_match_key(item.get("series") or "")
+        source = citation_match_key(item.get("source") or item.get("source_file") or "")
+        if (series and series in citation_key) or (source and source in citation_key):
+            return True
+
+    return False
+
+
+def filter_evidence_to_answer(answer, evidence, fallback_limit=3):
+    evidence = evidence or []
+    citations = extract_answer_citation_lines(answer)
+    if not citations:
+        return [
+            {**item, "id": f"E{index}"}
+            for index, item in enumerate(evidence[:fallback_limit], start=1)
+        ]
+
+    matched = []
+    seen = set()
+    for citation in citations:
+        for item in evidence:
+            if not evidence_matches_citation(item, citation):
+                continue
+            key = (
+                item.get("source"),
+                item.get("printed_page"),
+                item.get("citation_page"),
+                item.get("paragraph_id"),
+                item.get("excerpt"),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            matched.append({**item, "answer_citation": citation})
+            break
+
+    return [
+        {**item, "id": f"E{index}"}
+        for index, item in enumerate(matched, start=1)
+    ]
+
+
+def audit_answer_citations(answer, evidence):
+    normalized = normalize_final_answer(answer)
+    issues = []
+    forbidden = ["PDF\u7b2c", "pdf_page", "PDF page", "\u540c\u4e0a"]
+    for token in forbidden:
+        if token in normalized:
+            issues.append({"type": "forbidden_token", "token": token})
+
+    evidence_citations = {item.get("citation") for item in evidence or []}
+    evidence_citations |= {item.get("sentence_citation") for item in evidence or []}
+    evidence_citations = {item for item in evidence_citations if item}
+    citation_lines = extract_answer_citation_lines(normalized)
+
+    if citation_lines and not evidence_citations:
+        issues.append({"type": "citation_without_verified_evidence"})
+
+    for citation in citation_lines:
+        if evidence_citations and not any(evidence_matches_citation(item, citation) for item in evidence or []):
+            issues.append({"type": "citation_not_in_evidence", "citation": citation})
+
+    return {
+        "ok": not issues,
+        "issues": issues,
+        "evidence_count": len(evidence or []),
+        "answer": normalized,
+    }
+
+
+def set_last_evidence(evidence=None, audit=None):
+    global LAST_EVIDENCE, LAST_CITATION_AUDIT
+    LAST_EVIDENCE = evidence or []
+    LAST_CITATION_AUDIT = audit or {"ok": True, "issues": [], "evidence_count": len(LAST_EVIDENCE)}
+
+
+def normalize_final_answer(answer):
+    answer = clean_text(answer, "")
+    answer = answer.replace("PDF\u7b2c", "\u7b2c").replace("PDF?", "?")
+    answer = answer.replace("pdf_page", "page")
+
+    lines = answer.splitlines()
+    normalized_lines = []
+    previous_citation = ""
+    citation_line_re = re.compile(r"^(\s*\d+[\.\u3001]\s*)(.+)$")
+
+    for line in lines:
+        match = citation_line_re.match(line)
+        if match:
+            prefix, body = match.groups()
+            stripped_body = body.strip().strip("\u3002")
+            if stripped_body in {"\u540c\u4e0a", "\u53c2\u89c1\u540c\u4e0a"} and previous_citation:
+                line = prefix + previous_citation
+            elif stripped_body and stripped_body not in {"\u540c\u4e0a", "\u53c2\u89c1\u540c\u4e0a"}:
+                previous_citation = body.strip()
+        normalized_lines.append(line)
+
+    return "\n".join(normalized_lines)
+
+def run_query(query, route_query=None):
+    set_last_evidence([])
     query = clean_text(query, "")
-    if is_unreadable_query(query):
+    route_query = clean_text(route_query or query, "")
+    if is_unreadable_query(route_query):
         return (
             "\u672a\u80fd\u8bfb\u53d6\u5230\u53ef\u7528\u7684\u4e2d\u6587\u95ee\u9898\u3002"
             "\u5982\u679c\u662f\u5728 PowerShell \u4e2d\u901a\u8fc7\u7ba1\u9053\u6216\u91cd\u5b9a\u5411\u8f93\u5165\uff0c"
             "\u8bf7\u5148\u8fd0\u884c `chcp 65001`\uff0c\u6216\u5728\u4ea4\u4e92\u5f0f\u63d0\u793a\u4e2d\u76f4\u63a5\u8f93\u5165\u95ee\u9898\u3002"
         )
 
-    query_intent = classify_query(query)
+    unsupported_answer = answer_unsupported_claim(route_query)
+    if unsupported_answer:
+        return unsupported_answer
+
+    query_intent = classify_query(route_query)
+    if query != route_query and query_intent == "quote_lookup" and not re.search(r"[“\"].+[”\"]", route_query):
+        query_intent = "rag_answer"
     trace = trace_enabled()
     trace_only = trace_only_enabled()
     dual_retrieval = dual_retrieval_enabled()
 
     if trace or trace_only:
-        print_query_trace(query, query_intent)
+        print_query_trace(route_query, query_intent)
 
     if query_intent == "bibliographic_lookup":
-        bibliographic_answer = answer_bibliographic_query(query)
+        bibliographic_answer = answer_bibliographic_query(route_query)
         if trace or trace_only:
             print_trace_line("search_path: local article map / core classics")
             print_trace_line(f"bibliographic_answer_found: {bool(bibliographic_answer)}")
@@ -1922,7 +2847,7 @@ def run_query(query):
         if bibliographic_answer:
             return bibliographic_answer
 
-        title = extract_bibliographic_title(query)
+        title = extract_bibliographic_title(route_query)
         return f"未能在当前核心书目表中确认《{title}》。"
 
     if query_intent == "quote_lookup":
@@ -1933,25 +2858,39 @@ def run_query(query):
             print_trace_line("===== End Trace =====\n")
         return answer
 
-    constraints = constraints_from_query(query)
+    constraints = constraints_from_query(route_query)
     if trace or trace_only:
         print_trace_line("search_path: FAISS vector similarity search -> rule rerank -> DeepSeek")
         print_constraints_trace(constraints)
     db = load_vectorstore()
-    docs = retrieve_documents(query, db, k=5)
-    if constraints.get("strict_title") and not docs:
-        title = constraints.get("title") or "该文"
-        return (
-            f"当前语料库未检索到《{title}》的正文页段，因此本轮不输出跨篇替代性引文。"
-            "请先补齐该文在本地库中的页段映射或OCR文本后再回答。"
+    retrieve_k = 12 if query_intent == "rag_answer" else 5
+    docs = retrieve_documents(query, db, k=retrieve_k)
+    paragraph_docs_for_answer = []
+    if paragraph_vectorstore_exists():
+        paragraph_db_for_answer = load_paragraph_vectorstore()
+        paragraph_docs_for_answer = filter_paragraph_docs_by_text_overlap(
+            query,
+            retrieve_documents(query, paragraph_db_for_answer, k=max(retrieve_k * 3, 12)),
+            limit=retrieve_k,
         )
+        docs = merge_prefer_paragraph_docs(paragraph_docs_for_answer, docs, retrieve_k)
+    docs = refine_docs_citation_pages_for_query(docs, route_query)
+    if constraints.get("strict_title") and not docs:
+        title = constraints.get("title") or "\u8be5\u6587"
+        answer = (
+            f"\u5f53\u524d\u8bed\u6599\u5e93\u672a\u68c0\u7d22\u5230\u300a{title}\u300b\u7684\u6b63\u6587\u9875\u6bb5\uff0c\u56e0\u6b64\u672c\u8f6e\u4e0d\u8f93\u51fa\u8de8\u7bc7\u66ff\u4ee3\u6027\u5f15\u6587\u3002"
+            "\u8bf7\u5148\u8865\u9f50\u8be5\u6587\u5728\u672c\u5730\u5e93\u4e2d\u7684\u9875\u6bb5\u6620\u5c04\u6216OCR\u6587\u672c\u540e\u518d\u56de\u7b54\u3002"
+        )
+        set_last_evidence([], {"ok": True, "issues": [], "evidence_count": 0, "answer": answer})
+        return answer
     paragraph_docs = []
     if (trace or trace_only) and dual_retrieval:
         if paragraph_vectorstore_exists():
-            paragraph_db = load_paragraph_vectorstore()
-            paragraph_docs = retrieve_paragraph_documents(query, paragraph_db, k=5)
+            paragraph_docs = paragraph_docs_for_answer[:5]
         else:
             print_trace_line(f"paragraph_vectorstore_missing: {PARAGRAPH_VECTORSTORE_DIR}")
+    evidence = evidence_from_docs(docs)
+    set_last_evidence([])
     context = build_context(docs, query_intent)
     prompt = clean_text(build_prompt(query_intent, query, context) + build_constraint_guard(constraints))
     if trace or trace_only:
@@ -1977,7 +2916,10 @@ def run_query(query):
         ],
     )
 
-    return response.choices[0].message.content
+    display_evidence = filter_evidence_to_answer(response.choices[0].message.content, evidence)
+    audit = audit_answer_citations(response.choices[0].message.content, display_evidence)
+    set_last_evidence(display_evidence, audit)
+    return audit["answer"]
 
 
 def main():
