@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 DEFAULT_CORE_CLASSICS_PATH = Path(__file__).with_name("core_classics.json")
+DEFAULT_CORE_BIBLIOGRAPHY_PATH = Path(__file__).with_name("core_bibliography_catalog.json")
 
 
 def normalize_for_match(text):
@@ -41,6 +42,49 @@ def load_core_classics(path=None):
         )
 
     return classics
+
+
+@lru_cache(maxsize=4)
+def load_core_bibliography(path=None):
+    path = Path(path) if path else DEFAULT_CORE_BIBLIOGRAPHY_PATH
+
+    if not path.exists():
+        return []
+
+    with path.open("r", encoding="utf-8") as f:
+        sections = json.load(f)
+
+    classics_by_id = {classic.get("id"): classic for classic in load_core_classics()}
+    normalized_sections = []
+    for section in sections:
+        works = []
+        for work in sorted(section.get("works") or [], key=lambda item: item.get("priority", 99)):
+            classic = classics_by_id.get(work.get("classic_id"))
+            if not classic:
+                continue
+            works.append(
+                {
+                    "classic_id": classic.get("id"),
+                    "title": classic.get("title"),
+                    "author": classic.get("author"),
+                    "work_year": classic.get("work_year"),
+                    "work_type": classic.get("work_type"),
+                    "entries": classic.get("entries") or [],
+                    "priority": work.get("priority", 99),
+                    "role": work.get("role", "foundation"),
+                }
+            )
+
+        normalized_sections.append(
+            {
+                "id": section.get("id"),
+                "label": section.get("label"),
+                "description": section.get("description", ""),
+                "works": works,
+            }
+        )
+
+    return normalized_sections
 
 
 def match_core_classic(text, path=None):

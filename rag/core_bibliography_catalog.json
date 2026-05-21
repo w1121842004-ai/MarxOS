@@ -1,0 +1,98 @@
+[
+  {
+    "id": "marxist_philosophy",
+    "label": "马克思主义哲学",
+    "description": "以历史唯物主义、实践观点、辩证法和人的解放问题为核心的基础书目。",
+    "works": [
+      {
+        "classic_id": "critique_hegel_law_intro",
+        "priority": 1,
+        "role": "foundation"
+      },
+      {
+        "classic_id": "economic_philosophic_manuscripts_1844",
+        "priority": 2,
+        "role": "foundation"
+      },
+      {
+        "classic_id": "theses_feuerbach",
+        "priority": 3,
+        "role": "foundation"
+      },
+      {
+        "classic_id": "german_ideology",
+        "priority": 4,
+        "role": "foundation"
+      },
+      {
+        "classic_id": "anti_duhring",
+        "priority": 5,
+        "role": "extension"
+      },
+      {
+        "classic_id": "dialectics_nature",
+        "priority": 6,
+        "role": "extension"
+      }
+    ]
+  },
+  {
+    "id": "marxist_political_economy",
+    "label": "马克思主义政治经济学",
+    "description": "以劳动价值论、剩余价值论、资本主义生产方式和工资利润问题为核心的基础书目。",
+    "works": [
+      {
+        "classic_id": "wage_labour_capital",
+        "priority": 1,
+        "role": "foundation"
+      },
+      {
+        "classic_id": "value_price_profit",
+        "priority": 2,
+        "role": "foundation"
+      },
+      {
+        "classic_id": "capital_vol1",
+        "priority": 3,
+        "role": "foundation"
+      }
+    ]
+  },
+  {
+    "id": "scientific_socialism",
+    "label": "科学社会主义",
+    "description": "以无产阶级革命、国家政权、社会主义过渡和共产主义纲领为核心的基础书目。",
+    "works": [
+      {
+        "classic_id": "communist_manifesto",
+        "priority": 1,
+        "role": "foundation"
+      },
+      {
+        "classic_id": "civil_war_france",
+        "priority": 2,
+        "role": "foundation"
+      },
+      {
+        "classic_id": "critique_gotha_programme",
+        "priority": 3,
+        "role": "foundation"
+      },
+      {
+        "classic_id": "socialism_utopian_scientific",
+        "priority": 4,
+        "role": "foundation"
+      },
+      {
+        "classic_id": "eighteenth_brumaire",
+        "priority": 5,
+        "role": "extension"
+      },
+      {
+        "classic_id": "origin_family_private_property_state",
+        "priority": 6,
+        "role": "extension"
+      }
+    ]
+  }
+]

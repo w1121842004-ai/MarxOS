@@ -5,6 +5,7 @@ from unittest.mock import patch
 from langchain_core.documents import Document
 
 import app
+import web_app
 from rag.exact_quote_lookup import exact_quote_lookup
 
 
@@ -771,6 +772,207 @@ class AppLocalPathTests(unittest.TestCase):
         docs = app.retrieve_documents("\u9a6c\u514b\u601d\u5728\u300a\u54e5\u8fbe\u7eb2\u9886\u6279\u5224\u300b\u4e2d\u5982\u4f55\u5206\u6790\u5171\u4ea7\u4e3b\u4e49\u7684", FakeDb(), k=1)
 
         self.assertEqual(docs[0].metadata.get("page"), 615)
+
+    def test_farmer_cooperative_query_infers_fadeng_farmer_problem_title(self):
+        constraints = app.constraints_from_query("\u8bf7\u5217\u51fa\u5341\u6bb5\u9a6c\u514b\u601d\u5173\u4e8e\u519c\u6c11\u5408\u4f5c\u793e\u7684\u89c2\u70b9")
+
+        self.assertEqual(constraints.get("topic_id"), "peasant_cooperative")
+        self.assertGreaterEqual(len(constraints.get("sources") or set()), 3)
+        self.assertIn("mea04.pdf", constraints.get("sources") or set())
+
+    def test_diversify_documents_can_enforce_distinct_sources(self):
+        docs = [
+            Document(page_content="a", metadata={"source": "mea04.pdf", "article": "法德农民问题"}),
+            Document(page_content="b", metadata={"source": "mea04.pdf", "article": "法德农民问题（二）"}),
+            Document(page_content="c", metadata={"source": "mea02.pdf", "article": "德国农民战争"}),
+            Document(page_content="d", metadata={"source": "mea05.pdf", "article": "土地国有化"}),
+        ]
+
+        result = app.diversify_documents(docs, k=3, min_distinct_sources=3)
+
+        self.assertEqual(len(result), 3)
+        self.assertEqual(len({doc.metadata.get("source") for doc in result}), 3)
+
+    def test_normalize_topic_title_removes_author_prefix_and_noise(self):
+        self.assertEqual(
+            app.normalize_topic_title("弗·恩格斯法德农民问题"),
+            "法德农民问题",
+        )
+        self.assertEqual(
+            app.normalize_topic_title("卡·马克思论土地国有化.....................................................23•"),
+            "论土地国有化",
+        )
+
+    def test_topic_catalog_includes_six_popular_marx_themes(self):
+        topic_ids = [topic.get("id") for topic in app.TOPIC_CATALOG]
+
+        self.assertEqual(
+            topic_ids,
+            [
+                "social_analysis",
+                "capitalism_critique",
+                "alienation_liberation",
+                "state_revolution",
+                "peasant_cooperative",
+                "socialism_communism",
+            ],
+        )
+
+    def test_topic_seed_queries_expand_with_topic_work_titles(self):
+        constraints = app.constraints_from_query("请列出十段马克思关于农民合作社的观点")
+
+        seeds = app.topic_seed_queries("请列出十段马克思关于农民合作社的观点", constraints)
+
+        self.assertEqual(seeds[0], "请列出十段马克思关于农民合作社的观点")
+        self.assertIn("法德农民问题", seeds)
+        self.assertIn("德国农民战争", seeds)
+
+    def test_explicit_work_query_takes_priority_over_broad_topic(self):
+        constraints = app.constraints_from_query("请概括共产党宣言关于阶级斗争的观点")
+
+        self.assertTrue(constraints.get("strict_title"))
+        self.assertEqual(constraints.get("title"), "共产党宣言")
+        self.assertNotEqual(constraints.get("topic_id"), "social_analysis")
+
+    def test_format_topic_viewpoint_removes_leading_punctuation_and_work_prefix(self):
+        item = {
+            "article": "法德农民问题",
+            "section": "法德农民问题",
+            "excerpt": "。法德农民问题 要把这财产从现在就已经压在它身上的重担下解放出来z，把f田农变成自由的所有者。",
+        }
+        constraints = {
+            "topic_id": "peasant_cooperative",
+            "topic_markers": ["农民合作社", "小农", "社会帮助", "土地问题"],
+        }
+
+        viewpoint = app.format_topic_viewpoint(item, constraints)
+
+        self.assertFalse(viewpoint.startswith("。"))
+        self.assertNotIn("法德农民问题 要", viewpoint)
+        self.assertNotIn("z", viewpoint)
+        self.assertIn("解放农民", viewpoint)
+
+    def test_strict_title_list_query_can_answer_without_openai(self):
+        docs = [
+            Document(
+                page_content="。到目前为止的一切社会的历史都是阶级斗争的历史。",
+                metadata={
+                    "book": "马克思恩格斯选集 第1卷",
+                    "article": "共产党宣言",
+                    "section": "共产党宣言",
+                    "source": "mes01.pdf",
+                    "printed_page": 376,
+                    "pdf_page": 451,
+                },
+            ),
+            Document(
+                page_content="。我们的时代，资产阶级时代，却有一个特点：它使阶级对立简单化了。",
+                metadata={
+                    "book": "马克思恩格斯选集 第1卷",
+                    "article": "共产党宣言",
+                    "section": "共产党宣言",
+                    "source": "mes01.pdf",
+                    "printed_page": 377,
+                    "pdf_page": 452,
+                },
+            ),
+        ]
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return docs
+
+        with patch("app.load_vectorstore", return_value=FakeDb()), patch("app.OpenAI") as openai:
+            answer = app.run_query("请概括共产党宣言关于阶级斗争的观点")
+
+        openai.assert_not_called()
+        self.assertIn("《共产党宣言》", answer)
+        self.assertIn("阶级斗争", answer)
+        self.assertIn("观点：", answer)
+
+    def test_filter_evidence_keeps_only_matched_items_when_citations_match(self):
+        answer = (
+            "\u8fd9\u662f\u7b54\u6848\u3002\n\n"
+            "*\u5f15\u7528\u6ce8\u91ca*\n"
+            "1. \u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c401\u9875\u3002"
+        )
+        evidence = [
+            {
+                "citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c401\u9875",
+                "source": "mes01.pdf",
+                "printed_page": 401,
+                "excerpt": "matched",
+            },
+            {
+                "citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c402\u9875",
+                "source": "mes01.pdf",
+                "printed_page": 402,
+                "excerpt": "unmatched",
+            },
+        ]
+
+        result = app.filter_evidence_to_answer(answer, evidence, fallback_limit=2)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["id"], "E1")
+        self.assertEqual(result[0]["excerpt"], "matched")
+        self.assertEqual(result[0]["answer_citation"], "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c401\u9875\u3002")
+
+    def test_filter_evidence_falls_back_when_citation_lines_exist_but_no_match(self):
+        answer = (
+            "\u8fd9\u662f\u7b54\u6848\u3002\n\n"
+            "*\u5f15\u7528\u6ce8\u91ca*\n"
+            "1. \u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c9\u5377\uff0c\u7b2c999\u9875\u3002"
+        )
+        evidence = [
+            {"citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c401\u9875", "source": "mes01.pdf", "printed_page": 401, "excerpt": "A"},
+            {"citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c402\u9875", "source": "mes01.pdf", "printed_page": 402, "excerpt": "B"},
+            {"citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c403\u9875", "source": "mes01.pdf", "printed_page": 403, "excerpt": "C"},
+        ]
+
+        result = app.filter_evidence_to_answer(answer, evidence, fallback_limit=2)
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual([item["id"] for item in result], ["E1", "E2"])
+        self.assertTrue(all("answer_citation" not in item for item in result))
+
+    def test_filter_evidence_returns_empty_when_no_evidence_available(self):
+        answer = (
+            "\u8fd9\u662f\u7b54\u6848\u3002\n\n"
+            "*\u5f15\u7528\u6ce8\u91ca*\n"
+            "1. \u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c9\u5377\uff0c\u7b2c999\u9875\u3002"
+        )
+
+        result = app.filter_evidence_to_answer(answer, [], fallback_limit=3)
+
+        self.assertEqual(result, [])
+
+    def test_web_ask_metrics_marks_fallback_usage(self):
+        answer = (
+            "\u8fd9\u662f\u7b54\u6848\u3002\n\n"
+            "*\u5f15\u7528\u6ce8\u91ca*\n"
+            "1. \u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c9\u5377\uff0c\u7b2c999\u9875\u3002"
+        )
+        evidence = [
+            {"id": "E1", "citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c401\u9875", "source": "mes01.pdf", "printed_page": 401}
+        ]
+        citation_audit = {"ok": False, "issues": [{"type": "citation_not_in_evidence"}], "evidence_count": 1}
+
+        metrics = web_app.MarxOSHandler._build_ask_metrics(
+            query="\u8fd9\u53e5\u8bdd\u51fa\u81ea\u54ea\u91cc",
+            intent="quote_lookup",
+            history=[{"role": "user", "text": "q"}],
+            answer=answer,
+            evidence=evidence,
+            citation_audit=citation_audit,
+            elapsed_ms=123,
+        )
+
+        self.assertEqual(metrics["evidence_count"], 1)
+        self.assertEqual(metrics["citation_lines_count"], 1)
+        self.assertEqual(metrics["matched_count"], 0)
+        self.assertTrue(metrics["fallback_used"])
+        self.assertFalse(metrics["audit_ok"])
 
 
 if __name__ == "__main__":
