@@ -5,8 +5,8 @@ import json
 
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+from marxos_embeddings import HuggingFaceEmbeddings
 try:
     from clean_ocr_text import clean_ocr_page
 except ModuleNotFoundError:

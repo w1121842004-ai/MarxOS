@@ -91,6 +91,20 @@ def doc_text(doc) -> str:
     return "\n".join(str(field or "") for field in fields)
 
 
+def doc_title_text(doc) -> str:
+    metadata = app.normalize_metadata(doc.metadata)
+    fields = [
+        metadata.get("book"),
+        metadata.get("article"),
+        metadata.get("section"),
+        metadata.get("classic_title"),
+        metadata.get("classic_author"),
+        metadata.get("classic_work_type"),
+        metadata.get("source"),
+    ]
+    return "\n".join(str(field or "") for field in fields)
+
+
 def summarize_doc(doc) -> dict:
     metadata = app.normalize_metadata(doc.metadata)
     return {
@@ -113,6 +127,7 @@ def evaluate_case(case: dict, docs: list) -> dict:
     expected = expected_items(case.get("expected_work"))
     hard_negative = expected_items(case.get("hard_negative"))
     combined = normalize("\n".join(doc_text(doc) for doc in docs))
+    combined_titles = normalize("\n".join(doc_title_text(doc) for doc in docs))
 
     expected_norms = [normalize(item) for item in expected]
     is_negative = any(item in {normalize(x) for x in NEGATIVE_EXPECTATIONS} for item in expected_norms)
@@ -138,7 +153,7 @@ def evaluate_case(case: dict, docs: list) -> dict:
 
         hard_hits = [
             item for item in hard_negative
-            if normalize(item) and normalize(item) in combined
+            if normalize(item) and normalize(item) in combined_titles
         ]
 
         reasons = []

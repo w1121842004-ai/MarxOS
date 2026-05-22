@@ -1,32 +1,57 @@
-import subprocess
+import argparse
 import sys
 from pathlib import Path
+
+from common_cli import python_command, run_step
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def run_step(name, args):
-    print(f"[RUN ] {name}")
-    result = subprocess.run(args, cwd=ROOT)
-    if result.returncode != 0:
-        print(f"[FAIL] {name} (exit={result.returncode})")
-        return result.returncode
-    print(f"[PASS] {name}")
-    return 0
+QUICK_STEPS = [
+    ("regression_smoke", python_command(ROOT / "scripts" / "regression_smoke.py")),
+    (
+        "run_query_regressions",
+        [
+            sys.executable,
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            str(ROOT / "tests"),
+            "-p",
+            "test_run_query_regressions.py",
+        ],
+    ),
+]
+
+FULL_EXTRA_STEPS = [
+    ("evaluate_retrieval", python_command(ROOT / "scripts" / "evaluate_retrieval.py")),
+    ("evaluate_citation_pages", python_command(ROOT / "scripts" / "evaluate_citation_pages.py")),
+    ("evaluate_eval_dataset", python_command(ROOT / "scripts" / "evaluate_eval_dataset.py")),
+]
 
 
 def main():
-    steps = [
-        ("regression_smoke", [sys.executable, str(ROOT / "scripts" / "regression_smoke.py")]),
-    ]
+    parser = argparse.ArgumentParser(description="Run MarxOS regression and evaluation checks.")
+    parser.add_argument(
+        "--mode",
+        choices=("quick", "full"),
+        default="quick",
+        help="quick: fast local regressions; full: includes retrieval/dataset evaluations",
+    )
+    args = parser.parse_args()
 
-    for name, args in steps:
-        code = run_step(name, args)
+    steps = list(QUICK_STEPS)
+    if args.mode == "full":
+        steps.extend(FULL_EXTRA_STEPS)
+
+    for name, cmd in steps:
+        code = run_step(name, cmd, cwd=ROOT)
         if code != 0:
             return code
 
-    print("All checks passed.")
+    print(f"All {args.mode} checks passed.")
     return 0
 
 

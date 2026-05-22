@@ -1,13 +1,20 @@
 ﻿from openai import OpenAI
 
-from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from dotenv import load_dotenv
 import json
 import os
 import re
 import sys
+from pathlib import Path
+import marxos_citations as citations
+import marxos_answers as answer_utils
+import marxos_orchestration as orchestration
+import marxos_prompts as prompts
+import marxos_query_intent as query_intent
+import marxos_retrieval as retrieval_utils
+import marxos_trace as trace_utils
+from marxos_runtime import RuntimeState
 from rag.core_classics import classic_entries_for_query, load_core_classics
 from rag.exact_quote_lookup import exact_quote_lookup
 
@@ -27,9 +34,6 @@ LAST_CITATION_AUDIT = {}
 LAST_TOPIC_INFO = {}
 ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json")
 TOPIC_CATALOG_PATH = os.getenv("TOPIC_CATALOG_PATH", "rag/topic_catalog.json")
-EMBEDDINGS_INSTANCE = None
-VECTORSTORE_INSTANCE = None
-PARAGRAPH_VECTORSTORE_INSTANCE = None
 DEFAULT_PUBLISHER = "人民出版社"
 RERANK_DEBUG_ENV = "MARXOS_DEBUG_RERANK"
 TRACE_ENV = "MARXOS_TRACE"
@@ -38,6 +42,17 @@ DUAL_RETRIEVAL_ENV = "MARXOS_DUAL_RETRIEVAL"
 DEV_MODE_ENV = "MARXOS_DEV_MODE"
 DEV_TOKEN_ENV = "MARXOS_DEV_TOKEN"
 DEV_TOKEN_INPUT_ENV = "MARXOS_DEV_TOKEN_INPUT"
+RUNTIME = RuntimeState(
+    embedding_model=EMBEDDING_MODEL,
+    vectorstore_dir=VECTORSTORE_DIR,
+    paragraph_vectorstore_dir=PARAGRAPH_VECTORSTORE_DIR,
+    dev_mode_env=DEV_MODE_ENV,
+    dev_token_env=DEV_TOKEN_ENV,
+    dev_token_input_env=DEV_TOKEN_INPUT_ENV,
+    trace_env=TRACE_ENV,
+    trace_only_env=TRACE_ONLY_ENV,
+    dual_retrieval_env=DUAL_RETRIEVAL_ENV,
+)
 VOLUME_PUBLICATION_YEARS = {
     "me46a": "1979年",
     "me46b": "1979年",
@@ -319,6 +334,24 @@ def infer_printed_page_from_ocr_cache(metadata):
     return candidates[0]
 
 
+def find_pdf_page_by_printed_page(source, printed_page):
+    source_dir = Path(OCR_CACHE_DIR) / source.replace(".pdf", "")
+    if not source_dir.exists():
+        return None
+
+    paths = sorted(
+        source_dir.glob("page_*.json"),
+        key=lambda path: int(re.search(r"page_(\d+)", path.name).group(1)),
+    )
+    for path in paths:
+        pdf_page = int(re.search(r"page_(\d+)", path.name).group(1))
+        inferred = infer_printed_page_from_ocr_cache({"source": source, "pdf_page": pdf_page})
+        if inferred == printed_page:
+            return pdf_page
+
+    return None
+
+
 def clean_article_title(title):
     title = clean_text(title, "")
     title = re.split(r"[.\u2026•·]{3,}", title, maxsplit=1)[0]
@@ -336,6 +369,46 @@ TOPIC_TITLE_REWRITES = {
     "对农村居民土地的剥夺": "对农村居民土地的剥夺",
     "分成制和农民的小块土地所有制": "分成制和农民的小块土地所有制",
 }
+
+
+def _retrieval_ctx():
+    return {
+        "TOPIC_CATALOG": TOPIC_CATALOG,
+        "WORK_TITLE_ALIASES": WORK_TITLE_ALIASES,
+        "re": re,
+        "CONCEPT_CANONICAL_CLASSIC_IDS": CONCEPT_CANONICAL_CLASSIC_IDS,
+        "CONCEPT_PREFERRED_MARKERS": CONCEPT_PREFERRED_MARKERS,
+        "CONCEPT_PREFERRED_SOURCES": CONCEPT_PREFERRED_SOURCES,
+        "OCR_CACHE_DIR": OCR_CACHE_DIR,
+        "RERANK_DEBUG_ENV": RERANK_DEBUG_ENV,
+        "CLASSIC_SAYING_QUOTE_SEEDS": CLASSIC_SAYING_QUOTE_SEEDS,
+        "CLASSIC_SAYING_QUERY_SEEDS": CLASSIC_SAYING_QUERY_SEEDS,
+        "normalize_topic_title": normalize_topic_title,
+        "normalize_for_match": normalize_for_match,
+        "clean_article_title": clean_article_title,
+        "clean_text": clean_text,
+        "find_toc_entries": find_toc_entries,
+        "extract_bibliographic_title": extract_bibliographic_title,
+        "locator_entries_for_query": locator_entries_for_query,
+        "classic_entries_for_query": classic_entries_for_query,
+        "enrich_core_classic_entries": enrich_core_classic_entries,
+        "active_concept_terms": active_concept_terms,
+        "core_classic_by_id": core_classic_by_id,
+        "metadata_citation_page": metadata_citation_page,
+        "as_int": as_int,
+        "exact_quote_lookup": exact_quote_lookup,
+        "is_quote_lookup_query": is_quote_lookup_query,
+        "classify_query": classify_query,
+        "enrich_concept_metadata": enrich_concept_metadata,
+        "find_pdf_page_by_printed_page": find_pdf_page_by_printed_page,
+        "load_ocr_page_text": load_ocr_page_text,
+        "page_match_score": page_match_score,
+        "infer_printed_page_from_ocr_cache": infer_printed_page_from_ocr_cache,
+        "score_concept_focus": score_concept_focus,
+        "score_concept_source_priority": score_concept_source_priority,
+        "score_document_quality": score_document_quality,
+        "is_classic_sayings_query": is_classic_sayings_query,
+    }
 
 
 def normalize_topic_title(title):
@@ -523,143 +596,20 @@ def normalize_metadata(metadata):
 
 
 def citation_page_label(metadata):
-    metadata = normalize_metadata(metadata)
-    citation_page = metadata.get("citation_page")
-    printed_page = metadata.get("printed_page")
-    pdf_page = metadata.get("pdf_page")
-
-    if printed_page is not None:
-        return f"\u7b2c{clean_text(printed_page)}\u9875"
-    if citation_page is not None:
-        return f"\u7b2c{clean_text(citation_page)}\u9875"
-    if pdf_page is not None:
-        return f"\u7b2c{clean_text(pdf_page)}\u9875"
-    return "\u672a\u77e5\u9875\u7801"
+    return citations.citation_page_label(metadata, normalize_metadata, clean_text)
 
 
 def source_page_label(metadata):
-    metadata = normalize_metadata(metadata)
-    return citation_page_label(metadata)
+    return citations.source_page_label(metadata, normalize_metadata, clean_text)
 
 def format_citation(metadata, include_article=False):
-    metadata = normalize_metadata(metadata)
-    author, title, volume, year = normalize_book_parts(metadata)
-    article = clean_text(metadata.get("section") or metadata.get("article"), "")
-    author_text = f"{author}：" if author else ""
-    volume_text = volume if volume else ""
-    article_text = f"，{article}" if include_article and article else ""
-    year_text = f"，{year}" if year else ""
-    page_text = citation_page_label(metadata)
-
-    return f"{author_text}《{title}》{volume_text}{article_text}，北京：人民出版社{year_text}，{page_text}。"
-
-
-def extract_quoted_title(query):
-    query = clean_text(query, "")
-    match = re.search(r"《([^》]+)》", query)
-    if match:
-        return match.group(1).strip()
-
-    return None
-
-
-def extract_unquoted_title(query):
-    query = clean_text(query, "")
-    keywords = [
-        "在哪一卷",
-        "在哪卷",
-        "哪一卷",
-        "第几卷",
-        "收录在哪里",
-        "收在哪里",
-        "收录在哪",
-        "收在哪",
-        "在哪里",
-        "出自哪卷",
-        "属于哪卷",
-        "在哪本",
-        "从哪页",
-        "从哪一页",
-        "从第几页",
-        "哪一页开始",
-        "从哪一页开始",
-        "第几页",
-        "起始页",
-        "开始页",
-        "收录页",
-    ]
-    positions = [query.find(keyword) for keyword in keywords if keyword in query]
-    if not positions:
-        return None
-
-    title = query[:min(positions)]
-    title = re.sub(r"[，。；：、\s\"'“”《》（）()]+$", "", title).strip()
-
-    return title or None
-
-
-def extract_bibliographic_title(query):
-    return extract_quoted_title(query) or extract_unquoted_title(query)
-
-
-def normalize_for_match(text):
-    text = clean_text(text, "")
-    text = re.sub(r"[《》“”\"'（）()，。；：、\s·\-.—–]", "", text)
-    return text.lower()
-
-
-def is_bibliographic_query(query):
-    query = clean_text(query, "")
-    keywords = [
-        "在哪一卷",
-        "在哪卷",
-        "哪一卷",
-        "第几卷",
-        "收录在哪里",
-        "收在哪里",
-        "收录在哪",
-        "收在哪",
-        "在哪里",
-        "出自哪卷",
-        "属于哪卷",
-        "在哪本",
-        "从哪页",
-        "从哪一页",
-        "从第几页",
-        "哪一页开始",
-        "从哪一页开始",
-        "起始页",
-        "开始页",
-        "收录页",
-    ]
-
-    return any(keyword in query for keyword in keywords)
-
-
-def is_quote_lookup_query(query):
-    query = clean_text(query, "")
-    if extract_bibliographic_title(query):
-        return False
-
-    interrogative_markers = [
-        "什么是",
-        "是什么",
-        "何为",
-        "如何",
-        "怎么",
-        "怎样",
-        "为什么",
-        "本质",
-        "意义",
-    ]
-    if any(marker in query for marker in interrogative_markers):
-        return False
-
-    quote_keywords = ["引文", "出处", "出自", "哪一页", "哪页", "页码", "原文", "这句话", "这段话"]
-    if any(keyword in query for keyword in quote_keywords):
-        return True
-
-    return len(query) >= 24 and not re.search(r"[。！？!?]", query)
+    return citations.format_citation(
+        metadata,
+        include_article,
+        normalize_metadata,
+        normalize_book_parts,
+        clean_text,
+    )
 
 
 def is_concept_query(query):
@@ -677,41 +627,7 @@ def is_concept_query(query):
             "如何理解",
             "这个概念",
         ]
-    )
-
-
-def is_analysis_query(query):
-    query = clean_text(query, "")
-    communism_patterns = [
-        "共产主义是不是",
-        "共产主义是否",
-        "共产主义会不会",
-        "共产主义能不能",
-        "共产主义能否",
-        "共产主义一定会实现",
-        "共产主义必然实现",
-        "共产主义会实现",
-    ]
-    if any(pattern in query for pattern in communism_patterns):
-        return True
-
-    return any(
-        keyword in query
-        for keyword in [
-            "分析",
-            "怎么看",
-            "怎么看待",
-            "如何理解",
-            "为什么",
-            "现实",
-            "结合现实",
-            "现实表现",
-            "意义",
-            "当代意义",
-            "关系",
-            "评价",
-        ]
-    )
+    ) or bool(active_concept_terms(query))
 
 
 CLASSIC_SAYING_QUERY_SEEDS = [
@@ -738,11 +654,39 @@ CLASSIC_SAYING_QUOTE_SEEDS = [
 ]
 
 
+# Delegate the public routing helpers to the extracted query-intent module
+# while keeping the same app.py call surface for tests and callers.
+def extract_quoted_title(query):
+    return query_intent.extract_quoted_title(query, clean_text)
+
+
+def extract_unquoted_title(query):
+    return query_intent.extract_unquoted_title(query, clean_text)
+
+
+def extract_bibliographic_title(query):
+    return query_intent.extract_bibliographic_title(query, clean_text)
+
+
+def normalize_for_match(text):
+    return query_intent.normalize_for_match(text, clean_text)
+
+
+def is_bibliographic_query(query):
+    return query_intent.is_bibliographic_query(query, clean_text)
+
+
+def is_quote_lookup_query(query):
+    return query_intent.is_quote_lookup_query(query, clean_text)
+
+
+def is_analysis_query(query):
+    return query_intent.is_analysis_query(query, clean_text)
+
+
 def is_classic_sayings_query(query):
-    query = clean_text(query, "")
-    saying_markers = ["\u7ecf\u5178\u8bed\u53e5", "\u7ecf\u5178\u540d\u53e5", "\u540d\u8a00", "\u540d\u53e5", "\u8bed\u5f55"]
-    author_markers = ["\u9a6c\u514b\u601d", "\u6069\u683c\u65af", "\u9a6c\u6069", "\u9a6c\u514b\u601d\u4e3b\u4e49"]
-    return any(marker in query for marker in saying_markers) and any(marker in query for marker in author_markers)
+    return query_intent.is_classic_sayings_query(query, clean_text)
+
 
 def classify_query(query):
     """Classify a user query so retrieval and prompting can stay task-specific.
@@ -1270,301 +1214,99 @@ def locator_entries_for_query(query):
 
 
 def build_page_ranges(entries):
-    page_ranges = {}
-    for entry in entries:
-        page_ranges.setdefault(entry["source"], []).append(
-            (entry["start_page"], entry["end_page"])
-        )
-    return page_ranges
+    return retrieval_utils.build_page_ranges(entries)
 
 
 def dedupe_locator_entries(entries):
-    deduped = []
-    seen = set()
-    for entry in entries:
-        key = (
-            entry.get("source"),
-            entry.get("article"),
-            entry.get("start_page"),
-            entry.get("end_page"),
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(entry)
-    return deduped
+    return retrieval_utils.dedupe_locator_entries(entries)
 
 
 def normalize_topic_entries(entries):
-    normalized_entries = []
-    for entry in entries:
-        normalized = dict(entry)
-        article = normalize_topic_title(entry.get("article") or entry.get("classic_title"))
-        if article:
-            normalized["article"] = article
-            normalized["classic_title"] = article
-        normalized_entries.append(normalized)
-    return normalized_entries
+    return retrieval_utils.normalize_topic_entries(entries, _retrieval_ctx())
 
 
 def topic_matches_query(topic, query):
-    query_norm = normalize_for_match(query)
-    if not query_norm:
-        return False
-
-    for keyword in topic.get("keywords_any") or []:
-        keyword_norm = normalize_for_match(keyword)
-        if keyword_norm and keyword_norm in query_norm:
-            return True
-
-    for keyword_group in topic.get("keywords_all") or []:
-        keyword_norms = [normalize_for_match(item) for item in keyword_group if normalize_for_match(item)]
-        if keyword_norms and all(keyword in query_norm for keyword in keyword_norms):
-            return True
-
-    return False
+    return retrieval_utils.topic_matches_query(topic, query, _retrieval_ctx())
 
 
 def topic_entries_for_query(query):
-    for topic in TOPIC_CATALOG:
-        if not topic_matches_query(topic, query):
-            continue
-
-        entries = []
-        for work in topic.get("works") or []:
-            entries.extend(find_toc_entries(work))
-        entries = normalize_topic_entries(dedupe_locator_entries(entries))
-        if not entries:
-            continue
-
-        return {
-            "topic_id": topic.get("id"),
-            "topic_title": topic.get("label"),
-            "section": topic.get("section") or "",
-            "topic_markers": topic.get("content_markers") or [],
-            "entries": entries,
-            "sources": {entry["source"] for entry in entries},
-            "page_ranges": build_page_ranges(entries),
-            "allowed_titles": {
-                normalize_for_match(clean_article_title(entry.get("article") or entry.get("classic_title")))
-                for entry in entries
-                if clean_article_title(entry.get("article") or entry.get("classic_title"))
-            },
-            "min_distinct_sources": int(topic.get("min_distinct_sources") or 0),
-            "page_tolerance": int(topic.get("page_tolerance") or 0),
-        }
-
-    return {}
+    return retrieval_utils.topic_entries_for_query(query, _retrieval_ctx())
 
 
 def topic_info_from_constraints(constraints):
-    return {
-        "topic_id": constraints.get("topic_id") or "",
-        "topic_label": constraints.get("topic_title") or "",
-        "topic_section": constraints.get("section") or "",
-    }
+    return retrieval_utils.topic_info_from_constraints(constraints)
 
 
 def narrow_topic_constraints_by_query(query, constraints):
-    topic_entries = constraints.get("entries") or []
-    if not constraints.get("topic_id") or not topic_entries:
-        return constraints
-
-    query_norm = normalize_for_match(query)
-    matched_entries = []
-    for entry in topic_entries:
-        title = normalize_for_match(entry.get("article") or entry.get("classic_title"))
-        if title and title in query_norm:
-            matched_entries.append(entry)
-
-    if not matched_entries:
-        return constraints
-
-    return {
-        **constraints,
-        "entries": matched_entries,
-        "sources": {entry["source"] for entry in matched_entries},
-        "page_ranges": build_page_ranges(matched_entries),
-        "allowed_titles": {
-            normalize_for_match(clean_article_title(entry.get("article") or entry.get("classic_title")))
-            for entry in matched_entries
-            if clean_article_title(entry.get("article") or entry.get("classic_title"))
-        },
-    }
+    return retrieval_utils.narrow_topic_constraints_by_query(
+        query,
+        constraints,
+        _retrieval_ctx(),
+    )
 
 
 WORK_TITLE_ALIASES = {
     "法德农民问题": ["法德农民问题", "农民合作社", "农民问题"],
+    "关于费尔巴哈的提纲": ["关于费尔巴哈的提纲", "费尔巴哈提纲", "费尔巴哈", "实践"],
 }
 
 
 def infer_work_title_from_query(query):
-    query_norm = normalize_for_match(query)
-    if not query_norm:
-        return None
+    return retrieval_utils.infer_work_title_from_query(query, _retrieval_ctx())
 
-    for title, markers in WORK_TITLE_ALIASES.items():
-        title_norm = normalize_for_match(title)
-        if title_norm and title_norm in query_norm:
-            return title
 
-        marker_norms = [normalize_for_match(marker) for marker in markers if normalize_for_match(marker)]
-        if any(marker in query_norm for marker in marker_norms if len(marker) >= 5):
-            return title
-        hits = sum(1 for marker in marker_norms if marker in query_norm)
-        if hits >= 2:
-            return title
-
-    return None
+def concept_constraints_from_query(query):
+    return retrieval_utils.concept_constraints_from_query(query, _retrieval_ctx())
 
 
 def constraints_from_query(query):
-    title = extract_bibliographic_title(query)
-    locator_entries = locator_entries_for_query(query)
-    if locator_entries:
-        title = locator_entries[0].get("classic_title") or locator_entries[0].get("article")
-        return {
-            "title": title,
-            "strict_title": True,
-            "entries": locator_entries,
-            "sources": {entry["source"] for entry in locator_entries},
-            "page_ranges": build_page_ranges(locator_entries),
-        }
-
-    if title:
-        core_entries = classic_entries_for_query(title)
-    else:
-        core_entries = []
-    if core_entries:
-        entries = enrich_core_classic_entries(core_entries)
-        title = title or entries[0].get("classic_title")
-        return {
-            "title": title,
-            "strict_title": True,
-            "entries": entries,
-            "sources": {entry["source"] for entry in entries},
-            "page_ranges": build_page_ranges(entries),
-        }
-
-    topic_constraints = narrow_topic_constraints_by_query(query, topic_entries_for_query(query))
-    if topic_constraints:
-        return topic_constraints
-
-    inferred_title = infer_work_title_from_query(query)
-    if inferred_title and not title:
-        title = inferred_title
-
-    if not title:
-        return {}
-
-    entries = find_toc_entries(title)
-    if not entries:
-        return {"title": title}
-
-    return {
-        "title": title,
-        "entries": entries,
-        "sources": {entry["source"] for entry in entries},
-        "page_ranges": build_page_ranges(entries),
-    }
+    return retrieval_utils.constraints_from_query(query, _retrieval_ctx())
 
 
 def metadata_matches_constraints(metadata, constraints):
-    sources = constraints.get("sources")
-    if not sources:
-        return True
-
-    return metadata.get("source") in sources
+    return retrieval_utils.metadata_matches_constraints(metadata, constraints)
 
 
 def page_in_expected_range(metadata, constraints):
-    ranges = constraints.get("page_ranges")
-    if not ranges:
-        return False
-
-    source = metadata.get("source")
-    if source not in ranges:
-        return False
-
-    page = metadata_citation_page(metadata)
-    if page is None:
-        return False
-
-    source_ranges = ranges[source]
-    if source_ranges and isinstance(source_ranges[0], int):
-        source_ranges = [source_ranges]
-
-    tolerance = int(constraints.get("page_tolerance") or 0)
-    return any((start_page - tolerance) <= page <= (end_page + tolerance) for start_page, end_page in source_ranges)
+    return retrieval_utils.page_in_expected_range(metadata, constraints, _retrieval_ctx())
 
 
 def topic_title_allowed(metadata, constraints):
-    allowed_titles = constraints.get("allowed_titles") or set()
-    if not allowed_titles:
-        return True
-
-    article = clean_article_title(metadata.get("section") or metadata.get("article"))
-    article_norm = normalize_for_match(article)
-    for allowed in allowed_titles:
-        if article_norm and (article_norm in allowed or allowed in article_norm):
-            return True
-
-    classic_title = clean_article_title(metadata.get("classic_title") or metadata.get("locator_title"))
-    classic_norm = normalize_for_match(classic_title)
-    return any(classic_norm and (classic_norm in allowed or allowed in classic_norm) for allowed in allowed_titles)
+    return retrieval_utils.topic_title_allowed(metadata, constraints, _retrieval_ctx())
 
 
 def score_source_match(metadata, constraints):
-    return 100 if metadata_matches_constraints(metadata, constraints) else 0
+    return retrieval_utils.score_source_match(metadata, constraints)
 
 
 def score_page_range(metadata, constraints):
-    return 40 if page_in_expected_range(metadata, constraints) else 0
+    return retrieval_utils.score_page_range(metadata, constraints, _retrieval_ctx())
 
 
 def score_topic_title_match(metadata, constraints):
-    if not constraints.get("topic_id"):
-        return 0
-    return 45 if topic_title_allowed(metadata, constraints) else -35
+    return retrieval_utils.score_topic_title_match(metadata, constraints, _retrieval_ctx())
 
 
 def score_topic_content_match(metadata, content, constraints):
-    markers = constraints.get("topic_markers") or []
-    if not constraints.get("topic_id") or not markers:
-        return 0
-
-    article = normalize_for_match(clean_text(metadata.get("section") or metadata.get("article"), ""))
-    lead = normalize_for_match(content[:400])
-    body = normalize_for_match(content)
-    score = 0
-    for marker in markers:
-        marker_norm = normalize_for_match(marker)
-        if not marker_norm:
-            continue
-        if marker_norm in article:
-            score += 28
-        if marker_norm in lead:
-            score += 24
-        elif marker_norm in body:
-            score += 10
-    return min(score, 120)
+    return retrieval_utils.score_topic_content_match(
+        metadata,
+        content,
+        constraints,
+        _retrieval_ctx(),
+    )
 
 
 def score_article_match(metadata, normalized_title, haystack):
-    if not normalized_title:
-        return 0
-
-    article = clean_text(metadata.get("section") or metadata.get("article"), "")
-    score = 0
-    if normalized_title in normalize_for_match(article):
-        score += 35
-    if normalized_title in haystack:
-        score += 25
-    return score
+    return retrieval_utils.score_article_match(
+        metadata,
+        normalized_title,
+        haystack,
+        _retrieval_ctx(),
+    )
 
 
 def score_query_match(normalized_query, haystack):
-    return 10 if normalized_query and normalized_query in haystack else 0
+    return retrieval_utils.score_query_match(normalized_query, haystack)
 
 
 CONCEPT_FOCUS_TERMS = [
@@ -1820,6 +1562,9 @@ def concept_title_from_content(query, metadata, content):
     article_norm = normalize_for_match(article)
     content_norm = normalize_for_match(content)
     lead_norm = normalize_for_match(content[:500])
+    classic_norm = normalize_for_match(
+        metadata.get("classic_title") or metadata.get("locator_title") or ""
+    )
 
     for term in active_concept_terms(query):
         term_norm = normalize_for_match(term)
@@ -1828,13 +1573,15 @@ def concept_title_from_content(query, metadata, content):
         if term in CONCEPT_TITLE_FALLBACK_TO_CLASSIC:
             continue
 
-        markers = CONCEPT_PREFERRED_MARKERS.get(term, [])
+        markers = list(CONCEPT_PREFERRED_MARKERS.get(term, []))
         preferred = CONCEPT_PREFERRED_SOURCES.get(term) or {}
         term_markers = [] if term in CONCEPT_TITLE_FALLBACK_TO_CLASSIC else [term]
         markers = list(dict.fromkeys(markers + term_markers + list(preferred.get("markers", []))))
 
         for marker in markers:
             marker_norm = normalize_for_match(marker)
+            if classic_norm and marker_norm == classic_norm:
+                continue
             if marker_norm and (marker_norm in article_norm or marker_norm in lead_norm):
                 return marker
 
@@ -1891,6 +1638,15 @@ def enrich_concept_metadata(query, docs):
 
         if concept_article_title_is_weak(query, doc.metadata):
             concept_title = concept_title_from_content(query, doc.metadata, doc.page_content)
+            if not concept_title:
+                concept_title = next(
+                    (
+                        term
+                        for term in active_concept_terms(query)
+                        if term not in CONCEPT_TITLE_FALLBACK_TO_CLASSIC
+                    ),
+                    None,
+                )
             doc.metadata.setdefault("raw_article", doc.metadata.get("article"))
             doc.metadata.setdefault("raw_section", doc.metadata.get("section"))
             doc.metadata["article"] = concept_title or title
@@ -1916,7 +1672,16 @@ def active_concept_terms(query):
         if normalized_term and normalized_term in normalized_query:
             terms.append(term)
 
-    return terms
+    deduped = []
+    seen_norms = []
+    for term in sorted(terms, key=lambda item: len(normalize_for_match(item)), reverse=True):
+        normalized_term = normalize_for_match(term)
+        if any(normalized_term in seen for seen in seen_norms):
+            continue
+        deduped.append(term)
+        seen_norms.append(normalized_term)
+
+    return deduped
 
 
 def score_concept_focus(query, metadata, content):
@@ -1928,6 +1693,7 @@ def score_concept_focus(query, metadata, content):
     article_norm = normalize_for_match(article)
     content_norm = normalize_for_match(content)
     lead_norm = normalize_for_match(content[:300])
+    early_body_norm = normalize_for_match(content[:1200])
     score = 0
 
     for term in terms:
@@ -1945,13 +1711,26 @@ def score_concept_focus(query, metadata, content):
                 score -= 35
 
         if term_norm in article_norm:
-            score += 35
+            score += 55
+        term_index = content_norm.find(term_norm)
         if term_norm in lead_norm:
-            score += 30
-        elif term_norm in content_norm:
-            score += 12
-        elif term_norm in article_norm:
-            score -= 45
+            score += 70
+        elif term_index != -1:
+            score += 55
+        else:
+            score -= 60
+
+        if term_index != -1:
+            if term_index <= 120:
+                score += 95
+            elif term_index <= 260:
+                score += 72
+            elif term_index <= 480:
+                score += 44
+            elif term_index <= 900:
+                score += 18
+            else:
+                score -= 18
 
         direct_definition_patterns = [
             f"什么是{term_norm}",
@@ -1960,11 +1739,18 @@ def score_concept_focus(query, metadata, content):
         loose_definition_patterns = [
             f"{term_norm}是",
             f"所谓{term_norm}",
+            f"叫做{term_norm}",
+            f"称为{term_norm}",
+            f"就是{term_norm}",
         ]
         if any(pattern in lead_norm for pattern in direct_definition_patterns):
             score += 100
         elif any(pattern in lead_norm for pattern in loose_definition_patterns):
             score += 50
+        elif any(pattern in early_body_norm for pattern in direct_definition_patterns):
+            score += 75
+        elif any(pattern in early_body_norm for pattern in loose_definition_patterns):
+            score += 42
 
         for marker in CONCEPT_PREFERRED_MARKERS.get(term, []):
             marker_norm = normalize_for_match(marker)
@@ -1995,7 +1781,7 @@ def score_concept_focus(query, metadata, content):
         if malthus_norm in article_norm and malthus_norm not in query_norm:
             score -= 60
 
-    return min(score, 320)
+    return score
 
 
 def score_concept_source_priority(query, metadata):
@@ -2062,669 +1848,138 @@ def score_document_quality(metadata, content):
 
 
 def debug_rerank_score(index, doc, score_parts):
-    if os.getenv(RERANK_DEBUG_ENV) != "1":
-        return
-
-    metadata = doc.metadata
-    total = sum(score_parts.values())
-    detail = ", ".join(f"{name}={score}" for name, score in score_parts.items())
-    print(
-        f"[rerank] candidate={index} total={total} {detail} "
-        f"source={metadata.get('source')} page={metadata.get('page')} "
-        f"article={metadata.get('article') or metadata.get('section')}",
-        file=sys.stderr,
-    )
+    return retrieval_utils.debug_rerank_score(index, doc, score_parts, _retrieval_ctx())
 
 
 def rerank_documents(query, docs, constraints):
-    title = constraints.get("title")
-    normalized_title = normalize_for_match(title) if title else ""
-    normalized_query = normalize_for_match(query)
-    ranked = []
-
-    for index, doc in enumerate(docs, start=1):
-        metadata = doc.metadata
-        article = clean_text(metadata.get("section") or metadata.get("article"), "")
-        book = clean_text(metadata.get("book"), "")
-        content = clean_text(doc.page_content, "")
-        haystack = normalize_for_match(f"{book} {article} {content[:600]}")
-        score_parts = {
-            "source_match": score_source_match(metadata, constraints),
-            "page_range": score_page_range(metadata, constraints),
-            "topic_title": score_topic_title_match(metadata, constraints),
-            "topic_content": score_topic_content_match(metadata, content, constraints),
-            "article_match": score_article_match(metadata, normalized_title, haystack),
-            "query_match": score_query_match(normalized_query, haystack),
-            "concept_focus": score_concept_focus(query, metadata, content),
-            "concept_source": score_concept_source_priority(query, metadata),
-            "document_quality": score_document_quality(metadata, content),
-        }
-        score = sum(score_parts.values())
-        debug_rerank_score(index, doc, score_parts)
-
-        ranked.append((score, doc))
-
-    ranked.sort(key=lambda item: item[0], reverse=True)
-    return [doc for score, doc in ranked]
+    return retrieval_utils.rerank_documents(query, docs, constraints, _retrieval_ctx())
 
 
 def diversify_documents(docs, k, max_per_source=2, max_per_article=1, min_distinct_sources=0):
-    selected = []
-    source_counts = {}
-    article_counts = {}
-    selected_sources = set()
-
-    def can_select(doc):
-        metadata = doc.metadata
-        source = metadata.get("source") or ""
-        article = clean_text(metadata.get("section") or metadata.get("article"), "")
-        article_key = (source, normalize_for_match(article))
-
-        if source_counts.get(source, 0) >= max_per_source:
-            return False, source, article_key
-        if article_key[1] and article_counts.get(article_key, 0) >= max_per_article:
-            return False, source, article_key
-        return True, source, article_key
-
-    def record_selection(doc, source, article_key):
-        selected.append(doc)
-        source_counts[source] = source_counts.get(source, 0) + 1
-        article_counts[article_key] = article_counts.get(article_key, 0) + 1
-        if source:
-            selected_sources.add(source)
-
-    if min_distinct_sources > 0:
-        for doc in docs:
-            allowed, source, article_key = can_select(doc)
-            if not allowed or not source or source in selected_sources:
-                continue
-
-            record_selection(doc, source, article_key)
-            if len(selected) >= k or len(selected_sources) >= min_distinct_sources:
-                break
-
-    if len(selected) >= k:
-        return selected[:k]
-
-    for doc in docs:
-        if doc in selected:
-            continue
-
-        allowed, source, article_key = can_select(doc)
-        if not allowed:
-            continue
-
-        record_selection(doc, source, article_key)
-        if len(selected) >= k:
-            return selected
-
-    for doc in docs:
-        if doc in selected:
-            continue
-        selected.append(doc)
-        if len(selected) >= k:
-            break
-
-    return selected[:k]
+    return retrieval_utils.diversify_documents(
+        docs,
+        k,
+        _retrieval_ctx(),
+        max_per_source=max_per_source,
+        max_per_article=max_per_article,
+        min_distinct_sources=min_distinct_sources,
+    )
 
 
 def annotate_docs_with_constraints(docs, constraints):
-    title = constraints.get("title")
-    entries = constraints.get("entries") or []
-    if not title and not entries:
-        return docs
-
-    source_entries = {}
-    for entry in entries:
-        source_entries.setdefault(entry.get("source"), []).append(entry)
-
-    for doc in docs:
-        metadata = doc.metadata
-        if title:
-            if not metadata.get("classic_title"):
-                metadata["classic_title"] = title
-            if not metadata.get("work_title"):
-                metadata["work_title"] = title
-            if not metadata.get("locator_title"):
-                metadata["locator_title"] = title
-
-        try:
-            page = int(metadata.get("page"))
-        except (TypeError, ValueError):
-            page = None
-        citation_page = metadata_citation_page(metadata)
-        tolerance = int(constraints.get("page_tolerance") or 0)
-
-        matched_entry = None
-        for entry in source_entries.get(metadata.get("source"), []):
-            if citation_page is not None and (entry["start_page"] - tolerance) <= citation_page <= (entry["end_page"] + tolerance):
-                matched_entry = entry
-                break
-            if page is None or entry["start_page"] <= page <= entry["end_page"]:
-                matched_entry = entry
-                break
-
-        if matched_entry:
-            entry_title = matched_entry.get("classic_title") or matched_entry.get("article") or title
-            if entry_title:
-                metadata["classic_title"] = entry_title
-                metadata["work_title"] = entry_title
-                metadata["locator_title"] = entry_title
-                metadata["article"] = entry_title
-                metadata["section"] = entry_title
-            if matched_entry.get("classic_author"):
-                metadata.setdefault("classic_author", matched_entry.get("classic_author"))
-            if matched_entry.get("classic_work_type"):
-                metadata.setdefault("classic_work_type", matched_entry.get("classic_work_type"))
-
-    return docs
+    return retrieval_utils.annotate_docs_with_constraints(docs, constraints, _retrieval_ctx())
 
 
 def select_topic_documents(ranked_docs, constraints, k):
-    preferred = []
-    secondary = []
-    for doc in ranked_docs:
-        content = clean_text(doc.page_content, "")
-        title_hit = topic_title_allowed(doc.metadata, constraints)
-        content_hit = score_topic_content_match(doc.metadata, content, constraints) > 0
-        if title_hit and content_hit:
-            preferred.append(doc)
-        elif title_hit:
-            secondary.append(doc)
-    fallback = [doc for doc in ranked_docs if doc not in preferred]
-    preferred_selected = diversify_documents(
-        preferred,
-        k,
-        min_distinct_sources=constraints.get("min_distinct_sources", 0),
-    )
-    if len(preferred_selected) >= k:
-        return preferred_selected[:k]
+    return retrieval_utils.select_topic_documents(ranked_docs, constraints, k, _retrieval_ctx())
 
-    combined = preferred_selected
-    if len(combined) < k and secondary:
-        remaining = k - len(combined)
-        combined += diversify_documents(secondary, remaining)
-    if len(combined) < k:
-        remaining = k - len(combined)
-        extra = diversify_documents([doc for doc in fallback if doc not in secondary], remaining)
-        combined += extra
-    return combined[:k]
+
+def strict_title_cache_documents(query, constraints, limit=6):
+    return retrieval_utils.strict_title_cache_documents(
+        query,
+        constraints,
+        limit,
+        _retrieval_ctx(),
+    )
 
 
 def locator_backstop_documents(constraints, limit=4):
-    docs = []
-    seen_titles = set()
-    for entry in constraints.get("entries") or []:
-        title = entry.get("classic_title") or entry.get("article") or constraints.get("title")
-        if not title or title in seen_titles:
-            continue
-        seen_titles.add(title)
-        metadata = {
-            "source": entry.get("source"),
-            "page": entry.get("start_page"),
-            "citation_page": entry.get("start_page"),
-            "citation_page_type": "pdf_page",
-            "article": title,
-            "section": title,
-            "classic_title": title,
-            "work_title": title,
-            "locator_title": title,
-            "classic_author": entry.get("classic_author"),
-            "classic_work_type": entry.get("classic_work_type"),
-            "match_type": "locator_backstop",
-        }
-        content = (
-            f"{title}\n"
-            f"\u5b9a\u4f4d\u63d0\u793a\uff1a\u8be5\u95ee\u9898\u5bf9\u5e94\u5230\u300a{title}\u300b"
-            f"\uff0cPDF\u7b2c{entry.get('start_page')}-{entry.get('end_page')}\u9875\u8303\u56f4\u5185\u6838\u5bf9\u3002"
-        )
-        docs.append(Document(page_content=content, metadata=metadata))
-        if len(docs) >= limit:
-            break
-    return docs
+    return retrieval_utils.locator_backstop_documents(constraints, limit)
 
 
 def append_locator_backstops(docs, constraints, k):
-    if not constraints.get("strict_title") or not constraints.get("entries"):
-        return docs
-
-    backstops = locator_backstop_documents(constraints, limit=k)
-    existing_titles = {
-        normalize_for_match(doc.metadata.get("classic_title") or doc.metadata.get("locator_title"))
-        for doc in docs
-    }
-    missing_backstops = []
-    for doc in backstops:
-        title_key = normalize_for_match(doc.metadata.get("classic_title"))
-        if title_key and title_key in existing_titles:
-            continue
-        missing_backstops.append(doc)
-        existing_titles.add(title_key)
-
-    if not missing_backstops:
-        return docs[:k]
-
-    keep_count = max(0, k - len(missing_backstops))
-    return docs[:keep_count] + missing_backstops[:k]
+    return retrieval_utils.append_locator_backstops(docs, constraints, k, _retrieval_ctx())
 
 
 def dedupe_documents(docs):
-    deduped = []
-    seen = set()
-    for doc in docs:
-        key = (
-            doc.metadata.get("source"),
-            doc.metadata.get("page"),
-            doc.metadata.get("printed_page"),
-            doc.metadata.get("citation_page"),
-            clean_text(doc.metadata.get("article") or doc.metadata.get("section"), ""),
-            clean_text(doc.page_content, "")[:120],
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(doc)
-    return deduped
+    return retrieval_utils.dedupe_documents(docs, _retrieval_ctx())
 
 
 def topic_seed_queries(query, constraints):
-    seeds = [query]
-    seen = {normalize_for_match(query)}
-    for entry in constraints.get("entries") or []:
-        article = clean_text(entry.get("article") or entry.get("classic_title"), "")
-        if not article:
-            continue
-        normalized = normalize_for_match(article)
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        seeds.append(article)
-        if len(seeds) >= 6:
-            break
-    return seeds
+    return retrieval_utils.topic_seed_queries(query, constraints, _retrieval_ctx())
+
+
+def concept_seed_queries(query, constraints):
+    return retrieval_utils.concept_seed_queries(query, constraints, _retrieval_ctx())
 
 
 def topic_constrained_candidates(query, db, constraints, fetch_k):
-    candidates = []
-    seeds = topic_seed_queries(query, constraints)
-    per_seed_k = max(24, fetch_k // max(len(seeds), 1))
-    for seed in seeds:
-        candidates.extend(db.similarity_search(seed, k=per_seed_k))
+    return retrieval_utils.topic_constrained_candidates(
+        query,
+        db,
+        constraints,
+        fetch_k,
+        _retrieval_ctx(),
+    )
 
-    candidates = [
-        doc for doc in dedupe_documents(candidates)
-        if metadata_matches_constraints(doc.metadata, constraints)
-    ]
 
-    if constraints.get("page_ranges"):
-        ranged_candidates = [
-            doc for doc in candidates
-            if page_in_expected_range(doc.metadata, constraints)
-        ]
-        if ranged_candidates:
-            candidates = ranged_candidates
-
-    return candidates
+def concept_constrained_candidates(query, db, constraints, fetch_k):
+    return retrieval_utils.concept_constrained_candidates(
+        query,
+        db,
+        constraints,
+        fetch_k,
+        _retrieval_ctx(),
+    )
 
 
 def retrieve_documents(query, db, k=5, allow_exact_quote=True):
-    constraints = constraints_from_query(query)
-    normalized_query = normalize_for_match(query)
-
-    if constraints.get("strict_title") and "\u65e0\u4ea7\u9636\u7ea7\u4e13\u653f" in normalized_query:
-        return locator_backstop_documents(constraints, limit=k)
-
-    if allow_exact_quote and is_quote_lookup_query(query):
-        exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k)
-        if exact_docs:
-            docs = annotate_docs_with_constraints(exact_docs, constraints)
-            return append_locator_backstops(docs, constraints, k)
-
-    fetch_k = max(120 if constraints or active_concept_terms(query) else 30, k * 12)
-
-    if constraints.get("sources"):
-        if constraints.get("topic_id"):
-            candidates = topic_constrained_candidates(query, db, constraints, fetch_k)
-        else:
-            candidates = db.similarity_search(query, k=fetch_k)
-            candidates = [
-                doc for doc in candidates
-                if metadata_matches_constraints(doc.metadata, constraints)
-            ]
-        # For explicit title-constrained queries, prefer candidates that are
-        # inside the mapped page ranges to avoid prefaces/index pages hijacking
-        # answers with incorrect citations.
-        if constraints.get("page_ranges"):
-            ranged_candidates = [
-                doc for doc in candidates
-                if page_in_expected_range(doc.metadata, constraints)
-            ]
-            if ranged_candidates:
-                candidates = ranged_candidates
-
-        if constraints.get("strict_title") and constraints.get("page_ranges"):
-            candidates = [
-                doc for doc in candidates
-                if page_in_expected_range(doc.metadata, constraints)
-            ]
-
-        if not candidates:
-            title_query = constraints.get("title") or query
-            if constraints.get("topic_id"):
-                candidates = topic_constrained_candidates(title_query, db, constraints, fetch_k)
-            else:
-                candidates = [
-                    doc for doc in db.similarity_search(title_query, k=fetch_k)
-                    if metadata_matches_constraints(doc.metadata, constraints)
-                ]
-            if constraints.get("page_ranges"):
-                ranged_candidates = [
-                    doc for doc in candidates
-                    if page_in_expected_range(doc.metadata, constraints)
-                ]
-                if ranged_candidates:
-                    candidates = ranged_candidates
-            if constraints.get("strict_title") and constraints.get("page_ranges"):
-                candidates = [
-                    doc for doc in candidates
-                    if page_in_expected_range(doc.metadata, constraints)
-                ]
-
-        if not candidates:
-            if constraints.get("strict_title"):
-                return locator_backstop_documents(constraints, limit=k)
-            candidates = db.similarity_search(query, k=fetch_k)
-    else:
-        candidates = db.similarity_search(query, k=fetch_k)
-
-    if is_classic_sayings_query(query):
-        expanded = []
-        seen = set()
-        for quote in CLASSIC_SAYING_QUOTE_SEEDS:
-            for doc in exact_quote_lookup(quote, OCR_CACHE_DIR, limit=2):
-                key = (
-                    doc.metadata.get("source"),
-                    doc.metadata.get("page"),
-                    doc.metadata.get("article") or doc.metadata.get("section"),
-                    clean_text(doc.page_content, "")[:80],
-                )
-                if key in seen:
-                    continue
-                seen.add(key)
-                expanded.append(doc)
-
-        seed_k = max(12, k * 3)
-        for seed in CLASSIC_SAYING_QUERY_SEEDS:
-            for doc in db.similarity_search(seed, k=seed_k):
-                key = (
-                    doc.metadata.get("source"),
-                    doc.metadata.get("page"),
-                    doc.metadata.get("article") or doc.metadata.get("section"),
-                    clean_text(doc.page_content, "")[:80],
-                )
-                if key in seen:
-                    continue
-                seen.add(key)
-                expanded.append(doc)
-
-        for doc in candidates:
-            key = (
-                doc.metadata.get("source"),
-                doc.metadata.get("page"),
-                doc.metadata.get("article") or doc.metadata.get("section"),
-                clean_text(doc.page_content, "")[:80],
-            )
-            if key in seen:
-                continue
-            seen.add(key)
-            expanded.append(doc)
-        candidates = expanded
-
-    if is_classic_sayings_query(query):
-        docs = diversify_documents(
-            candidates,
-            k,
-            max_per_source=2,
-            max_per_article=1,
-            min_distinct_sources=constraints.get("min_distinct_sources", 0),
-        )
-        docs = annotate_docs_with_constraints(docs, constraints)
-        return append_locator_backstops(docs, constraints, k)
-
-    ranked_docs = rerank_documents(query, candidates, constraints)
-    if constraints.get("topic_id"):
-        docs = select_topic_documents(ranked_docs, constraints, k)
-    elif (not constraints and classify_query(query) == "rag_answer" and k > 5) or constraints.get("min_distinct_sources"):
-        docs = diversify_documents(
-            ranked_docs,
-            k,
-            min_distinct_sources=constraints.get("min_distinct_sources", 0),
-        )
-    else:
-        docs = ranked_docs[:k]
-
-    if classify_query(query) == "concept_explain":
-        docs = enrich_concept_metadata(query, docs)
-
-    if allow_exact_quote and is_quote_lookup_query(query):
-        for doc in docs:
-            doc.metadata["match_type"] = "vector_candidate"
-            doc.metadata["confidence"] = 0.0
-
-    docs = annotate_docs_with_constraints(docs, constraints)
-    return append_locator_backstops(docs, constraints, k)
+    return retrieval_utils.retrieve_documents(
+        query,
+        db,
+        k,
+        allow_exact_quote,
+        _retrieval_ctx(),
+    )
 
 
 
 
 def candidate_pdf_pages_from_metadata(metadata):
-    pages = []
-    for key in ("pdf_page", "page"):
-        page = as_int(metadata.get(key))
-        if page is not None:
-            pages.append(page)
-    for key in ("page_span", "page_range"):
-        value = metadata.get(key)
-        if isinstance(value, (list, tuple)):
-            pages.extend(page for page in (as_int(item) for item in value) if page is not None)
-        elif isinstance(value, str):
-            pages.extend(as_int(item) for item in re.findall(r"\d+", value))
-    pages = [page for page in pages if page is not None]
-    if len(pages) == 1:
-        pages.extend([pages[0] - 1, pages[0] + 1])
-    if pages:
-        lo, hi = min(pages), max(pages)
-        pages = list(range(max(1, lo), hi + 1))
-    return sorted(set(pages))
+    return retrieval_utils.candidate_pdf_pages_from_metadata(metadata, _retrieval_ctx())
 
 
 def refine_doc_citation_page_for_query(doc, query):
-    metadata = dict(doc.metadata or {})
-    source = metadata.get("source")
-    candidate_pages = candidate_pdf_pages_from_metadata(metadata)
-    if not source or len(candidate_pages) <= 1:
-        return doc
-
-    scored_pages = []
-    for pdf_page in candidate_pages:
-        text = load_ocr_page_text(source, pdf_page)
-        # Page choice should follow the retrieved evidence text first. The user
-        # query is only a secondary hint; otherwise broad analytical questions
-        # can pull a cross-page paragraph back to the wrong page.
-        score = page_match_score(doc.page_content, text) * 2 + page_match_score(query, text)
-        printed = infer_printed_page_from_ocr_cache({"source": source, "pdf_page": pdf_page})
-        scored_pages.append((score, printed is not None, pdf_page, printed))
-
-    scored_pages.sort(reverse=True)
-    best_score, has_printed, best_pdf_page, best_printed_page = scored_pages[0]
-    if best_score <= 0:
-        return doc
-
-    refined = Document(page_content=doc.page_content, metadata=metadata)
-    refined.metadata["pdf_page"] = best_pdf_page
-    refined.metadata["page"] = best_pdf_page
-    refined.metadata["citation_page_refined"] = True
-    refined.metadata["citation_page_refined_by"] = "query_ocr_page_overlap"
-    if best_printed_page is not None:
-        refined.metadata["printed_page"] = best_printed_page
-        refined.metadata["citation_page"] = best_printed_page
-        refined.metadata["citation_page_type"] = "printed_page"
-    return refined
+    return retrieval_utils.refine_doc_citation_page_for_query(doc, query, _retrieval_ctx())
 
 
 def refine_docs_citation_pages_for_query(docs, query):
-    return [refine_doc_citation_page_for_query(doc, query) for doc in docs]
+    return retrieval_utils.refine_docs_citation_pages_for_query(docs, query, _retrieval_ctx())
 
 def retrieve_paragraph_documents(query, db, k=5):
-    docs = retrieve_documents(query, db, k=k, allow_exact_quote=False)
-    for doc in docs:
-        doc.metadata.setdefault("retrieval_unit", "paragraph")
-        doc.metadata.setdefault("match_type", "paragraph_vector_candidate")
-    return docs
+    return retrieval_utils.retrieve_paragraph_documents(query, db, k, _retrieval_ctx())
 
 
 def final_answer_style_rules():
-    return (
-        "\n\u6700\u7ec8\u56de\u7b54\u98ce\u683c\uff1a\n"
-        "1. \u76f4\u63a5\u56de\u7b54\u95ee\u9898\uff0c\u4e0d\u8981\u95ee\u5019\uff0c\u4e0d\u8981\u81ea\u6211\u4ecb\u7ecd\uff0c\u4e0d\u8981\u8bf4\u201c\u4f60\u597d\u201d\u6216\u201c\u6211\u662f MarxOS\u201d\u3002\n"
-        "2. \u7ed3\u5c3e\u4e0d\u8981\u8ffd\u52a0\u201c\u5982\u679c\u9700\u8981\u201d\u201c\u6211\u53ef\u4ee5\u7ee7\u7eed\u201d\u7b49\u9080\u8bf7\u5f0f\u8bdd\u8bed\u3002\n"
-        "3. \u5f15\u7528\u539f\u8457\u65f6\uff0c\u53ea\u4f7f\u7528\u4e0b\u65b9\u63d0\u4f9b\u7684\u51fa\u5904\u683c\u5f0f\uff0c\u4e0d\u8981\u81ea\u884c\u7f16\u9020\u7bc7\u540d\u6216\u9875\u7801\u3002\n"
-        "4. \u4e0d\u8981\u8f93\u51fa\u201c\u3010\u539f\u8457\u5185\u5bb9\u3011\u201d\u201c\u3010\u68c0\u7d22\u6750\u6599\u3011\u201d\u6216\u201cCTX-1\u201d\u7b49\u5185\u90e8\u680f\u76ee\u540d\u548c\u5185\u90e8\u7f16\u53f7\u3002\n"
-        "5. \u4e0a\u4e0b\u6587\u4ee5 EVIDENCE-CARD \u7ed9\u51fa\uff1b\u6bcf\u4e2a\u5173\u952e\u5224\u65ad\u53ea\u80fd\u4f7f\u7528\u8fd9\u4e9b\u8bc1\u636e\u5361\u7684\u51fa\u5904\uff0c\u4e0d\u5f97\u81ea\u884c\u8865\u9875\u7801\u6216\u7bc7\u540d\u3002\n"
-    )
+    return prompts.final_answer_style_rules()
 
 
 def footnote_citation_rules():
-    return (
-        "\n\u5f15\u6587\u5448\u73b0\u683c\u5f0f\uff08\u5f3a\u5236\uff09\uff1a\n"
-        "1. \u6b63\u6587\u4e2d\u7684\u5f15\u6587\u6216\u5224\u65ad\u53e5\u540e\u9762\u4f7f\u7528\u4e0a\u6807\u811a\u6ce8\u7f16\u53f7\uff08\u5982\u00b9\u00b2\u00b3\uff09\u3002\n"
-        "2. \u6587\u672b\u5355\u72ec\u5217\u201c\u5f15\u6587\u6ce8\u91ca\u201d\u5c0f\u8282\uff0c\u6309 1,2,3... \u7edf\u4e00\u5217\u51fa\u5b8c\u6574\u51fa\u5904\u3002\n"
-        "3. \u4e0d\u8981\u628a\u5b8c\u6574\u51fa\u5904\u63d2\u5728\u53e5\u5b50\u4e2d\u95f4\u3002\n"
-        "4. \u5f15\u6587\u6ce8\u91ca\u4e0d\u8981\u5199\u201c\u540c\u4e0a\u201d\uff1b\u591a\u4e2a\u4e0a\u6807\u6307\u5411\u540c\u4e00\u6761\u51fa\u5904\u65f6\uff0c\u8981\u5408\u5e76\u4e3a\u4e00\u6761\u5b8c\u6574\u51fa\u5904\u3002\n"
-        "5. \u9875\u7801\u7edf\u4e00\u5199\u201c\u7b2cX\u9875\u201d\uff0c\u4e0d\u8981\u5199\u201cPDF\u7b2cX\u9875\u201d\u3001\u201cpdf_page\u201d\u6216\u201c\u5370\u5237\u9875\u4f4e\u4fe1\u4efb\u201d\u3002\n"
-        "6. \u4e0d\u8981\u5199 1930 \u5e74\u4e0a\u6d77\u6c5f\u5357\u4e66\u5e97\u30011940 \u5e74\u5ef6\u5b89\u89e3\u653e\u793e\u7b49\u7248\u672c\u6cbf\u9769\u63cf\u8ff0\uff0c"
-        "\u7edf\u4e00\u4f7f\u7528\u201c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e\u201d\u3002\n"
-    )
+    return prompts.footnote_citation_rules()
 
 
 def build_quote_prompt(query, context):
-    return (
-        f"\n\u4f60\u662f MarxOS \u7684\u51fa\u5904\u6838\u5bf9\u5668\u3002\n\n"
-        f"\u4efb\u52a1\uff1a\u7528\u6237\u7ed9\u51fa\u4e00\u53e5\u6216\u4e00\u6bb5\u539f\u6587\uff0c"
-        f"\u8bf7\u53ea\u6839\u636e\u3010\u68c0\u7d22\u6750\u6599\u3011\u5224\u65ad\u6700\u53ef\u80fd\u51fa\u5904\u3002\n\n"
-        f"{final_answer_style_rules()}\n"
-        f"\u56de\u7b54\u8981\u6c42\uff1a\n"
-        f"1. \u53ea\u8f93\u51fa\u51fa\u5904\uff0c\u4e0d\u505a\u7406\u8bba\u5206\u6790\u3002\n"
-        f"2. \u4f18\u5148\u4f7f\u7528\u68c0\u7d22\u6750\u6599\u4e2d\u7684\u201c\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\u201d"
-        f"\u6216\u201c\u6bb5\u843d\u5177\u4f53\u51fa\u5904\u683c\u5f0f\u201d\u3002\n"
-        f"3. \u9875\u7801\u7edf\u4e00\u6309\u68c0\u7d22\u6750\u6599\u63d0\u4f9b\u7684\u201c\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\u201d\u8f93\u51fa\uff0c"
-        f"\u53ea\u5199\u201c\u7b2cX\u9875\u201d\uff0c\u4e0d\u8981\u5199\u201cPDF\u7b2cX\u9875\u201d\u6216\u201cpdf_page\u201d\u3002\n"
-        f"4. \u5982\u679c\u6ca1\u6709\u7cbe\u786e\u5339\u914d\uff0c\u5fc5\u987b\u8bf4\u660e"
-        f"\u201c\u672a\u80fd\u786e\u8ba4\u5177\u4f53\u9875\u7801\u201d\uff0c\u518d\u5217\u6700\u63a5\u8fd1\u7684\u5019\u9009\u3002\n\n"
-        f"\u7981\u6b62\u8f93\u51fa\uff1a\u4e0d\u8981\u5728\u6700\u7ec8\u56de\u7b54\u4e2d\u51fa\u73b0"
-        f"\u201c\u8d44\u65991\u201d\u201c\u8d44\u65992\u201d\u201c\u7247\u6bb51\u201d"
-        f"\u201c\u68c0\u7d22\u6750\u6599\u201d\u7b49\u5185\u90e8\u7f16\u53f7\u6216\u5185\u90e8\u8bf4\u6cd5\u3002\n\n"
-        f"# \u68c0\u7d22\u6750\u6599\n{context}\n\n# \u7528\u6237\u539f\u6587\n{query}\n"
-    )
+    return prompts.build_quote_prompt(query, context)
 
 
 def build_concept_prompt(query, context):
-    return (
-        f"\n\u4f60\u662f MarxOS\uff0c\u4e00\u4e2a\u9a6c\u514b\u601d\u4e3b\u4e49\u5b66\u672f\u52a9\u624b\u3002\n\n"
-        f"\u4efb\u52a1\uff1a\u89e3\u91ca\u7528\u6237\u63d0\u51fa\u7684\u6982\u5ff5\u3002"
-        f"\u4f18\u5148\u4f9d\u636e\u3010\u539f\u8457\u5185\u5bb9\u3011\uff0c\u518d\u505a\u5fc5\u8981\u7684\u7406\u8bba\u6982\u62ec\u3002\n\n"
-        f"{final_answer_style_rules()}\n"
-        f"\u56de\u7b54\u8981\u6c42\uff1a\n"
-        f"1. \u5148\u7ed9\u51fa\u7b80\u660e\u5b9a\u4e49\u3002\n"
-        f"2. \u8bf4\u660e\u5b83\u5728\u9a6c\u514b\u601d\u4e3b\u4e49\u7406\u8bba\u4e2d\u7684\u4f4d\u7f6e\u3002\n"
-        f"3. \u5982\u4f7f\u7528\u539f\u8457\u6750\u6599\uff0c\u9644\u7b80\u77ed\u51fa\u5904\u3002\n"
-        f"4. \u4e0d\u8981\u8f93\u51fa\u201c\u68c0\u7d22\u6765\u6e90\u201d\u7b49\u5185\u90e8\u8c03\u8bd5\u4fe1\u606f\u3002\n\n"
-        f"\u7bc7\u76ee\u8986\u76d6\u8981\u6c42\uff1a\u5728\u6750\u6599\u5141\u8bb8\u7684\u524d\u63d0\u4e0b\uff0c"
-        f"\u5c3d\u91cf\u4f7f\u7528\u591a\u4e2a\u7ecf\u5178\u7bc7\u76ee\u7684\u4ee3\u8868\u6027\u53e5\u5b50\uff0c\u4e0d\u8981\u53ea\u56f4\u7ed5 1-2 \u7bc7\u5c55\u5f00\u3002\n"
-        f"{footnote_citation_rules()}\n"
-        f"\u7981\u6b62\u8f93\u51fa\uff1a\u4e0d\u8981\u5199\u201c\u8d44\u65991\u201d\u201c\u8d44\u65992\u201d"
-        f"\u201c\u7247\u6bb51\u201d\u201c\u68c0\u7d22\u6750\u6599\u201d\u7b49\u5185\u90e8\u7f16\u53f7\uff1b"
-        f"\u9700\u8981\u5f15\u7528\u65f6\uff0c\u53ea\u4f7f\u7528\u51fa\u5904\u6587\u672c\u3002\n\n"
-        f"# \u539f\u8457\u5185\u5bb9\n{context}\n\n# \u7528\u6237\u95ee\u9898\n{query}\n"
-    )
+    return prompts.build_concept_prompt(query, context)
 
 
 def build_analysis_prompt(query, context):
-    return (
-        f"\n\u4f60\u662f MarxOS\uff0c\u4e00\u4e2a\u9a6c\u514b\u601d\u4e3b\u4e49\u5b66\u672f\u667a\u80fd\u4f53\u3002\n\n"
-        f"\u4efb\u52a1\uff1a\u57fa\u4e8e\u3010\u539f\u8457\u5185\u5bb9\u3011\u548c\u9a6c\u514b\u601d\u4e3b\u4e49\u7406\u8bba\uff0c"
-        f"\u5bf9\u7528\u6237\u95ee\u9898\u505a\u7ed3\u6784\u6027\u5206\u6790\u3002\n\n"
-        f"{final_answer_style_rules()}\n"
-        f"\u5206\u6790\u6846\u67b6\uff1a\u751f\u4ea7\u529b\u4e0e\u751f\u4ea7\u5173\u7cfb\u3001"
-        f"\u7ecf\u6d4e\u57fa\u7840\u4e0e\u4e0a\u5c42\u5efa\u7b51\u3001\u9636\u7ea7\u5173\u7cfb\u3001"
-        f"\u8d44\u672c\u903b\u8f91\u3001\u52b3\u52a8\u8fc7\u7a0b\u3002\n\n"
-        f"\u56de\u7b54\u8981\u6c42\uff1a\n"
-        f"1. \u4f18\u5148\u4f9d\u636e\u539f\u8457\u5185\u5bb9\uff0c\u4e14\u81f3\u5c11\u4f7f\u7528\u4e24\u6761\u4e0d\u540c\u6750\u6599\u652f\u6491\u5173\u952e\u5224\u65ad\u3002\n"
-        f"2. \u56de\u7b54\u5206\u4e09\u5c42\uff1a\u5148\u7ed9\u7ed3\u8bba\uff0c\u518d\u7ed9\u7406\u8bba\u673a\u5236\uff0c\u6700\u540e\u7ed9\u73b0\u5b9e\u6307\u5411\u6216\u5386\u53f2\u6761\u4ef6\u3002\n"
-        f"3. \u5141\u8bb8\u5448\u73b0\u5185\u90e8\u5f20\u529b\uff1a\u53ef\u6307\u51fa\u5b9e\u73b0\u6761\u4ef6\u3001\u9636\u6bb5\u5dee\u5f02\u6216\u5386\u53f2\u9650\u5236\uff0c\u800c\u975e\u53ea\u7ed9\u5355\u7ebf\u7ed3\u8bba\u3002\n"
-        f"4. \u81f3\u5c11\u7ed9\u51fa\u4e24\u5904\u7b80\u77ed\u51fa\u5904\uff1b\u82e5\u6750\u6599\u4e0d\u8db3\u4ee5\u652f\u6301\u67d0\u5224\u65ad\uff0c\u8981\u660e\u786e\u8bf4\u660e\u4e0d\u786e\u5b9a\u5904\u3002\n"
-        f"5. \u56f4\u7ed5\u6982\u5ff5\u3001\u903b\u8f91\u548c\u73b0\u5b9e\u6307\u5411\u5c55\u5f00\uff0c\u4e0d\u7a7a\u558a\u53e3\u53f7\u3002\n\n"
-        f"\u7bc7\u76ee\u8986\u76d6\u8981\u6c42\uff1a\u5728\u6750\u6599\u5141\u8bb8\u7684\u524d\u63d0\u4e0b\uff0c"
-        f"\u5c3d\u91cf\u4f7f\u7528\u591a\u4e2a\u7ecf\u5178\u7bc7\u76ee\u7684\u4ee3\u8868\u6027\u53e5\u5b50\uff0c\u4e0d\u8981\u53ea\u56f4\u7ed5 1-2 \u7bc7\u5c55\u5f00\u3002\n"
-        f"{footnote_citation_rules()}\n"
-        f"\u7981\u6b62\u8f93\u51fa\uff1a\u4e0d\u8981\u5199\u201c\u8d44\u65991\u201d\u201c\u8d44\u65992\u201d"
-        f"\u201c\u7247\u6bb51\u201d\u201c\u68c0\u7d22\u6750\u6599\u201d\u7b49\u5185\u90e8\u7f16\u53f7\uff1b"
-        f"\u9700\u8981\u5f15\u7528\u65f6\uff0c\u53ea\u4f7f\u7528\u51fa\u5904\u6587\u672c\u3002\n\n"
-        f"# \u539f\u8457\u5185\u5bb9\n{context}\n\n# \u7528\u6237\u95ee\u9898\n{query}\n"
-    )
+    return prompts.build_analysis_prompt(query, context)
 
 
 def build_default_prompt(query, context):
-    return (
-        f"\n\u4f60\u662f MarxOS\uff0c\u4e00\u4e2a\u9a6c\u514b\u601d\u4e3b\u4e49\u5b66\u672f\u52a9\u624b\u3002\n\n"
-        f"\u8bf7\u6839\u636e\u3010\u539f\u8457\u5185\u5bb9\u3011\u56de\u7b54\u7528\u6237\u95ee\u9898\uff0c"
-        f"\u4f18\u5148\u7ed9\u51fa\u7ed3\u6784\u5316\u3001\u4fe1\u606f\u5bc6\u5ea6\u9ad8\u7684\u56de\u7b54\u3002\n"
-        f"{final_answer_style_rules()}\n"
-        f"\u56de\u7b54\u7ed3\u6784\uff1a\n"
-        f"1. \u5148\u7528 1-2 \u53e5\u76f4\u63a5\u56de\u7b54\u95ee\u9898\u7ed3\u8bba\u3002\n"
-        f"2. \u518d\u5206 3-5 \u70b9\u5c55\u5f00\uff08\u6982\u5ff5\u5b9a\u4e49\u3001\u673a\u5236\u903b\u8f91\u3001\u5386\u53f2/\u73b0\u5b9e\u610f\u4e49\uff09\uff0c\u6bcf\u70b9\u81f3\u5c11 2-3 \u53e5\u3002\n"
-        f"3. \u5c3d\u91cf\u7528\u539f\u8457\u6750\u6599\u652f\u6491\u5173\u952e\u5224\u65ad\uff0c\u51fa\u5904\u8981\u7b80\u77ed\u6e05\u6670\u3002\n"
-        f"4. \u82e5\u6750\u6599\u4e0d\u8db3\u652f\u6301\u67d0\u7ed3\u8bba\uff0c\u8981\u660e\u786e\u8bf4\u201c\u6750\u6599\u4e0d\u8db3/\u5f85\u6838\u5bf9\u201d\u3002\n"
-        f"5. \u7981\u6b62\u53e3\u53f7\u5f0f\u3001\u7a7a\u6d1e\u8868\u8ff0\u3002\n\n"
-        f"\u7bc7\u76ee\u8986\u76d6\u8981\u6c42\uff1a\n"
-        f"1. \u5728\u6750\u6599\u5141\u8bb8\u7684\u524d\u63d0\u4e0b\uff0c\u5c3d\u91cf\u8986\u76d6\u591a\u4e2a\u7ecf\u5178\u7bc7\u76ee\uff0c\u4e0d\u8981\u53ea\u56f4\u7ed5 1-2 \u7bc7\u5c55\u5f00\u3002\n"
-        f"2. \u4f18\u5148\u9009\u7528\u4e0d\u540c\u6765\u6e90\u7684\u4ee3\u8868\u6027\u53e5\u5b50\u3002\n\n"
-        f"\u51fa\u5904\u8981\u6c42\uff1a\n"
-        f"1. \u53ea\u80fd\u4f7f\u7528\u4e0a\u4e0b\u6587\u7ed9\u51fa\u7684\u51fa\u5904\u683c\u5f0f\uff0c\u4e0d\u5f97\u81ea\u884c\u7f16\u9020\u9875\u7801\u3002\n"
-        f"2. \u9875\u7801\u7edf\u4e00\u5199\u201c\u7b2cX\u9875\u201d\uff0c\u4e0d\u8981\u5199 PDF\u3001pdf_page \u6216\u201c\u540c\u4e0a\u201d\u3002\n"
-        f"3. \u4e0d\u8981\u5199 1930 \u5e74\u4e0a\u6d77\u6c5f\u5357\u4e66\u5e97\u30011940 \u5e74\u5ef6\u5b89\u89e3\u653e\u793e\u7b49\u7248\u672c\u6cbf\u9769\u63cf\u8ff0\uff0c"
-        f"\u7edf\u4e00\u4f7f\u7528\u201c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e\u201d\u3002\n\n"
-        f"{footnote_citation_rules()}\n"
-        f"\u4e0d\u8981\u8f93\u51fa\u201c\u68c0\u7d22\u6765\u6e90\u201d\u7b49\u5185\u90e8\u8c03\u8bd5\u4fe1\u606f\u3002\n\n"
-        f"\u7981\u6b62\u8f93\u51fa\uff1a\u4e0d\u8981\u5199\u201c\u8d44\u65991\u201d\u201c\u8d44\u65992\u201d"
-        f"\u201c\u7247\u6bb51\u201d\u201c\u68c0\u7d22\u6750\u6599\u201d\u7b49\u5185\u90e8\u7f16\u53f7\uff1b"
-        f"\u9700\u8981\u5f15\u7528\u65f6\uff0c\u53ea\u4f7f\u7528\u51fa\u5904\u6587\u672c\u3002\n\n"
-        f"# \u539f\u8457\u5185\u5bb9\n{context}\n\n# \u7528\u6237\u95ee\u9898\n{query}\n"
-    )
+    return prompts.build_default_prompt(query, context)
 
 
 def build_constraint_guard(constraints):
-    sources = sorted(constraints.get("sources") or [])
-    if not sources:
-        return ""
-
-    source_text = "、".join(sources)
-    return (
-        "\n引用约束（必须严格遵守）：\n"
-        f"1. 本题只允许引用以下来源：{source_text}。\n"
-        "2. 不得写出任何不在该列表中的卷次、书名或来源。\n"
-        "3. 若材料不足，请明确写“当前材料不足以支持该卷次判断”，不要补写其他卷次。\n"
-    )
+    return prompts.build_constraint_guard(constraints)
 
 
 def build_prompt(intent, query, context):
-    prompt_builders = {
-        "quote_lookup": build_quote_prompt,
-        "concept_explain": build_concept_prompt,
-        "theory_analysis": build_analysis_prompt,
-        "rag_answer": build_default_prompt,
-    }
-    return prompt_builders.get(intent, build_default_prompt)(query, context)
+    return prompts.build_prompt(intent, query, context)
 
 def build_context(docs, query_intent):
     # Chunk creation happens in the vectorstore build step. This function only
@@ -2790,202 +2045,109 @@ def build_context(docs, query_intent):
 
 
 def env_flag(name):
-    return os.getenv(name, "").lower() in {"1", "true", "yes", "on"}
+    return RUNTIME.env_flag(name)
 
 
 def dev_mode_enabled():
     """Gate developer-only output that may expose prompts, chunks, or metadata."""
-    if not env_flag(DEV_MODE_ENV):
-        return False
-
-    expected_token = os.getenv(DEV_TOKEN_ENV)
-    if not expected_token:
-        return True
-
-    return os.getenv(DEV_TOKEN_INPUT_ENV) == expected_token
+    return RUNTIME.dev_mode_enabled()
 
 
 def trace_enabled():
-    return dev_mode_enabled() and env_flag(TRACE_ENV)
+    return RUNTIME.trace_enabled()
 
 
 def trace_only_enabled():
-    return dev_mode_enabled() and env_flag(TRACE_ONLY_ENV)
+    return RUNTIME.trace_only_enabled()
 
 
 def dual_retrieval_enabled():
-    return dev_mode_enabled() and env_flag(DUAL_RETRIEVAL_ENV)
+    return RUNTIME.dual_retrieval_enabled()
 
 
 def compact_preview(text, limit=180):
-    text = " ".join(clean_text(text, "").split())
-    if len(text) <= limit:
-        return text
-
-    return text[:limit] + "..."
+    return trace_utils.compact_preview(text, clean_text, limit=limit)
 
 
 def print_trace_line(text=""):
-    print(text, file=sys.stderr)
+    return trace_utils.print_trace_line(text)
 
 
 def print_query_trace(query, query_intent):
-    print_trace_line("\n===== MarxOS Trace =====")
-    print_trace_line(f"query: {query}")
-    print_trace_line(f"intent: {query_intent}")
+    return trace_utils.print_query_trace(query, query_intent)
 
 
 def print_constraints_trace(constraints):
-    if not constraints:
-        print_trace_line("routing_constraints: none")
-        return
-
-    print_trace_line("routing_constraints:")
-    print_trace_line(f"- title: {constraints.get('title')}")
-    print_trace_line(f"- sources: {sorted(constraints.get('sources') or [])}")
-    print_trace_line(f"- page_ranges: {constraints.get('page_ranges') or {}}")
+    return trace_utils.print_constraints_trace(constraints)
 
 
 def print_docs_trace(docs, label="retrieved_docs"):
-    print_trace_line(f"{label}: {len(docs)}")
-
-    for index, doc in enumerate(docs, start=1):
-        metadata = normalize_metadata(doc.metadata)
-        print_trace_line(f"\n[{index}]")
-        print_trace_line(
-            "metadata: "
-            f"book={metadata.get('book')}, article={metadata.get('article')}, "
-            f"section={metadata.get('section')}, source={metadata.get('source')}, "
-            f"page={metadata.get('page')}, printed_page={metadata.get('printed_page')}, "
-            f"pdf_page={metadata.get('pdf_page')}, citation_page={metadata.get('citation_page')}, "
-            f"citation_page_type={metadata.get('citation_page_type')}"
-        )
-        print_trace_line(
-            "standard_metadata: "
-            f"series={metadata.get('series')}, volume={metadata.get('volume')}, "
-            f"publisher={metadata.get('publisher')}, publication_year={metadata.get('publication_year')}, "
-            f"source_file={metadata.get('source_file')}"
-        )
-        if metadata.get("match_type"):
-            print_trace_line(
-                f"match: type={metadata.get('match_type')}, confidence={metadata.get('confidence')}, "
-                f"lookup_scope={metadata.get('lookup_scope')}"
-            )
-        print_trace_line(f"sentence_citation: {format_citation(metadata, include_article=False)}")
-        print_trace_line(f"paragraph_citation: {format_citation(metadata, include_article=True)}")
-        print_trace_line(f"preview: {compact_preview(doc.page_content)}")
+    return trace_utils.print_docs_trace(
+        docs,
+        normalize_metadata,
+        format_citation,
+        compact_preview,
+        label=label,
+    )
 
 
 def print_prompt_trace(prompt):
-    print_trace_line("\nprompt_preview:")
-    print_trace_line(compact_preview(prompt, limit=500))
-    print_trace_line("===== End Trace =====\n")
+    return trace_utils.print_prompt_trace(prompt, compact_preview)
 
 
 def build_trace_only_answer(query_intent, docs, prompt, paragraph_docs=None):
-    paragraph_docs = paragraph_docs or []
-    lines = [
-        "已完成 TRACE_ONLY 调试运行，未调用 DeepSeek。",
-        f"intent: {query_intent}",
-        f"retrieved_docs: {len(docs)}",
-        "",
-        "Top chunks:",
-    ]
-
-    for index, doc in enumerate(docs, start=1):
-        metadata = normalize_metadata(doc.metadata)
-        lines.append(
-            f"{index}. source={metadata.get('source')}, article={metadata.get('article')}, "
-            f"page={metadata.get('page')}, pdf_page={metadata.get('pdf_page')}, "
-            f"citation_page={metadata.get('citation_page')}, type={metadata.get('citation_page_type')}"
-        )
-        lines.append(f"   preview: {compact_preview(doc.page_content, limit=120)}")
-
-    if paragraph_docs:
-        lines.extend(["", "Top paragraphs:"])
-        for index, doc in enumerate(paragraph_docs, start=1):
-            metadata = normalize_metadata(doc.metadata)
-            lines.append(
-                f"{index}. source={metadata.get('source')}, article={metadata.get('article')}, "
-                f"page={metadata.get('page')}, pdf_page={metadata.get('pdf_page')}, "
-                f"citation_page={metadata.get('citation_page')}, type={metadata.get('citation_page_type')}"
-            )
-            lines.append(f"   preview: {compact_preview(doc.page_content, limit=120)}")
-
-    lines.extend(["", "Prompt preview:", compact_preview(prompt, limit=700)])
-    return "\n".join(lines)
+    return trace_utils.build_trace_only_answer(
+        query_intent,
+        docs,
+        prompt,
+        normalize_metadata,
+        compact_preview,
+        paragraph_docs=paragraph_docs,
+    )
 
 
 def load_embeddings():
-    global EMBEDDINGS_INSTANCE
-    if EMBEDDINGS_INSTANCE is None:
-        EMBEDDINGS_INSTANCE = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-    return EMBEDDINGS_INSTANCE
+    return RUNTIME.load_embeddings()
 
 
 def load_vectorstore():
-    global VECTORSTORE_INSTANCE
-    if VECTORSTORE_INSTANCE is None:
-        VECTORSTORE_INSTANCE = FAISS.load_local(
-            VECTORSTORE_DIR,
-            load_embeddings(),
-            allow_dangerous_deserialization=True,
-        )
-    return VECTORSTORE_INSTANCE
+    return RUNTIME.load_vectorstore()
 
 
 def paragraph_vectorstore_exists():
-    return os.path.exists(os.path.join(PARAGRAPH_VECTORSTORE_DIR, "index.faiss"))
+    return RUNTIME.paragraph_vectorstore_exists()
 
 
 def load_paragraph_vectorstore():
-    global PARAGRAPH_VECTORSTORE_INSTANCE
-    if PARAGRAPH_VECTORSTORE_INSTANCE is None:
-        PARAGRAPH_VECTORSTORE_INSTANCE = FAISS.load_local(
-            PARAGRAPH_VECTORSTORE_DIR,
-            load_embeddings(),
-            allow_dangerous_deserialization=True,
-        )
-    return PARAGRAPH_VECTORSTORE_INSTANCE
+    return RUNTIME.load_paragraph_vectorstore()
 
 
 def retrieve_dual_documents(query, chunk_db, paragraph_db, k=5):
-    return {
-        "chunk": retrieve_documents(query, chunk_db, k=k),
-        "paragraph": retrieve_paragraph_documents(query, paragraph_db, k=k),
-    }
+    return retrieval_utils.retrieve_dual_documents(
+        query,
+        chunk_db,
+        paragraph_db,
+        k,
+        _retrieval_ctx(),
+    )
 
 
 def merge_prefer_paragraph_docs(paragraph_docs, chunk_docs, limit):
-    merged = []
-    seen = set()
-    for doc in list(paragraph_docs or []) + list(chunk_docs or []):
-        metadata = doc.metadata or {}
-        key = (
-            metadata.get("source"),
-            metadata.get("paragraph_id") or metadata.get("pdf_page") or metadata.get("page"),
-            metadata.get("printed_page") or metadata.get("citation_page"),
-            clean_text(doc.page_content, "")[:120],
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        merged.append(doc)
-        if len(merged) >= limit:
-            break
-    return merged
+    return retrieval_utils.merge_prefer_paragraph_docs(
+        paragraph_docs,
+        chunk_docs,
+        limit,
+        _retrieval_ctx(),
+    )
 
 
 def filter_paragraph_docs_by_text_overlap(query, docs, limit=None):
-    filtered = []
-    for doc in docs or []:
-        score = page_match_score(query, doc.page_content)
-        if score <= 0:
-            continue
-        doc.metadata["paragraph_query_overlap_score"] = score
-        filtered.append(doc)
-    filtered.sort(key=lambda item: item.metadata.get("paragraph_query_overlap_score", 0), reverse=True)
-    return filtered[:limit] if limit else filtered
+    return retrieval_utils.filter_paragraph_docs_by_text_overlap(
+        query,
+        docs,
+        _retrieval_ctx(),
+        limit=limit,
+    )
 
 
 UNSUPPORTED_CLAIM_RULES = [
@@ -3028,476 +2190,154 @@ UNSUPPORTED_CLAIM_RULES = [
 
 
 def answer_unsupported_claim(query):
-    normalized_query = normalize_for_match(query)
-    for rule in UNSUPPORTED_CLAIM_RULES:
-        if all(normalize_for_match(token) in normalized_query for token in rule["tokens"]):
-            return rule["answer"]
-    return ""
+    return answer_utils.answer_unsupported_claim(
+        query,
+        UNSUPPORTED_CLAIM_RULES,
+        normalize_for_match,
+    )
 
 
 
 def evidence_from_doc(doc, index=1):
-    metadata = normalize_metadata(doc.metadata)
-    content = clean_text(doc.page_content, "")
-    return {
-        "id": f"E{index}",
-        "citation": format_citation(metadata, include_article=False),
-        "detailed_citation": format_citation(metadata, include_article=True),
-        "sentence_citation": format_citation(metadata, include_article=False),
-        "source": metadata.get("source"),
-        "source_file": metadata.get("source_file") or metadata.get("source"),
-        "series": metadata.get("series"),
-        "volume": metadata.get("volume"),
-        "article": metadata.get("article") or metadata.get("section"),
-        "section": metadata.get("section"),
-        "paragraph_id": metadata.get("paragraph_id"),
-        "line_start": metadata.get("line_start"),
-        "line_end": metadata.get("line_end"),
-        "char_start": metadata.get("char_start"),
-        "char_end": metadata.get("char_end"),
-        "printed_page": metadata.get("printed_page"),
-        "citation_page": metadata.get("citation_page"),
-        "pdf_page": metadata.get("pdf_page") or metadata.get("page"),
-        "match_type": metadata.get("match_type"),
-        "confidence": metadata.get("confidence"),
-        "excerpt": compact_preview(content, limit=240) if "compact_preview" in globals() else content[:240],
-    }
+    return citations.evidence_from_doc(
+        doc,
+        index,
+        normalize_metadata,
+        clean_text,
+        compact_preview,
+        format_citation,
+    )
 
 
 def evidence_from_docs(docs, limit=12):
-    evidence = []
-    seen = set()
-    for doc in docs[:limit]:
-        item = evidence_from_doc(doc, index=len(evidence) + 1)
-        key = (item.get("source"), item.get("printed_page"), item.get("citation_page"), item.get("article"), item.get("excerpt")[:80])
-        if key in seen:
-            continue
-        seen.add(key)
-        evidence.append(item)
-    return evidence
+    return citations.evidence_from_docs(
+        docs,
+        limit,
+        normalize_metadata,
+        clean_text,
+        compact_preview,
+        format_citation,
+    )
 
 
 def is_view_list_query(query):
-    normalized = normalize_for_match(query)
-    if not normalized:
-        return False
-    list_markers = ["列出", "概括", "归纳", "梳理", "观点", "主张", "看法"]
-    return any(normalize_for_match(marker) in normalized for marker in list_markers)
+    return answer_utils.is_view_list_query(query, normalize_for_match)
 
 
 def is_topic_view_list_query(query, constraints):
-    return bool(constraints.get("topic_id")) and is_view_list_query(query)
+    return answer_utils.is_topic_view_list_query(query, constraints, normalize_for_match)
 
 
 def clean_excerpt_for_display(text, article=""):
-    text = clean_text(text, "")
-    article = clean_text(article, "")
-    if not text:
-        return ""
-
-    text = text.replace("...", "").replace("……", "")
-    text = re.sub(r"\s+", "", text)
-    text = re.sub(r"^[。；，、：:]+", "", text)
-    if article:
-        text = re.sub(rf"^{re.escape(article)}[呢，。；：:\s]*", "", text)
-    text = re.sub(r"[A-Za-z]+", "", text)
-    text = text.replace("f田农", "农田").replace("z把", "把").replace("z ", "")
-    text = re.split(r"编者注|——+编者注|注：|\(\d+\)|①|②|③|④|⑤|⑥|⑦|⑧|⑨|⑩", text, maxsplit=1)[0]
-    text = re.split(r"共产党宣言这段话在|恩格斯在[０-９0-9１８９]{4}年", text, maxsplit=1)[0]
-    text = re.sub(r"([。！？；]){2,}", r"\1", text)
-    text = re.sub(r"([，、；：]){2,}", r"\1", text)
-    return text.strip("。；，、：: ")
+    return answer_utils.clean_excerpt_for_display(text, clean_text, article=article)
 
 
 def best_excerpt_span(text, markers, max_len=88):
-    cleaned = clean_excerpt_for_display(text)
-    if not cleaned:
-        return ""
-
-    clauses = [
-        chunk.strip("。；，、：: ")
-        for chunk in re.split(r"[。！？；]", cleaned)
-        if chunk.strip("。；，、：: ")
-    ]
-    if not clauses:
-        return cleaned[:max_len]
-
-    normalized_markers = [normalize_for_match(marker) for marker in markers if normalize_for_match(marker)]
-    scored = []
-    for index, clause in enumerate(clauses):
-        norm = normalize_for_match(clause)
-        score = sum(1 for marker in normalized_markers if marker in norm)
-        if len(clause) < 12:
-            score -= 1
-        scored.append((score, -index, clause))
-    scored.sort(reverse=True)
-    chosen = scored[0][2] if scored else clauses[0]
-
-    if len(chosen) < 28:
-        clause_index = clauses.index(chosen)
-        if clause_index + 1 < len(clauses):
-            chosen = f"{chosen}，{clauses[clause_index + 1]}"
-
-    return chosen[:max_len].rstrip("，、；： ")
+    return answer_utils.best_excerpt_span(
+        text,
+        markers,
+        clean_text,
+        normalize_for_match,
+        max_len=max_len,
+    )
 
 
 def summarize_peasant_cooperative_viewpoint(text):
-    normalized = normalize_for_match(text)
-    if "合作社" in normalized and "共同耕种" in normalized:
-        return "农业工人只有把土地从大地产和封建占有中解放出来，转为社会财产并实行合作社共同耕种，才能真正摆脱贫困。"
-    if "土地结合起来" in normalized and "大规模经营" in normalized:
-        return "分散的小块土地应结合起来实行较大规模经营，并通过合作社方式重新组织生产。"
-    if "农民合作社" in normalized and ("资金" in normalized or "机会" in normalized):
-        return "国家或社会应为农民合作社提供土地、资金和转向副业的机会，帮助其完成过渡。"
-    if "社会帮助" in normalized or "示范" in normalized:
-        return "对小农不能采取暴力剥夺，而应通过示范和社会帮助引导其逐步走向合作化。"
-    if "暴力去剥夺小农" in normalized or ("暴力" in normalized and "小农" in normalized):
-        return "无产阶级政党不应以暴力剥夺小农，而应争取他们自愿走向新的合作经营形式。"
-    if "小农" in normalized and "土地结合起来" in normalized:
-        return "小农经济的出路不在维持分散经营，而在把分散土地结合起来走合作经营道路。"
-    if "公有土地" in normalized or ("小农" in normalized and "饲料" in normalized):
-        return "必须重组支撑小农生产的土地条件，否则小农经济会持续陷入贫困和衰败。"
-    if "重担下解放出来" in normalized or "债务" in normalized:
-        return "单靠减轻债务和保全小块土地并不能真正解放农民，关键是为其转向新的合作经营形式创造条件。"
-    if "农村无产者" in normalized or "最低工资" in normalized:
-        return "在解决小农问题的同时，还应把农村无产者纳入最低工资和合作经营的政策安排。"
-    return ""
+    return answer_utils.summarize_peasant_cooperative_viewpoint(text, normalize_for_match)
 
 
 def format_topic_viewpoint(item, constraints):
-    article = clean_text(item.get("article") or item.get("section"), "")
-    topic_id = constraints.get("topic_id") or ""
-    topic_markers = list(constraints.get("topic_markers") or [])
-    excerpt = clean_excerpt_for_display(item.get("excerpt"), article=article)
-    if not excerpt:
-        return ""
-
-    if topic_id == "peasant_cooperative":
-        summary = summarize_peasant_cooperative_viewpoint(excerpt)
-        if summary:
-            return summary
-
-    best = best_excerpt_span(excerpt, topic_markers, max_len=88)
-    if not best:
-        return ""
-    if best.endswith(("。", "！", "？")):
-        return best
-    return f"{best}。"
+    return answer_utils.format_topic_viewpoint(
+        item,
+        constraints,
+        clean_text,
+        normalize_for_match,
+    )
 
 
 def strict_title_answer_evidence(query, constraints, evidence, limit=8):
-    title_norm = normalize_for_match(constraints.get("title") or "")
-    focus_terms = [normalize_for_match(term) for term in active_concept_terms(query) if normalize_for_match(term)]
-    preferred_sources = {
-        item.get("source")
-        for item in constraints.get("entries") or []
-        if item.get("priority") == 1 and item.get("source")
-    }
-    ranked = []
-    for item in evidence or []:
-        article = clean_text(item.get("article") or item.get("section"), "")
-        article_norm = normalize_for_match(article)
-        excerpt = clean_excerpt_for_display(item.get("excerpt"), article=article)
-        excerpt_norm = normalize_for_match(excerpt)
-        if not excerpt_norm:
-            continue
-        score = 0
-        if title_norm and title_norm in article_norm:
-            score += 25
-        if item.get("source") in preferred_sources:
-            score += 18
-        if item.get("printed_page") is not None:
-            score += 8
-        if focus_terms:
-            score += sum(24 for term in focus_terms if term in excerpt_norm)
-            if not any(term in excerpt_norm for term in focus_terms):
-                score -= 12
-        if any(marker in excerpt_norm for marker in [normalize_for_match("序言"), normalize_for_match("导言"), normalize_for_match("注释")]):
-            score -= 16
-        if normalize_for_match("编者注") in excerpt_norm:
-            score -= 24
-        if item.get("printed_page") is not None and item.get("printed_page") <= 30 and focus_terms:
-            score -= 10
-        ranked.append((score, item))
-
-    ranked.sort(key=lambda pair: pair[0], reverse=True)
-    selected = [item for score, item in ranked if score > 0]
-    return selected[:limit]
+    return answer_utils.strict_title_answer_evidence(
+        query,
+        constraints,
+        evidence,
+        active_concept_terms,
+        clean_text,
+        normalize_for_match,
+        limit=limit,
+    )
 
 
 def build_strict_title_view_list_answer(query, constraints, evidence, limit=8):
-    direct = strict_title_answer_evidence(query, constraints, evidence, limit=limit)
-    if len(direct) < 2:
-        return ""
-
-    title = constraints.get("title") or "该文"
-    focus_terms = active_concept_terms(query)
-    lines = [f"根据当前检索到的《{title}》原著材料，可以先归纳出以下要点：", ""]
-
-    for index, item in enumerate(direct[:limit], start=1):
-        viewpoint = format_topic_viewpoint(item, {"topic_markers": focus_terms})
-        if not viewpoint:
-            continue
-        citation = item.get("citation") or item.get("sentence_citation") or ""
-        lines.append(f"{index}. 观点：{viewpoint}")
-        if citation:
-            lines.append(f"   {citation}")
-
-    return "\n".join(lines).rstrip()
+    return answer_utils.build_strict_title_view_list_answer(
+        query,
+        constraints,
+        evidence,
+        active_concept_terms,
+        clean_text,
+        normalize_for_match,
+        limit=limit,
+    )
 
 
 def topic_direct_evidence(evidence, constraints):
-    markers = [normalize_for_match(marker) for marker in (constraints.get("topic_markers") or []) if normalize_for_match(marker)]
-    topic_id = constraints.get("topic_id") or ""
-    preferred_title_weights = {}
-    direct_excerpt_markers = []
-    if topic_id == "peasant_cooperative":
-        preferred_title_weights = {
-            normalize_for_match("法德农民问题"): 20,
-            normalize_for_match("德国农民战争"): 8,
-            normalize_for_match("对农村居民土地的剥夺"): 6,
-        }
-        direct_excerpt_markers = [
-            normalize_for_match(marker)
-            for marker in [
-                "合作社",
-                "共同耕种",
-                "小农",
-                "大土地",
-                "农村无产者",
-                "土地纲领",
-                "土地所有制",
-                "社会帮助",
-                "示范",
-                "暴力去剥夺小农",
-            ]
-        ]
-    direct = []
-    for item in evidence or []:
-        article = normalize_for_match(clean_text(item.get("article") or item.get("section"), ""))
-        excerpt = normalize_for_match(clean_text(item.get("excerpt"), ""))
-        score = 0
-        direct_hits = 0
-        for marker in markers:
-            if marker in article:
-                score += 3
-            if marker in excerpt:
-                score += 2
-        for marker, bonus in preferred_title_weights.items():
-            if marker and marker in article:
-                score += bonus
-        if direct_excerpt_markers:
-            direct_hits = sum(1 for marker in direct_excerpt_markers if marker and marker in excerpt)
-            score += direct_hits * 6
-            if direct_hits == 0:
-                score -= 18
-        if topic_id == "peasant_cooperative":
-            is_preferred_title = any(marker and marker in article for marker in preferred_title_weights)
-            if direct_hits == 0:
-                continue
-            if not is_preferred_title and direct_hits < 2:
-                continue
-            if normalize_for_match("法德农民问题") in article and direct_hits >= 1:
-                score += 10
-            if normalize_for_match("同样") in excerpt:
-                score -= 6
-        if excerpt.startswith(normalize_for_match("法德农民问题呢")):
-            score -= 15
-        if normalize_for_match("现在我们来谈一谈较大的农民") in excerpt:
-            score -= 8
-        if score > 0:
-            direct.append((score, item))
-    direct.sort(key=lambda pair: pair[0], reverse=True)
-    return [item for _, item in direct]
+    return answer_utils.topic_direct_evidence(
+        evidence,
+        constraints,
+        clean_text,
+        normalize_for_match,
+    )
 
 
 def topic_answer_evidence(evidence, constraints, limit=10):
-    direct = topic_direct_evidence(evidence, constraints)
-    topic_id = constraints.get("topic_id") or ""
-    if topic_id == "peasant_cooperative":
-        positive_markers = [
-            normalize_for_match(marker)
-            for marker in [
-                "合作社",
-                "共同耕种",
-                "小农",
-                "最低工资",
-                "土地纲领",
-                "农村无产者",
-                "大土地",
-                "社会帮助",
-                "示范",
-                "房产和田产",
-                "土地结合起来",
-                "暴力去剥夺小农",
-            ]
-        ]
-        negative_markers = [
-            normalize_for_match(marker)
-            for marker in [
-                "只是大概地研究这一问题",
-                "现在我们来谈一谈较大的农民",
-                "历史上德国人民",
-                "论述打算通过对这场斗争的历史进程",
-                "由于存在着地方分权",
-            ]
-        ]
-        strong = []
-        fallback = []
-        for item in direct:
-            excerpt_norm = normalize_for_match(clean_text(item.get("excerpt"), ""))
-            positive_hits = sum(1 for marker in positive_markers if marker and marker in excerpt_norm)
-            negative_hit = any(marker and marker in excerpt_norm for marker in negative_markers)
-            if negative_hit:
-                continue
-            if positive_hits >= 1:
-                strong.append(item)
-            else:
-                fallback.append(item)
-        selected = strong + fallback
-        return selected[:limit]
-    return direct[:limit]
+    return answer_utils.topic_answer_evidence(
+        evidence,
+        constraints,
+        clean_text,
+        normalize_for_match,
+        limit=limit,
+    )
 
 
 def build_topic_view_list_answer(query, constraints, evidence, limit=8):
-    direct = topic_answer_evidence(evidence, constraints, limit=limit)
-    if len(direct) < 2:
-        return ""
-
-    lines = []
-    topic_id = constraints.get("topic_id") or ""
-    topic_label = constraints.get("topic_title") or "该专题"
-    if topic_id == "peasant_cooperative":
-        lines.append(f"根据当前检索到的原著材料，可以先列出{topic_label}中更直接相关的要点：")
-    else:
-        lines.append(f"根据当前检索到的原著材料，可以先归纳出{topic_label}中的以下要点：")
-    lines.append("")
-
-    for index, item in enumerate(direct[:limit], start=1):
-        viewpoint = format_topic_viewpoint(item, constraints)
-        if not viewpoint:
-            continue
-        citation = item.get("citation") or item.get("sentence_citation") or ""
-        lines.append(f"{index}. 观点：{viewpoint}")
-        if citation:
-            lines.append(f"   {citation}")
-
-    lines.append("")
-    lines.append("说明：以上为基于当前专题证据的归纳整理，若要继续扩充到更系统的十段专题摘录，还需要继续补入俄国农村公社、土地制度和农民问题相关文本。")
-    return "\n".join(lines)
+    return answer_utils.build_topic_view_list_answer(
+        query,
+        constraints,
+        evidence,
+        clean_text,
+        normalize_for_match,
+        limit=limit,
+    )
 
 
 def extract_answer_citation_lines(answer):
-    normalized = normalize_final_answer(answer)
-    citations = []
-    for line in normalized.splitlines():
-        match = re.match(r"\s*(?:\d+[\.\u3001]|\(\d+\))\s*(.+?\u7b2c\d+\u9875\u3002?)\s*$", line)
-        if match:
-            citations.append(match.group(1).strip())
-    return citations
+    return citations.extract_answer_citation_lines(answer, normalize_final_answer)
 
 
 def citation_match_key(citation):
-    return normalize_for_match(citation or "")
+    return citations.citation_match_key(citation, normalize_for_match)
 
 
 def evidence_matches_citation(item, citation):
-    citation_key = citation_match_key(citation)
-    if not citation_key:
-        return False
-
-    candidates = [
-        item.get("citation"),
-        item.get("sentence_citation"),
-        item.get("detailed_citation"),
-    ]
-    for candidate in candidates:
-        candidate_key = citation_match_key(candidate)
-        if candidate_key and (candidate_key in citation_key or citation_key in candidate_key):
-            return True
-
-    page_match = re.search(r"\u7b2c(\d+)\u9875", citation or "")
-    citation_page = str(page_match.group(1)) if page_match else ""
-    item_pages = {
-        str(item.get("printed_page") or ""),
-        str(item.get("citation_page") or ""),
-    }
-    item_pages.discard("")
-    if citation_page and citation_page in item_pages:
-        series = citation_match_key(item.get("series") or "")
-        source = citation_match_key(item.get("source") or item.get("source_file") or "")
-        if (series and series in citation_key) or (source and source in citation_key):
-            return True
-
-    return False
+    return citations.evidence_matches_citation(item, citation, normalize_for_match)
 
 
 def filter_evidence_to_answer(answer, evidence, fallback_limit=3):
-    evidence = evidence or []
-    citations = extract_answer_citation_lines(answer)
-    if not citations:
-        return [
-            {**item, "id": f"E{index}"}
-            for index, item in enumerate(evidence[:fallback_limit], start=1)
-        ]
-
-    matched = []
-    seen = set()
-    for citation in citations:
-        for item in evidence:
-            if not evidence_matches_citation(item, citation):
-                continue
-            key = (
-                item.get("source"),
-                item.get("printed_page"),
-                item.get("citation_page"),
-                item.get("paragraph_id"),
-                item.get("excerpt"),
-            )
-            if key in seen:
-                continue
-            seen.add(key)
-            matched.append({**item, "answer_citation": citation})
-            break
-
-    if not matched:
-        return [
-            {**item, "id": f"E{index}"}
-            for index, item in enumerate(evidence[:fallback_limit], start=1)
-        ]
-
-    return [
-        {**item, "id": f"E{index}"}
-        for index, item in enumerate(matched, start=1)
-    ]
+    return citations.filter_evidence_to_answer(
+        answer,
+        evidence,
+        fallback_limit,
+        normalize_final_answer,
+        normalize_for_match,
+    )
 
 
 def audit_answer_citations(answer, evidence):
-    normalized = normalize_final_answer(answer)
-    issues = []
-    forbidden = ["PDF\u7b2c", "pdf_page", "PDF page", "\u540c\u4e0a"]
-    for token in forbidden:
-        if token in normalized:
-            issues.append({"type": "forbidden_token", "token": token})
-
-    evidence_citations = {item.get("citation") for item in evidence or []}
-    evidence_citations |= {item.get("sentence_citation") for item in evidence or []}
-    evidence_citations = {item for item in evidence_citations if item}
-    citation_lines = extract_answer_citation_lines(normalized)
-
-    if citation_lines and not evidence_citations:
-        issues.append({"type": "citation_without_verified_evidence"})
-
-    for citation in citation_lines:
-        if evidence_citations and not any(evidence_matches_citation(item, citation) for item in evidence or []):
-            issues.append({"type": "citation_not_in_evidence", "citation": citation})
-
-    return {
-        "ok": not issues,
-        "issues": issues,
-        "evidence_count": len(evidence or []),
-        "answer": normalized,
-    }
+    return citations.audit_answer_citations(
+        answer,
+        evidence,
+        normalize_final_answer,
+        normalize_for_match,
+    )
 
 
 def set_last_evidence(evidence=None, audit=None):
@@ -3537,22 +2377,20 @@ def normalize_final_answer(answer):
 def run_query(query, route_query=None):
     set_last_evidence([])
     set_last_topic_info({})
-    query = clean_text(query, "")
-    route_query = clean_text(route_query or query, "")
-    if is_unreadable_query(route_query):
-        return (
-            "\u672a\u80fd\u8bfb\u53d6\u5230\u53ef\u7528\u7684\u4e2d\u6587\u95ee\u9898\u3002"
-            "\u5982\u679c\u662f\u5728 PowerShell \u4e2d\u901a\u8fc7\u7ba1\u9053\u6216\u91cd\u5b9a\u5411\u8f93\u5165\uff0c"
-            "\u8bf7\u5148\u8fd0\u884c `chcp 65001`\uff0c\u6216\u5728\u4ea4\u4e92\u5f0f\u63d0\u793a\u4e2d\u76f4\u63a5\u8f93\u5165\u95ee\u9898\u3002"
-        )
+    request = orchestration.prepare_query_request(
+        query,
+        route_query,
+        clean_text,
+        is_unreadable_query,
+        answer_unsupported_claim,
+        classify_query,
+    )
+    if request.get("early_answer"):
+        return request["early_answer"]
 
-    unsupported_answer = answer_unsupported_claim(route_query)
-    if unsupported_answer:
-        return unsupported_answer
-
-    query_intent = classify_query(route_query)
-    if query != route_query and query_intent == "quote_lookup" and not re.search(r"[“\"].+[”\"]", route_query):
-        query_intent = "rag_answer"
+    query = request["query"]
+    route_query = request["route_query"]
+    query_intent = request["query_intent"]
     trace = trace_enabled()
     trace_only = trace_only_enabled()
     dual_retrieval = dual_retrieval_enabled()
@@ -3560,77 +2398,66 @@ def run_query(query, route_query=None):
     if trace or trace_only:
         print_query_trace(route_query, query_intent)
 
-    if query_intent == "bibliographic_lookup":
-        bibliographic_answer = answer_bibliographic_query(route_query)
-        if trace or trace_only:
-            print_trace_line("search_path: local article map / core classics")
-            print_trace_line(f"bibliographic_answer_found: {bool(bibliographic_answer)}")
-            print_trace_line("===== End Trace =====\n")
-        if bibliographic_answer:
-            return bibliographic_answer
-
-        title = extract_bibliographic_title(route_query)
-        return f"未能在当前核心书目表中确认《{title}》。"
-
-    if query_intent == "quote_lookup":
-        if trace or trace_only:
-            print_trace_line("search_path: exact OCR quote lookup")
-        answer = answer_quote_query(query, trace=trace or trace_only)
-        if trace or trace_only:
-            print_trace_line("===== End Trace =====\n")
-        return answer
+    local_answer = orchestration.maybe_answer_local_lookup(
+        query,
+        route_query,
+        query_intent,
+        trace,
+        trace_only,
+        answer_bibliographic_query,
+        extract_bibliographic_title,
+        answer_quote_query,
+        print_trace_line,
+    )
+    if local_answer:
+        return local_answer
 
     constraints = constraints_from_query(route_query)
-    set_last_topic_info(topic_info_from_constraints(constraints))
-    if trace or trace_only:
-        print_trace_line("search_path: FAISS vector similarity search -> rule rerank -> DeepSeek")
-        print_constraints_trace(constraints)
-    db = load_vectorstore()
-    retrieve_k = 12 if query_intent == "rag_answer" else 5
-    docs = retrieve_documents(query, db, k=retrieve_k)
-    paragraph_docs_for_answer = []
-    topic_list_query = query_intent == "rag_answer" and is_topic_view_list_query(route_query, constraints)
-    if paragraph_vectorstore_exists() and not topic_list_query:
-        paragraph_db_for_answer = load_paragraph_vectorstore()
-        paragraph_docs_for_answer = filter_paragraph_docs_by_text_overlap(
-            query,
-            retrieve_documents(query, paragraph_db_for_answer, k=max(retrieve_k * 3, 12)),
-            limit=retrieve_k,
-        )
-        docs = merge_prefer_paragraph_docs(paragraph_docs_for_answer, docs, retrieve_k)
-    docs = refine_docs_citation_pages_for_query(docs, route_query)
-    if constraints.get("strict_title") and not docs:
-        title = constraints.get("title") or "\u8be5\u6587"
-        answer = (
-            f"\u5f53\u524d\u8bed\u6599\u5e93\u672a\u68c0\u7d22\u5230\u300a{title}\u300b\u7684\u6b63\u6587\u9875\u6bb5\uff0c\u56e0\u6b64\u672c\u8f6e\u4e0d\u8f93\u51fa\u8de8\u7bc7\u66ff\u4ee3\u6027\u5f15\u6587\u3002"
-            "\u8bf7\u5148\u8865\u9f50\u8be5\u6587\u5728\u672c\u5730\u5e93\u4e2d\u7684\u9875\u6bb5\u6620\u5c04\u6216OCR\u6587\u672c\u540e\u518d\u56de\u7b54\u3002"
-        )
-        set_last_evidence([], {"ok": True, "issues": [], "evidence_count": 0, "answer": answer})
-        return answer
-    paragraph_docs = []
-    if (trace or trace_only) and dual_retrieval:
-        if paragraph_vectorstore_exists():
-            paragraph_docs = paragraph_docs_for_answer[:5]
-        else:
-            print_trace_line(f"paragraph_vectorstore_missing: {PARAGRAPH_VECTORSTORE_DIR}")
-    evidence = evidence_from_docs(docs)
-    topic_view_answer = ""
-    if query_intent == "rag_answer" and is_topic_view_list_query(route_query, constraints):
-        topic_view_answer = build_topic_view_list_answer(route_query, constraints, evidence, limit=min(10, len(evidence)))
-        if topic_view_answer:
-            answer_evidence = topic_answer_evidence(evidence, constraints, limit=min(10, len(evidence)))
-            display_evidence = filter_evidence_to_answer(topic_view_answer, answer_evidence, fallback_limit=min(10, len(answer_evidence)))
-            audit = audit_answer_citations(topic_view_answer, display_evidence)
-            set_last_evidence(display_evidence, audit)
-            return audit["answer"]
-    if query_intent == "rag_answer" and constraints.get("strict_title") and is_view_list_query(route_query):
-        title_view_answer = build_strict_title_view_list_answer(route_query, constraints, evidence, limit=min(8, len(evidence)))
-        if title_view_answer:
-            answer_evidence = strict_title_answer_evidence(route_query, constraints, evidence, limit=min(8, len(evidence)))
-            display_evidence = filter_evidence_to_answer(title_view_answer, answer_evidence, fallback_limit=min(8, len(answer_evidence)))
-            audit = audit_answer_citations(title_view_answer, display_evidence)
-            set_last_evidence(display_evidence, audit)
-            return audit["answer"]
+    retrieval_state = orchestration.collect_retrieval_materials(
+        query,
+        route_query,
+        query_intent,
+        constraints,
+        PARAGRAPH_VECTORSTORE_DIR,
+        trace,
+        trace_only,
+        topic_info_from_constraints,
+        set_last_topic_info,
+        print_trace_line,
+        print_constraints_trace,
+        load_vectorstore,
+        retrieve_documents,
+        paragraph_vectorstore_exists,
+        load_paragraph_vectorstore,
+        filter_paragraph_docs_by_text_overlap,
+        merge_prefer_paragraph_docs,
+        refine_docs_citation_pages_for_query,
+        evidence_from_docs,
+        is_topic_view_list_query,
+    )
+    docs = retrieval_state["docs"]
+    evidence = retrieval_state["evidence"]
+    paragraph_docs = retrieval_state["paragraph_docs"] if dual_retrieval else []
+
+    local_view_answer = orchestration.maybe_answer_local_view_query(
+        query,
+        route_query,
+        query_intent,
+        constraints,
+        docs,
+        evidence,
+        set_last_evidence,
+        filter_evidence_to_answer,
+        audit_answer_citations,
+        is_topic_view_list_query,
+        build_topic_view_list_answer,
+        topic_answer_evidence,
+        is_view_list_query,
+        build_strict_title_view_list_answer,
+        strict_title_answer_evidence,
+    )
+    if local_view_answer:
+        return local_view_answer
     set_last_evidence([])
     context = build_context(docs, query_intent)
     prompt = clean_text(build_prompt(query_intent, query, context) + build_constraint_guard(constraints))

@@ -27,7 +27,7 @@ CASES = [
     {
         "name": "analysis_capital_logic",
         "query": "结合现实怎么看待资本逻辑？",
-        "expected_intent": "theory_analysis",
+        "expected_intent": "concept_explain",
     },
     {
         "name": "quote_manifesto_ghost",

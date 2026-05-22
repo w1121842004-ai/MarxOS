@@ -85,6 +85,14 @@
         "end_page": 627,
         "priority": 1,
         "entry_type": "primary"
+      },
+      {
+        "source": "mea03.pdf",
+        "article": "哥达纲领批判",
+        "start_page": 428,
+        "end_page": 460,
+        "priority": 2,
+        "entry_type": "parallel"
       }
     ],
     "author": "卡·马克思",
