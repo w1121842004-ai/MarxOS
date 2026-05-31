@@ -6,9 +6,80 @@ from unittest.mock import patch
 from langchain_core.documents import Document
 
 import app
+import marxos_orchestration as orchestration
 
 
 class RunQueryRegressionTests(unittest.TestCase):
+    def test_collect_retrieval_materials_uses_corrective_retrieval_for_low_quality_initial_docs(self):
+        weak_doc = Document(
+            page_content="定位提示：请在原文范围内核对。",
+            metadata={
+                "source": "mes01.pdf",
+                "article": "关于费尔巴哈的提纲",
+                "match_type": "locator_backstop",
+                "page": 135,
+            },
+        )
+        strong_doc = Document(
+            page_content="人的本质不是单个人所固有的抽象物，在其现实性上，它是一切社会关系的总和。",
+            metadata={
+                "source": "mes01.pdf",
+                "article": "关于费尔巴哈的提纲",
+                "printed_page": 135,
+                "citation_page": 135,
+                "pdf_page": 151,
+                "match_type": "vector_candidate",
+            },
+        )
+        calls = {"count": 0}
+
+        def fake_retrieve_documents(_query, _db, k=5):
+            calls["count"] += 1
+            return [weak_doc] if calls["count"] == 1 else [strong_doc]
+
+        def fake_evidence_from_docs(docs):
+            items = []
+            for index, doc in enumerate(docs, start=1):
+                items.append(
+                    {
+                        "id": f"E{index}",
+                        "source": doc.metadata.get("source"),
+                        "article": doc.metadata.get("article"),
+                        "printed_page": doc.metadata.get("printed_page"),
+                        "citation_page": doc.metadata.get("citation_page"),
+                        "excerpt": doc.page_content[:80],
+                    }
+                )
+            return items
+
+        state = orchestration.collect_retrieval_materials(
+            query="人的本质是什么？",
+            route_query="人的本质是什么？",
+            query_intent="concept_explain",
+            constraints={},
+            paragraph_vectorstore_dir="vectorstore/marx_reader_paragraph",
+            trace=False,
+            trace_only=False,
+            topic_info_from_constraints=lambda constraints: constraints,
+            set_last_topic_info=lambda _info: None,
+            print_trace_line=lambda _text: None,
+            print_constraints_trace=lambda _constraints: None,
+            load_vectorstore=lambda: object(),
+            retrieve_documents=fake_retrieve_documents,
+            paragraph_vectorstore_exists=lambda: False,
+            load_paragraph_vectorstore=lambda: None,
+            filter_paragraph_docs_by_text_overlap=lambda query, docs, limit=None: docs[:limit],
+            merge_prefer_paragraph_docs=lambda paragraph_docs, chunk_docs, limit: (paragraph_docs + chunk_docs)[:limit],
+            refine_docs_citation_pages_for_query=lambda docs, query: docs,
+            evidence_from_docs=fake_evidence_from_docs,
+            is_topic_view_list_query=lambda query, constraints: False,
+        )
+
+        self.assertEqual(calls["count"], 2)
+        self.assertEqual(state["crag_report"].get("path"), "corrective")
+        self.assertGreaterEqual(state["crag_report"].get("score", 0), state["crag_report"].get("threshold", 0))
+        self.assertEqual(state["docs"][0].metadata.get("printed_page"), 135)
+
     def test_run_query_rejects_unsupported_slogan_without_vector_or_llm(self):
         query = "以人民为中心是否出自马克思原著？"
 

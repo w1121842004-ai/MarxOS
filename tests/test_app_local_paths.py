@@ -1059,6 +1059,7 @@ class AppLocalPathTests(unittest.TestCase):
             citation_audit=citation_audit,
             elapsed_ms=123,
             topic_info={},
+            crag_report={"path": "corrective", "score": 58, "threshold": 55, "ok": True, "issues": []},
         )
 
         self.assertEqual(metrics["evidence_count"], 1)
@@ -1066,6 +1067,7 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertEqual(metrics["matched_count"], 0)
         self.assertTrue(metrics["fallback_used"])
         self.assertFalse(metrics["audit_ok"])
+        self.assertEqual(metrics["crag_path"], "corrective")
 
 
 if __name__ == "__main__":

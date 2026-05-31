@@ -33,6 +33,7 @@ PAGE_MAP_PATH = os.getenv("PAGE_MAP_PATH", "data/page_map.json")
 LAST_EVIDENCE = []
 LAST_CITATION_AUDIT = {}
 LAST_TOPIC_INFO = {}
+LAST_CRAG_REPORT = {}
 ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json")
 TOPIC_CATALOG_PATH = os.getenv("TOPIC_CATALOG_PATH", "rag/topic_catalog.json")
 DEFAULT_PUBLISHER = "人民出版社"
@@ -2448,6 +2449,11 @@ def set_last_topic_info(info=None):
     LAST_TOPIC_INFO = info or {}
 
 
+def set_last_crag_report(report=None):
+    global LAST_CRAG_REPORT
+    LAST_CRAG_REPORT = report or {}
+
+
 def normalize_final_answer(answer):
     answer = clean_text(answer, "")
     answer = answer.replace("PDF\u7b2c", "\u7b2c").replace("PDF?", "?")
@@ -2476,6 +2482,7 @@ def run_query(query, route_query=None):
         try:
             set_last_evidence([])
             set_last_topic_info({})
+            set_last_crag_report({})
             request = orchestration.prepare_query_request(
                 query,
                 route_query,
@@ -2501,6 +2508,74 @@ def run_query(query, route_query=None):
             trace = trace_enabled()
             trace_only = trace_only_enabled()
             dual_retrieval = dual_retrieval_enabled()
+
+            def _audit_rank(audit_payload):
+                issues = audit_payload.get("issues") or []
+                return (
+                    1 if audit_payload.get("ok") else 0,
+                    -len(issues),
+                    int(audit_payload.get("evidence_count") or 0),
+                )
+
+            def _build_prompt_for_docs(active_docs, span_name):
+                with phoenix.trace_manager.start_as_current_span(span_name) as span:
+                    context = build_context(active_docs, query_intent)
+                    prompt = clean_text(build_prompt(query_intent, query, context) + build_constraint_guard(constraints))
+                    phoenix.set_attributes(
+                        span,
+                        {
+                            "prompt.length": len(prompt),
+                            "prompt.preview": phoenix.compact_text(prompt, limit=240),
+                        },
+                    )
+                return prompt
+
+            def _generate_raw_answer(prompt, span_name):
+                with phoenix.trace_manager.start_as_current_span(span_name) as span:
+                    client = OpenAI(
+                        api_key=os.getenv("DEEPSEEK_API_KEY"),
+                        base_url="https://api.deepseek.com",
+                    )
+                    response = client.chat.completions.create(
+                        model="deepseek-chat",
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": prompt,
+                            }
+                        ],
+                    )
+                    raw_answer = response.choices[0].message.content
+                    phoenix.set_attributes(
+                        span,
+                        {
+                            "llm.vendor": "deepseek",
+                            "llm.api_style": "openai_compatible",
+                            "llm.model": "deepseek-chat",
+                            "llm.output_length": len(raw_answer or ""),
+                        },
+                    )
+                return raw_answer
+
+            def _finalize_answer(raw_answer, active_evidence, active_crag_report, span_name, recovery_used=False):
+                with phoenix.trace_manager.start_as_current_span(span_name) as span:
+                    repaired_answer = repair_answer_citations(raw_answer, active_evidence)
+                    display_evidence = filter_evidence_to_answer(repaired_answer, active_evidence)
+                    audit = audit_answer_citations(repaired_answer, display_evidence)
+                    audit["crag_report"] = dict(active_crag_report or {})
+                    audit["crag_recovery_used"] = recovery_used
+                    phoenix.set_attributes(
+                        span,
+                        {
+                            "citation.audit_ok": bool(audit.get("ok")),
+                            "citation.issue_count": len(audit.get("issues") or []),
+                            "answer.length": len(audit["answer"]),
+                            "crag.path": (active_crag_report or {}).get("path") or "",
+                            "crag.score": int((active_crag_report or {}).get("score") or 0),
+                        },
+                    )
+                    phoenix.set_attributes(span, phoenix.summarize_evidence(display_evidence))
+                return audit, display_evidence
 
             phoenix.set_attributes(
                 root_span,
@@ -2586,6 +2661,8 @@ def run_query(query, route_query=None):
                 )
                 docs = retrieval_state["docs"]
                 evidence = retrieval_state["evidence"]
+                crag_report = retrieval_state.get("crag_report") or {}
+                set_last_crag_report(crag_report)
                 paragraph_docs = retrieval_state["paragraph_docs"] if dual_retrieval else []
                 phoenix.set_attributes(span, phoenix.summarize_docs(docs, normalize_metadata))
                 if paragraph_docs:
@@ -2598,6 +2675,15 @@ def run_query(query, route_query=None):
                         ),
                     )
                 phoenix.set_attributes(span, phoenix.summarize_evidence(evidence))
+                phoenix.set_attributes(
+                    span,
+                    {
+                        "crag.path": crag_report.get("path") or "",
+                        "crag.score": int(crag_report.get("score") or 0),
+                        "crag.threshold": int(crag_report.get("threshold") or 0),
+                        "crag.ok": bool(crag_report.get("ok", False)),
+                    },
+                )
 
             with phoenix.trace_manager.start_as_current_span("marxos.local_view_answer") as span:
                 local_view_answer = orchestration.maybe_answer_local_view_query(
@@ -2635,16 +2721,7 @@ def run_query(query, route_query=None):
                     return local_view_answer
 
             set_last_evidence([])
-            with phoenix.trace_manager.start_as_current_span("marxos.prompt_build") as span:
-                context = build_context(docs, query_intent)
-                prompt = clean_text(build_prompt(query_intent, query, context) + build_constraint_guard(constraints))
-                phoenix.set_attributes(
-                    span,
-                    {
-                        "prompt.length": len(prompt),
-                        "prompt.preview": phoenix.compact_text(prompt, limit=240),
-                    },
-                )
+            prompt = _build_prompt_for_docs(docs, "marxos.prompt_build")
             if trace or trace_only:
                 print_docs_trace(docs)
                 if dual_retrieval and paragraph_docs:
@@ -2662,54 +2739,84 @@ def run_query(query, route_query=None):
                 )
                 return answer
 
-            with phoenix.trace_manager.start_as_current_span("marxos.llm_generate") as span:
-                client = OpenAI(
-                    api_key=os.getenv("DEEPSEEK_API_KEY"),
-                    base_url="https://api.deepseek.com",
-                )
-                response = client.chat.completions.create(
-                    model="deepseek-chat",
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": prompt,
-                        }
-                    ],
-                )
-                raw_answer = response.choices[0].message.content
-                phoenix.set_attributes(
-                    span,
-                    {
-                        "llm.vendor": "deepseek",
-                        "llm.api_style": "openai_compatible",
-                        "llm.model": "deepseek-chat",
-                        "llm.output_length": len(raw_answer or ""),
-                    },
-                )
+            raw_answer = _generate_raw_answer(prompt, "marxos.llm_generate")
+            audit, display_evidence = _finalize_answer(
+                raw_answer,
+                evidence,
+                crag_report,
+                "marxos.citation_audit",
+            )
 
-            with phoenix.trace_manager.start_as_current_span("marxos.citation_audit") as span:
-                repaired_answer = repair_answer_citations(raw_answer, evidence)
-                display_evidence = filter_evidence_to_answer(repaired_answer, evidence)
-                audit = audit_answer_citations(repaired_answer, display_evidence)
-                set_last_evidence(display_evidence, audit)
-                phoenix.set_attributes(
-                    span,
-                    {
-                        "citation.audit_ok": bool(audit.get("ok")),
-                        "citation.issue_count": len(audit.get("issues") or []),
-                        "answer.length": len(audit["answer"]),
-                    },
-                )
-                phoenix.set_attributes(span, phoenix.summarize_evidence(display_evidence))
-                phoenix.set_attributes(
-                    root_span,
-                    {
-                        "answer.path": "llm",
-                        "answer.length": len(audit["answer"]),
-                        "citation.audit_ok": bool(audit.get("ok")),
-                    },
-                )
-                return audit["answer"]
+            if not audit.get("ok"):
+                with phoenix.trace_manager.start_as_current_span("marxos.citation_recovery") as span:
+                    recovery_state = orchestration.collect_retrieval_materials(
+                        query,
+                        route_query,
+                        query_intent,
+                        constraints,
+                        PARAGRAPH_VECTORSTORE_DIR,
+                        trace,
+                        trace_only,
+                        topic_info_from_constraints,
+                        set_last_topic_info,
+                        print_trace_line,
+                        print_constraints_trace,
+                        load_vectorstore,
+                        retrieve_documents,
+                        paragraph_vectorstore_exists,
+                        load_paragraph_vectorstore,
+                        filter_paragraph_docs_by_text_overlap,
+                        merge_prefer_paragraph_docs,
+                        refine_docs_citation_pages_for_query,
+                        evidence_from_docs,
+                        is_topic_view_list_query,
+                        force_corrective=True,
+                    )
+                    recovery_docs = recovery_state["docs"]
+                    recovery_evidence = recovery_state["evidence"]
+                    recovery_crag_report = recovery_state.get("crag_report") or {}
+                    recovery_paragraph_docs = recovery_state["paragraph_docs"] if dual_retrieval else []
+                    recovery_prompt = _build_prompt_for_docs(recovery_docs, "marxos.prompt_build_recovery")
+                    recovery_raw_answer = _generate_raw_answer(recovery_prompt, "marxos.llm_generate_recovery")
+                    recovery_audit, recovery_display_evidence = _finalize_answer(
+                        recovery_raw_answer,
+                        recovery_evidence,
+                        recovery_crag_report,
+                        "marxos.citation_audit_recovery",
+                        recovery_used=True,
+                    )
+                    phoenix.set_attributes(
+                        span,
+                        {
+                            "recovery.used": True,
+                            "recovery.audit_ok": bool(recovery_audit.get("ok")),
+                            "recovery.issue_count": len(recovery_audit.get("issues") or []),
+                            "recovery.crag_path": recovery_crag_report.get("path") or "",
+                        },
+                    )
+                    if _audit_rank(recovery_audit) >= _audit_rank(audit):
+                        docs = recovery_docs
+                        evidence = recovery_evidence
+                        paragraph_docs = recovery_paragraph_docs
+                        crag_report = recovery_crag_report
+                        prompt = recovery_prompt
+                        audit = recovery_audit
+                        display_evidence = recovery_display_evidence
+                        set_last_crag_report(crag_report)
+
+            set_last_evidence(display_evidence, audit)
+            phoenix.set_attributes(
+                root_span,
+                {
+                    "answer.path": "llm",
+                    "answer.length": len(audit["answer"]),
+                    "citation.audit_ok": bool(audit.get("ok")),
+                    "crag.path": crag_report.get("path") or "",
+                    "crag.score": int(crag_report.get("score") or 0),
+                    "crag.recovery_used": bool(audit.get("crag_recovery_used", False)),
+                },
+            )
+            return audit["answer"]
         except Exception as exc:
             root_span.record_exception(exc)
             raise

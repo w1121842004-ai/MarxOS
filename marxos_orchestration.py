@@ -1,5 +1,128 @@
 from __future__ import annotations
 
+from langchain_core.documents import Document
+
+
+def _doc_page_anchor(doc):
+    metadata = doc.metadata or {}
+    return (
+        metadata.get("printed_page")
+        or metadata.get("citation_page")
+        or metadata.get("pdf_page")
+        or metadata.get("page")
+    )
+
+
+def _doc_identity(doc):
+    metadata = doc.metadata or {}
+    content = str(doc.page_content or "").strip()
+    return (
+        metadata.get("source"),
+        metadata.get("paragraph_id") or metadata.get("pdf_page") or metadata.get("page"),
+        metadata.get("printed_page") or metadata.get("citation_page"),
+        metadata.get("article") or metadata.get("section"),
+        content[:120],
+    )
+
+
+def _tag_docs(docs, path):
+    tagged = []
+    for doc in docs or []:
+        metadata = dict(doc.metadata or {})
+        metadata.setdefault("crag_path", path)
+        tagged.append(Document(page_content=doc.page_content, metadata=metadata))
+    return tagged
+
+
+def _merge_ranked_docs(*doc_groups):
+    merged = []
+    seen = set()
+    for docs in doc_groups:
+        for doc in docs or []:
+            key = _doc_identity(doc)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(doc)
+    return merged
+
+
+def assess_retrieval_quality(query_intent, docs, evidence, constraints):
+    docs = docs or []
+    evidence = evidence or []
+    issues = []
+    score = 0
+
+    if not docs:
+        issues.append("no_docs")
+        return {"ok": False, "score": 0, "issues": issues}
+
+    score += min(len(docs), 5) * 10
+    score += min(len(evidence), 4) * 8
+
+    anchored_docs = [doc for doc in docs if _doc_page_anchor(doc) is not None]
+    if anchored_docs:
+        score += min(len(anchored_docs), 4) * 7
+    else:
+        issues.append("no_page_anchor")
+
+    match_types = {str((doc.metadata or {}).get("match_type") or "") for doc in docs}
+    if "exact_quote" in match_types:
+        score += 25
+    if "cache_backstop" in match_types:
+        score += 8
+    if "paragraph_vector_candidate" in match_types:
+        score += 6
+
+    locator_only = bool(docs) and match_types.issubset({"locator_backstop"})
+    if locator_only:
+        score -= 35
+        issues.append("locator_only")
+
+    sources = {
+        (doc.metadata or {}).get("source")
+        for doc in docs
+        if (doc.metadata or {}).get("source")
+    }
+    if constraints.get("topic_id") or constraints.get("min_distinct_sources"):
+        if len(sources) >= max(2, int(constraints.get("min_distinct_sources") or 0)):
+            score += 12
+        else:
+            issues.append("insufficient_source_diversity")
+
+    if constraints.get("strict_title"):
+        strict_hits = [
+            doc for doc in docs
+            if (doc.metadata or {}).get("classic_title")
+            or (doc.metadata or {}).get("locator_title")
+        ]
+        if strict_hits:
+            score += 10
+        else:
+            issues.append("missing_strict_title_binding")
+
+    if query_intent == "quote_lookup" and "exact_quote" not in match_types:
+        score -= 20
+        issues.append("missing_exact_quote_hit")
+
+    if query_intent == "concept_explain" and not anchored_docs:
+        score -= 10
+
+    threshold = 45
+    if query_intent == "quote_lookup":
+        threshold = 55
+    elif constraints.get("strict_title") or constraints.get("topic_id"):
+        threshold = 52
+
+    return {
+        "ok": score >= threshold and not locator_only,
+        "score": score,
+        "issues": issues,
+        "threshold": threshold,
+        "source_count": len(sources),
+        "anchored_count": len(anchored_docs),
+    }
+
 
 def prepare_query_request(
     query,
@@ -89,7 +212,18 @@ def collect_retrieval_materials(
     refine_docs_citation_pages_for_query,
     evidence_from_docs,
     is_topic_view_list_query,
+    force_corrective=False,
 ):
+    def build_state(selected_docs, selected_paragraph_docs, report, path):
+        selected_docs = refine_docs_citation_pages_for_query(selected_docs, route_query)
+        selected_evidence = evidence_from_docs(selected_docs)
+        return {
+            "docs": selected_docs,
+            "evidence": selected_evidence,
+            "paragraph_docs": selected_paragraph_docs[:5] if (trace or trace_only) else [],
+            "crag_report": {**report, "path": path},
+        }
+
     set_last_topic_info(topic_info_from_constraints(constraints))
     if trace or trace_only:
         print_trace_line("search_path: FAISS vector similarity search -> rule rerank -> DeepSeek")
@@ -97,7 +231,7 @@ def collect_retrieval_materials(
 
     db = load_vectorstore()
     retrieve_k = 12 if query_intent == "rag_answer" else 5
-    docs = retrieve_documents(query, db, k=retrieve_k)
+    docs = _tag_docs(retrieve_documents(query, db, k=retrieve_k), "initial_chunk")
     paragraph_docs_for_answer = []
     topic_list_query = query_intent == "rag_answer" and is_topic_view_list_query(route_query, constraints)
     paragraph_store_ready = paragraph_vectorstore_exists()
@@ -109,22 +243,85 @@ def collect_retrieval_materials(
             retrieve_documents(query, paragraph_db_for_answer, k=max(retrieve_k * 3, 12)),
             limit=retrieve_k,
         )
+        paragraph_docs_for_answer = _tag_docs(paragraph_docs_for_answer, "initial_paragraph")
         docs = merge_prefer_paragraph_docs(paragraph_docs_for_answer, docs, retrieve_k)
 
-    docs = refine_docs_citation_pages_for_query(docs, route_query)
+    initial_state = build_state(
+        docs,
+        paragraph_docs_for_answer,
+        assess_retrieval_quality(
+            query_intent,
+            docs,
+            evidence_from_docs(refine_docs_citation_pages_for_query(docs, route_query)),
+            constraints,
+        ),
+        "initial",
+    )
 
-    paragraph_docs = []
+    best_state = initial_state
+    report = initial_state["crag_report"]
+
+    should_correct = force_corrective or (
+        not report.get("ok")
+        and query_intent not in {"bibliographic_lookup", "quote_lookup"}
+    ) or (
+        query_intent == "quote_lookup" and not report.get("ok")
+    )
+
+    if should_correct:
+        corrective_chunk_docs = _tag_docs(
+            retrieve_documents(route_query, db, k=max(retrieve_k * 2, 8)),
+            "corrective_route_chunk",
+        )
+        corrective_paragraph_docs = []
+        if paragraph_store_ready and not topic_list_query:
+            paragraph_db_for_answer = paragraph_db_for_answer if paragraph_docs_for_answer else load_paragraph_vectorstore()
+            corrective_paragraph_docs = filter_paragraph_docs_by_text_overlap(
+                route_query,
+                retrieve_documents(route_query, paragraph_db_for_answer, k=max(retrieve_k * 4, 16)),
+                limit=max(retrieve_k, 8),
+            )
+            corrective_paragraph_docs = _tag_docs(corrective_paragraph_docs, "corrective_paragraph")
+
+        merged_docs = _merge_ranked_docs(
+            corrective_paragraph_docs,
+            corrective_chunk_docs,
+            paragraph_docs_for_answer,
+            docs,
+        )
+        if corrective_paragraph_docs:
+            merged_docs = merge_prefer_paragraph_docs(corrective_paragraph_docs, merged_docs, max(retrieve_k * 2, 10))
+        else:
+            merged_docs = merged_docs[: max(retrieve_k * 2, 10)]
+
+        corrective_state = build_state(
+            merged_docs,
+            corrective_paragraph_docs or paragraph_docs_for_answer,
+            assess_retrieval_quality(
+                query_intent,
+                merged_docs,
+                evidence_from_docs(refine_docs_citation_pages_for_query(merged_docs, route_query)),
+                constraints,
+            ),
+            "forced_corrective" if force_corrective else "corrective",
+        )
+        if corrective_state["crag_report"]["score"] >= best_state["crag_report"]["score"]:
+            best_state = corrective_state
+            report = corrective_state["crag_report"]
+
     if trace or trace_only:
-        if paragraph_store_ready:
-            paragraph_docs = paragraph_docs_for_answer[:5]
-        elif query_intent != "rag_answer" or not topic_list_query:
+        if report.get("path") == "corrective":
+            print_trace_line(
+                f"crag: corrective retrieval engaged (score={report.get('score')}, issues={','.join(report.get('issues') or []) or 'none'})"
+            )
+        else:
+            print_trace_line(
+                f"crag: initial retrieval accepted (score={report.get('score')}, issues={','.join(report.get('issues') or []) or 'none'})"
+            )
+        if not paragraph_store_ready and (query_intent != "rag_answer" or not topic_list_query):
             print_trace_line(f"paragraph_vectorstore_missing: {paragraph_vectorstore_dir}")
 
-    return {
-        "docs": docs,
-        "evidence": evidence_from_docs(docs),
-        "paragraph_docs": paragraph_docs,
-    }
+    return best_state
 
 
 def maybe_answer_local_view_query(

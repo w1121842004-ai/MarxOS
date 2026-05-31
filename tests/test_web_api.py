@@ -22,6 +22,15 @@ class WebApiTests(unittest.TestCase):
                         "topic_section": "科学社会主义",
                     }
                 )
+                web_app.app.set_last_crag_report(
+                    {
+                        "path": "corrective",
+                        "score": 63,
+                        "threshold": 52,
+                        "ok": True,
+                        "issues": ["locator_only"],
+                    }
+                )
                 web_app.app.set_last_evidence(
                     [
                         {
@@ -62,6 +71,7 @@ class WebApiTests(unittest.TestCase):
             self.assertEqual(res.status, 200)
             self.assertEqual(data.get("intent"), "rag_answer")
             self.assertEqual(data.get("topic", {}).get("topic_id"), "peasant_cooperative")
+            self.assertEqual(data.get("crag", {}).get("path"), "corrective")
             self.assertTrue(data.get("evidence"))
             self.assertEqual(data["evidence"][0].get("source"), "mes01.pdf")
 
@@ -76,6 +86,8 @@ class WebApiTests(unittest.TestCase):
             self.assertEqual(metrics.get("citation_lines_count"), 1)
             self.assertEqual(metrics.get("matched_count"), 0)
             self.assertTrue(metrics.get("fallback_used"))
+            self.assertEqual(metrics.get("crag_path"), "corrective")
+            self.assertEqual(metrics.get("crag_score"), 63)
 
 
 if __name__ == "__main__":

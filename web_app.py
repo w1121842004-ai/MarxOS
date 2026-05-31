@@ -547,7 +547,7 @@ class MarxOSHandler(BaseHTTPRequestHandler):
         return web_support.append_metrics_log(metrics, METRICS_LOG_PATH)
 
     @staticmethod
-    def _build_ask_metrics(query, intent, history, answer, evidence, citation_audit, elapsed_ms, topic_info):
+    def _build_ask_metrics(query, intent, history, answer, evidence, citation_audit, elapsed_ms, topic_info, crag_report):
         return web_support.build_ask_metrics(
             query,
             intent,
@@ -557,6 +557,7 @@ class MarxOSHandler(BaseHTTPRequestHandler):
             citation_audit,
             elapsed_ms,
             topic_info,
+            crag_report,
             MAX_HISTORY_TURNS,
             app.extract_answer_citation_lines,
         )
@@ -779,6 +780,7 @@ class MarxOSHandler(BaseHTTPRequestHandler):
         evidence = getattr(app, "LAST_EVIDENCE", [])
         citation_audit = getattr(app, "LAST_CITATION_AUDIT", {})
         topic_info = getattr(app, "LAST_TOPIC_INFO", {})
+        crag_report = getattr(app, "LAST_CRAG_REPORT", {})
         metrics = self._build_ask_metrics(
             query=query,
             intent=intent,
@@ -788,6 +790,7 @@ class MarxOSHandler(BaseHTTPRequestHandler):
             citation_audit=citation_audit,
             elapsed_ms=elapsed_ms,
             topic_info=topic_info,
+            crag_report=crag_report,
         )
         self._append_metrics_log(metrics)
         try:
@@ -804,6 +807,7 @@ class MarxOSHandler(BaseHTTPRequestHandler):
                 evidence,
                 citation_audit,
                 topic_info,
+                crag_report,
                 elapsed_ms,
                 history,
                 MAX_HISTORY_TURNS,

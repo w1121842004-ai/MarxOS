@@ -15,9 +15,10 @@ def append_metrics_log(metrics, metrics_log_path: Path) -> None:
         print(f"metrics_log_write_failed: {exc}", file=sys.stderr)
 
 
-def build_ask_metrics(query, intent, history, answer, evidence, citation_audit, elapsed_ms, topic_info, max_history_turns, extract_answer_citation_lines):
+def build_ask_metrics(query, intent, history, answer, evidence, citation_audit, elapsed_ms, topic_info, crag_report, max_history_turns, extract_answer_citation_lines):
     citation_audit = citation_audit or {}
     topic_info = topic_info or {}
+    crag_report = crag_report or {}
     issues = citation_audit.get("issues") or []
     return {
         "event": "api_ask",
@@ -36,6 +37,12 @@ def build_ask_metrics(query, intent, history, answer, evidence, citation_audit, 
         "matched_count": len([item for item in evidence or [] if item.get("answer_citation")]),
         "fallback_used": any((item.get("answer_citation") in (None, "")) for item in (evidence or [])) and bool(evidence),
         "audit_ok": bool(citation_audit.get("ok", True)),
+        "crag_path": crag_report.get("path") or "",
+        "crag_score": int(crag_report.get("score") or 0),
+        "crag_threshold": int(crag_report.get("threshold") or 0),
+        "crag_ok": bool(crag_report.get("ok", False)),
+        "crag_issue_count": len(crag_report.get("issues") or []),
+        "crag_recovery_used": bool(citation_audit.get("crag_recovery_used", False)),
     }
 
 
@@ -149,13 +156,14 @@ def topic_scoped_query(query, history, is_contextual_followup_fn):
     return f"{topic_label}：{query}"
 
 
-def build_ask_response(intent, answer, evidence, citation_audit, topic_info, elapsed_ms, history, max_history_turns):
+def build_ask_response(intent, answer, evidence, citation_audit, topic_info, crag_report, elapsed_ms, history, max_history_turns):
     return {
         "intent": intent,
         "answer": answer,
         "evidence": evidence,
         "citation_audit": citation_audit,
         "topic": topic_info,
+        "crag": crag_report or {},
         "elapsed_ms": elapsed_ms,
         "memory_turns": min(len(history), max_history_turns),
     }
