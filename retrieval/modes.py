@@ -4,6 +4,7 @@ from pathlib import Path
 from langchain_core.documents import Document
 
 from retrieval.constraints import (
+    controlled_multi_queries,
     candidate_pdf_pages_from_metadata,
     concept_seed_queries,
     constraints_from_query,
@@ -13,6 +14,7 @@ from retrieval.constraints import (
 )
 from retrieval.ranking import (
     annotate_docs_with_constraints,
+    collapse_content_near_duplicates,
     dedupe_documents,
     diversify_documents,
     rerank_documents,
@@ -22,6 +24,153 @@ from retrieval.ranking import (
 
 def _helper(ctx, name):
     return ctx[name]
+
+
+def _candidate_key(doc, ctx):
+    clean_text = _helper(ctx, "clean_text")
+    metadata = doc.metadata or {}
+    return (
+        metadata.get("source"),
+        metadata.get("page"),
+        metadata.get("printed_page"),
+        metadata.get("citation_page"),
+        clean_text(metadata.get("article") or metadata.get("section"), ""),
+        clean_text(doc.page_content, "")[:120],
+    )
+
+
+def _content_signature(doc, ctx):
+    normalize_for_match = _helper(ctx, "normalize_for_match")
+    content = normalize_for_match(doc.page_content or "")
+    if not content:
+        return ""
+    return content[:96]
+
+
+def _signature_preference(doc, rank, ctx):
+    is_noisy_article_title = _helper(ctx, "is_noisy_article_title")
+    score_document_quality = _helper(ctx, "score_document_quality")
+    clean_text = _helper(ctx, "clean_text")
+    metadata = doc.metadata or {}
+    article = clean_text(metadata.get("article") or metadata.get("section"), "")
+    score = score_document_quality(metadata, clean_text(doc.page_content, ""))
+    if not is_noisy_article_title(article):
+        score += 25
+    if metadata.get("page_type") not in {"toc", "title_page"}:
+        score += 8
+    score -= rank * 0.2
+    return score
+
+
+def _hybrid_merge_candidates(query, dense_candidates, constraints, fetch_k, ctx):
+    hybrid_retrieval_enabled = _helper(ctx, "hybrid_retrieval_enabled")
+    controlled_multi_queries = _helper(ctx, "controlled_multi_queries")
+    sparse_retrieve_documents = _helper(ctx, "sparse_retrieve_documents")
+
+    if not hybrid_retrieval_enabled():
+        return dense_candidates
+
+    dense_candidates = list(dense_candidates or [])
+    sparse_candidates = []
+    for variant in controlled_multi_queries(query, constraints, ctx):
+        sparse_candidates.extend(
+            sparse_retrieve_documents(variant, limit=max(fetch_k // 3, 12))
+        )
+    if not sparse_candidates:
+        return dense_candidates
+
+    ranked = {}
+    signature_to_key = {}
+    signature_scores = {}
+    for rank, doc in enumerate(dense_candidates, start=1):
+        key = _candidate_key(doc, ctx)
+        clone = Document(page_content=doc.page_content, metadata=dict(doc.metadata or {}))
+        clone.metadata["hybrid_dense_rank"] = rank
+        ranked[key] = clone
+        signature = _content_signature(clone, ctx)
+        if signature:
+            preference = _signature_preference(clone, rank, ctx)
+            if preference > signature_scores.get(signature, float("-inf")):
+                signature_scores[signature] = preference
+                signature_to_key[signature] = key
+
+    for rank, doc in enumerate(sparse_candidates, start=1):
+        key = _candidate_key(doc, ctx)
+        target = ranked.get(key)
+        if target is None:
+            signature = _content_signature(doc, ctx)
+            dense_key = signature_to_key.get(signature) if signature else None
+            if dense_key is not None:
+                target = ranked[dense_key]
+                target.metadata["hybrid_sparse_merged"] = "content_signature"
+
+        if target is not None:
+            target.metadata["hybrid_sparse_rank"] = rank
+            for key, value in (doc.metadata or {}).items():
+                if key.startswith("sparse_") and value is not None:
+                    target.metadata[key] = value
+            target.metadata["hybrid_sparse_hit"] = True
+            continue
+
+        clone = Document(page_content=doc.page_content, metadata=dict(doc.metadata or {}))
+        clone.metadata["hybrid_sparse_rank"] = rank
+        clone.metadata["hybrid_sparse_hit"] = True
+        ranked[key] = clone
+        signature = _content_signature(clone, ctx)
+        if signature and signature not in signature_to_key:
+            signature_to_key[signature] = key
+
+    merged = []
+    for doc in ranked.values():
+        dense_rank = doc.metadata.get("hybrid_dense_rank")
+        sparse_rank = doc.metadata.get("hybrid_sparse_rank")
+        rrf = 0.0
+        if dense_rank:
+            rrf += 1 / (60 + dense_rank)
+        if sparse_rank:
+            sparse_weight = 1.15 if dense_rank else 0.72
+            rrf += sparse_weight / (55 + sparse_rank)
+        doc.metadata["hybrid_rrf_score"] = round(rrf, 6)
+        if dense_rank and sparse_rank:
+            doc.metadata["hybrid_source"] = "fused"
+        elif sparse_rank:
+            doc.metadata["hybrid_source"] = "sparse"
+        else:
+            doc.metadata["hybrid_source"] = "dense"
+        merged.append(doc)
+
+    merged.sort(
+        key=lambda item: (
+            item.metadata.get("hybrid_rrf_score", 0),
+            -int(item.metadata.get("hybrid_dense_rank") or 9999),
+            item.metadata.get("sparse_score", 0) or 0,
+        ),
+        reverse=True,
+    )
+    merged = dedupe_documents(merged, ctx)
+    if constraints.get("sources"):
+        merged = [
+            doc for doc in merged
+            if metadata_matches_constraints(doc.metadata, constraints)
+        ]
+    if constraints.get("page_ranges"):
+        ranged = [
+            doc for doc in merged
+            if page_in_expected_range(doc.metadata, constraints, ctx)
+        ]
+        if ranged:
+            merged = ranged
+    return merged
+
+
+def _controlled_dense_candidates(query, db, constraints, fetch_k, ctx):
+    controlled_multi_queries = _helper(ctx, "controlled_multi_queries")
+    candidates = []
+    variants = controlled_multi_queries(query, constraints, ctx)
+    per_query_k = max(18, fetch_k // max(len(variants), 1))
+    for variant in variants:
+        candidates.extend(db.similarity_search(variant, k=per_query_k))
+    return dedupe_documents(candidates, ctx)
 
 
 def strict_title_cache_documents(query, constraints, limit, ctx):
@@ -196,7 +345,15 @@ def concept_constrained_candidates(query, db, constraints, fetch_k, ctx):
     seeds = concept_seed_queries(query, constraints, ctx)
     per_seed_k = max(18, fetch_k // max(len(seeds), 1))
     for seed in seeds:
-        candidates.extend(db.similarity_search(seed, k=per_seed_k))
+        candidates.extend(
+            _hybrid_merge_candidates(
+                seed,
+                db.similarity_search(seed, k=per_seed_k),
+                constraints,
+                per_seed_k,
+                ctx,
+            )
+        )
 
     candidates = [
         doc for doc in dedupe_documents(candidates, ctx)
@@ -227,6 +384,7 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
     clean_text = _helper(ctx, "clean_text")
     is_front_matter_candidate = _helper(ctx, "is_front_matter_candidate")
     requests_derivative_material = _helper(ctx, "requests_derivative_material")
+    expand_semantic_parent_docs = _helper(ctx, "expand_semantic_parent_docs")
 
     constraints = constraints_from_query(query, ctx)
     normalized_query = normalize_for_match(query)
@@ -248,7 +406,8 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
         elif constraints.get("topic_id"):
             candidates = topic_constrained_candidates(query, db, constraints, fetch_k, ctx)
         else:
-            candidates = db.similarity_search(query, k=fetch_k)
+            candidates = _controlled_dense_candidates(query, db, constraints, fetch_k, ctx)
+            candidates = _hybrid_merge_candidates(query, candidates, constraints, fetch_k, ctx)
             candidates = [
                 doc for doc in candidates
                 if metadata_matches_constraints(doc.metadata, constraints)
@@ -287,7 +446,13 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
                 candidates = topic_constrained_candidates(title_query, db, constraints, fetch_k, ctx)
             else:
                 candidates = [
-                    doc for doc in db.similarity_search(title_query, k=fetch_k)
+                    doc for doc in _hybrid_merge_candidates(
+                        title_query,
+                        _controlled_dense_candidates(title_query, db, constraints, fetch_k, ctx),
+                        constraints,
+                        fetch_k,
+                        ctx,
+                    )
                     if metadata_matches_constraints(doc.metadata, constraints)
                 ]
             if constraints.get("page_ranges"):
@@ -310,9 +475,21 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
                     cache_docs = annotate_docs_with_constraints(cache_docs, constraints, ctx)
                     return append_locator_backstops(cache_docs, constraints, k, ctx)
                 return locator_backstop_documents(constraints, limit=k)
-            candidates = db.similarity_search(query, k=fetch_k)
+            candidates = _hybrid_merge_candidates(
+                query,
+                _controlled_dense_candidates(query, db, constraints, fetch_k, ctx),
+                constraints,
+                fetch_k,
+                ctx,
+            )
     else:
-        candidates = db.similarity_search(query, k=fetch_k)
+        candidates = _hybrid_merge_candidates(
+            query,
+            _controlled_dense_candidates(query, db, constraints, fetch_k, ctx),
+            constraints,
+            fetch_k,
+            ctx,
+        )
 
     if is_classic_sayings_query(query):
         expanded = []
@@ -332,7 +509,13 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
 
         seed_k = max(12, k * 3)
         for seed in CLASSIC_SAYING_QUERY_SEEDS:
-            for doc in db.similarity_search(seed, k=seed_k):
+            for doc in _hybrid_merge_candidates(
+                seed,
+                db.similarity_search(seed, k=seed_k),
+                constraints,
+                seed_k,
+                ctx,
+            ):
                 key = (
                     doc.metadata.get("source"),
                     doc.metadata.get("page"),
@@ -378,6 +561,7 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
             candidates = body_candidates
 
     ranked_docs = rerank_documents(query, candidates, constraints, ctx)
+    ranked_docs = collapse_content_near_duplicates(ranked_docs, ctx)
     if constraints.get("topic_id"):
         docs = select_topic_documents(ranked_docs, constraints, k, ctx)
     elif (not constraints and classify_query(query) == "rag_answer" and k > 5) or constraints.get("min_distinct_sources"):
@@ -399,6 +583,7 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
             doc.metadata["confidence"] = 0.0
 
     docs = annotate_docs_with_constraints(docs, constraints, ctx)
+    docs = expand_semantic_parent_docs(docs)
     return append_locator_backstops(docs, constraints, k, ctx)
 
 

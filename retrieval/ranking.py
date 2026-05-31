@@ -1,3 +1,4 @@
+import math
 import os
 import sys
 
@@ -69,6 +70,40 @@ def score_query_match(normalized_query, haystack):
     return 10 if normalized_query and normalized_query in haystack else 0
 
 
+def score_hybrid_signal(metadata, ctx):
+    article = metadata.get("section") or metadata.get("article") or ""
+    dense_rank = metadata.get("hybrid_dense_rank")
+    sparse_rank = metadata.get("hybrid_sparse_rank")
+    is_noisy_article_title = _helper(ctx, "is_noisy_article_title")
+    title_phrase_hits = int(metadata.get("sparse_title_phrase_hits") or 0)
+    book_phrase_hits = int(metadata.get("sparse_book_phrase_hits") or 0)
+    content_phrase_hits = int(metadata.get("sparse_content_phrase_hits") or 0)
+    score = 0
+    if dense_rank and sparse_rank:
+        score += 10
+    elif metadata.get("hybrid_sparse_hit"):
+        score += 1
+    if metadata.get("hybrid_rrf_score"):
+        score += min(int(float(metadata.get("hybrid_rrf_score")) * 320), 9)
+    if metadata.get("sparse_score"):
+        scale = 1.7 if dense_rank else 1.0
+        cap = 6 if dense_rank else 4
+        score += min(int(math.log1p(float(metadata.get("sparse_score"))) * scale), cap)
+    if title_phrase_hits:
+        score += min(title_phrase_hits * 5, 10)
+    if book_phrase_hits:
+        score += min(book_phrase_hits * 3, 6)
+    if content_phrase_hits and not (title_phrase_hits or book_phrase_hits):
+        score -= min(content_phrase_hits * 2, 6)
+    if sparse_rank and not dense_rank and not (title_phrase_hits or book_phrase_hits):
+        score -= 6
+    if sparse_rank and not dense_rank and is_noisy_article_title(article):
+        score -= 14
+    if sparse_rank and not dense_rank and metadata.get("page_type") in {"toc", "title_page"}:
+        score -= 20
+    return score
+
+
 def debug_rerank_score(index, doc, score_parts, ctx):
     RERANK_DEBUG_ENV = ctx["RERANK_DEBUG_ENV"]
     if os.getenv(RERANK_DEBUG_ENV) != "1":
@@ -109,6 +144,7 @@ def rerank_documents(query, docs, constraints, ctx):
             "topic_content": score_topic_content_match(metadata, content, constraints, ctx),
             "article_match": score_article_match(metadata, normalized_title, haystack, ctx),
             "query_match": score_query_match(normalized_query, haystack),
+            "hybrid_signal": score_hybrid_signal(metadata, ctx),
             "concept_focus": score_concept_focus(query, metadata, content),
             "concept_source": score_concept_source_priority(query, metadata),
             "document_quality": score_document_quality(metadata, content),
@@ -280,3 +316,36 @@ def dedupe_documents(docs, ctx):
         seen.add(key)
         deduped.append(doc)
     return deduped
+
+
+def collapse_content_near_duplicates(docs, ctx):
+    clean_text = _helper(ctx, "clean_text")
+    normalize_for_match = _helper(ctx, "normalize_for_match")
+    score_document_quality = _helper(ctx, "score_document_quality")
+    is_noisy_article_title = _helper(ctx, "is_noisy_article_title")
+    best_by_signature = {}
+    order = []
+
+    for index, doc in enumerate(docs):
+        metadata = doc.metadata or {}
+        signature = normalize_for_match(clean_text(doc.page_content, ""))[:96]
+        if not signature:
+            signature = f"__empty__:{index}"
+        article = clean_text(metadata.get("article") or metadata.get("section"), "")
+        preference = (
+            score_document_quality(metadata, clean_text(doc.page_content, "")),
+            0 if is_noisy_article_title(article) else 1,
+            1 if metadata.get("hybrid_dense_rank") else 0,
+            1 if metadata.get("hybrid_source") == "fused" else 0,
+            -(metadata.get("hybrid_dense_rank") or 9999),
+            -index,
+        )
+        current = best_by_signature.get(signature)
+        if current is None:
+            best_by_signature[signature] = (preference, doc)
+            order.append(signature)
+            continue
+        if preference > current[0]:
+            best_by_signature[signature] = (preference, doc)
+
+    return [best_by_signature[signature][1] for signature in order]

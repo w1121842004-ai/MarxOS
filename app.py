@@ -18,6 +18,8 @@ import marxos_trace as trace_utils
 from marxos_runtime import RuntimeState
 from rag.core_classics import classic_entries_for_query, load_core_classics
 from rag.exact_quote_lookup import exact_quote_lookup
+from rag.semantic_retrieval import expand_semantic_parent_docs as expand_semantic_parent_windows
+from rag.semantic_retrieval import sparse_retrieve_documents as sparse_parent_retrieval
 
 
 load_dotenv()
@@ -28,8 +30,10 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader_core")
 PARAGRAPH_VECTORSTORE_DIR = os.getenv("PARAGRAPH_VECTORSTORE_DIR", "vectorstore/marx_reader_paragraph")
+PARAGRAPH_CACHE_PATH = os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache_core.jsonl")
 OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "data/ocr_cache")
 PAGE_MAP_PATH = os.getenv("PAGE_MAP_PATH", "data/page_map.json")
+SEMANTIC_PARENT_WINDOW = int(os.getenv("SEMANTIC_PARENT_WINDOW", "1"))
 LAST_EVIDENCE = []
 LAST_CITATION_AUDIT = {}
 LAST_TOPIC_INFO = {}
@@ -41,6 +45,7 @@ RERANK_DEBUG_ENV = "MARXOS_DEBUG_RERANK"
 TRACE_ENV = "MARXOS_TRACE"
 TRACE_ONLY_ENV = "MARXOS_TRACE_ONLY"
 DUAL_RETRIEVAL_ENV = "MARXOS_DUAL_RETRIEVAL"
+HYBRID_RETRIEVAL_ENV = "MARXOS_HYBRID_RETRIEVAL"
 DEV_MODE_ENV = "MARXOS_DEV_MODE"
 DEV_TOKEN_ENV = "MARXOS_DEV_TOKEN"
 DEV_TOKEN_INPUT_ENV = "MARXOS_DEV_TOKEN_INPUT"
@@ -412,7 +417,35 @@ def _retrieval_ctx():
         "is_front_matter_candidate": is_front_matter_candidate,
         "requests_derivative_material": requests_derivative_material,
         "is_classic_sayings_query": is_classic_sayings_query,
+        "is_noisy_article_title": is_noisy_article_title,
+        "controlled_multi_queries": controlled_multi_queries,
+        "expand_semantic_parent_docs": expand_semantic_parent_docs,
+        "hybrid_retrieval_enabled": hybrid_retrieval_enabled,
+        "sparse_retrieve_documents": sparse_retrieve_documents,
     }
+
+
+def expand_semantic_parent_docs(docs):
+    return expand_semantic_parent_windows(
+        docs,
+        window=SEMANTIC_PARENT_WINDOW,
+        path=PARAGRAPH_CACHE_PATH,
+    )
+
+
+def hybrid_retrieval_enabled():
+    value = os.getenv(HYBRID_RETRIEVAL_ENV, "")
+    if not value:
+        return True
+    return value.lower() in {"1", "true", "yes", "on"}
+
+
+def sparse_retrieve_documents(query, limit=24):
+    return sparse_parent_retrieval(
+        query,
+        limit=limit,
+        path=PARAGRAPH_CACHE_PATH,
+    )
 
 
 def normalize_topic_title(title):
@@ -1989,6 +2022,10 @@ def topic_seed_queries(query, constraints):
 
 def concept_seed_queries(query, constraints):
     return retrieval_utils.concept_seed_queries(query, constraints, _retrieval_ctx())
+
+
+def controlled_multi_queries(query, constraints, ctx=None):
+    return retrieval_utils.controlled_multi_queries(query, constraints, ctx or _retrieval_ctx())
 
 
 def topic_constrained_candidates(query, db, constraints, fetch_k):

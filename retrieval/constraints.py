@@ -1,3 +1,6 @@
+import re
+
+
 def _helper(ctx, name):
     return ctx[name]
 
@@ -314,6 +317,81 @@ def concept_seed_queries(query, constraints, ctx):
         seen.add(normalized)
         deduped.append(str(seed).strip())
     return deduped or [query]
+
+
+CONTROLLED_QUERY_STOP_PHRASES = (
+    "请解释",
+    "请说明",
+    "请问",
+    "为什么说",
+    "为什么",
+    "怎么理解",
+    "如何理解",
+    "什么是",
+    "是不是",
+    "到底",
+    "这句话",
+    "这个表述",
+    "这个说法",
+    "这个概念",
+    "这段话",
+    "后面那句",
+)
+
+
+def controlled_multi_queries(query, constraints, ctx):
+    normalize_for_match = _helper(ctx, "normalize_for_match")
+    clean_text = _helper(ctx, "clean_text")
+    active_concept_terms = _helper(ctx, "active_concept_terms")
+
+    def add_seed(seeds, seed):
+        seed = str(seed or "").strip()
+        if seed:
+            seeds.append(seed)
+
+    query = str(query or "").strip()
+    seeds = []
+    add_seed(seeds, query)
+
+    title = clean_text(constraints.get("title"), "")
+    topic_title = clean_text(constraints.get("topic_title"), "")
+    topic_markers = [clean_text(item, "") for item in (constraints.get("topic_markers") or []) if clean_text(item, "")]
+    concept_terms = [clean_text(item, "") for item in active_concept_terms(query) if clean_text(item, "")]
+
+    if title:
+        add_seed(seeds, title)
+        if concept_terms:
+            add_seed(seeds, f"{title} {' '.join(concept_terms[:2])}")
+
+    if topic_title:
+        add_seed(seeds, topic_title)
+        if topic_markers:
+            add_seed(seeds, f"{topic_title} {topic_markers[0]}")
+
+    for term in concept_terms[:2]:
+        add_seed(seeds, term)
+
+    compact = query
+    for phrase in CONTROLLED_QUERY_STOP_PHRASES:
+        compact = compact.replace(phrase, " ")
+    compact = re.sub(r"[“”\"'‘’]", " ", compact)
+    keywords = []
+    keywords.extend(re.findall(r"[A-Za-z0-9]{3,}", compact))
+    keywords.extend(re.findall(r"[\u4e00-\u9fff]{2,8}", compact))
+    if keywords:
+        add_seed(seeds, " ".join(keywords[:4]))
+
+    deduped = []
+    seen = set()
+    for seed in seeds:
+        normalized = normalize_for_match(seed)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(seed)
+        if len(deduped) >= 4:
+            break
+    return deduped or ([query] if query else [])
 
 
 def metadata_matches_constraints(metadata, constraints):

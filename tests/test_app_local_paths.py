@@ -8,6 +8,7 @@ from langchain_core.documents import Document
 import app
 import web_app
 from rag.exact_quote_lookup import exact_quote_lookup
+from rag import semantic_retrieval
 
 
 class AppLocalPathTests(unittest.TestCase):
@@ -233,6 +234,121 @@ class AppLocalPathTests(unittest.TestCase):
         docs = app.retrieve_documents("\u8d44\u672c\u662f\u4ec0\u4e48\uff1f", FakeDb(), k=1)
 
         self.assertIn(docs[0].metadata.get("source"), {"mea07.pdf", "mes02.pdf"})
+
+    def test_retrieve_documents_merges_sparse_candidates_into_hybrid_pool(self):
+        dense_doc = Document(
+            page_content="\u4e0e\u95ee\u9898\u5173\u8054\u4e0d\u5927\u7684\u8bed\u4e49\u6bb5\u843d\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c2\u5377",
+                "article": "\u8bed\u4e49\u5019\u9009",
+                "section": "\u8bed\u4e49\u5019\u9009",
+                "source": "mea02.pdf",
+                "printed_page": 88,
+                "pdf_page": 93,
+            },
+        )
+        sparse_doc = Document(
+            page_content="\u5269\u4f59\u4ef7\u503c\u662f\u88ab\u96c7\u4f63\u52b3\u52a8\u8005\u521b\u9020\u800c\u88ab\u8d44\u672c\u5bb6\u65e0\u507f\u5360\u6709\u7684\u90e8\u5206\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c7\u5377",
+                "article": "\u5269\u4f59\u4ef7\u503c",
+                "section": "\u5269\u4f59\u4ef7\u503c",
+                "source": "mea07.pdf",
+                "printed_page": 220,
+                "pdf_page": 251,
+                "match_type": "sparse_candidate",
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [dense_doc]
+
+        with (
+            patch("app.sparse_retrieve_documents", return_value=[sparse_doc]) as sparse,
+            patch("app.expand_semantic_parent_docs", side_effect=lambda docs: docs),
+        ):
+            docs = app.retrieve_documents("\u8bf7\u89e3\u91ca\u201c\u65e0\u507f\u5360\u6709\u7684\u90e8\u5206\u201d\u8fd9\u4e2a\u8868\u8ff0", FakeDb(), k=3)
+
+        sparse.assert_called()
+        self.assertTrue(any(doc.metadata.get("source") == "mea07.pdf" for doc in docs))
+        self.assertTrue(any(doc.metadata.get("match_type") == "sparse_candidate" for doc in docs))
+
+    def test_retrieve_documents_uses_controlled_multi_query_variants(self):
+        concept_doc = Document(
+            page_content="\u5546\u54c1\u62dc\u7269\u6559\u662f\u4e00\u79cd\u7279\u5b9a\u7684\u793e\u4f1a\u5173\u7cfb\u8868\u73b0\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c5\u5377",
+                "article": "\u8d44\u672c\u8bba \u7b2c1\u5377",
+                "section": "\u8d44\u672c\u8bba \u7b2c1\u5377",
+                "source": "mea05.pdf",
+                "printed_page": 88,
+                "pdf_page": 101,
+            },
+        )
+        seen_queries = []
+
+        class FakeDb:
+            def similarity_search(self, query, k):
+                seen_queries.append(query)
+                return [concept_doc]
+
+        with (
+            patch("app.sparse_retrieve_documents", return_value=[]),
+            patch("app.expand_semantic_parent_docs", side_effect=lambda docs: docs),
+        ):
+            docs = app.retrieve_documents(
+                "\u8bf7\u89e3\u91ca\u300a\u8d44\u672c\u8bba\u300b\u91cc\u7684\u5546\u54c1\u62dc\u7269\u6559",
+                FakeDb(),
+                k=1,
+            )
+
+        self.assertIn(docs[0].metadata.get("source"), {"mea05.pdf", "mes02.pdf"})
+        self.assertGreaterEqual(len(set(seen_queries)), 2)
+        self.assertTrue(any("\u8d44\u672c\u8bba" in query for query in seen_queries))
+        self.assertTrue(any("\u5546\u54c1\u62dc\u7269\u6559" in query for query in seen_queries))
+
+    def test_expand_semantic_parent_docs_returns_parent_window(self):
+        child_doc = Document(
+            page_content="\u5f02\u5316\u52b3\u52a8\u4f7f\u4eba\u4e0e\u81ea\u8eab\u76f8\u5f02\u5316\u3002",
+            metadata={
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u6587\u96c6 \u7b2c1\u5377",
+                "article": "\u5f02\u5316\u52b3\u52a8",
+                "section": "\u5f02\u5316\u52b3\u52a8",
+                "source": "mea01.pdf",
+                "page": 161,
+                "printed_page": 161,
+                "pdf_page": 182,
+                "retrieval_unit": "paragraph_child",
+                "parent_paragraph_id": "mea01.pdf#p000002",
+            },
+        )
+        parent_doc = Document(
+            page_content="\u524d\u7f6e\u6bb5\u843d\n\n\u5f02\u5316\u52b3\u52a8\u4f7f\u4eba\u4e0e\u81ea\u8eab\u76f8\u5f02\u5316\u3002\n\n\u540e\u7f6e\u6bb5\u843d",
+            metadata={
+                "source": "mea01.pdf",
+                "paragraph_id": "mea01.pdf#p000002",
+                "parent_paragraph_id": "mea01.pdf#p000002",
+                "retrieval_unit": "paragraph_window",
+                "printed_page": 161,
+                "pdf_page": 182,
+            },
+        )
+
+        by_id = {"mea01.pdf#p000002": {"source": "mea01.pdf", "paragraph_id": "mea01.pdf#p000002", "paragraph_index": 2}}
+        by_source = {
+            "mea01.pdf": [
+                {"source": "mea01.pdf", "paragraph_id": "mea01.pdf#p000001", "paragraph_index": 1, "paragraph_text": "\u524d\u7f6e\u6bb5\u843d", "pdf_page_start": 182, "pdf_page_end": 182, "printed_page_start": 161, "printed_page_end": 161, "citation_page_start": 161, "citation_page_end": 161},
+                {"source": "mea01.pdf", "paragraph_id": "mea01.pdf#p000002", "paragraph_index": 2, "paragraph_text": "\u5f02\u5316\u52b3\u52a8\u4f7f\u4eba\u4e0e\u81ea\u8eab\u76f8\u5f02\u5316\u3002", "pdf_page_start": 182, "pdf_page_end": 182, "printed_page_start": 161, "printed_page_end": 161, "citation_page_start": 161, "citation_page_end": 161},
+                {"source": "mea01.pdf", "paragraph_id": "mea01.pdf#p000003", "paragraph_index": 3, "paragraph_text": "\u540e\u7f6e\u6bb5\u843d", "pdf_page_start": 182, "pdf_page_end": 182, "printed_page_start": 161, "printed_page_end": 161, "citation_page_start": 161, "citation_page_end": 161},
+            ]
+        }
+
+        with patch.object(semantic_retrieval, "load_paragraph_records", return_value=(by_id, by_source)):
+            docs = app.expand_semantic_parent_docs([child_doc])
+
+        self.assertEqual(docs[0].metadata.get("retrieval_unit"), "paragraph_window")
+        self.assertIn("\u540e\u7f6e\u6bb5\u843d", docs[0].page_content)
 
     def test_retrieve_documents_demotes_index_like_chunks(self):
         noisy_index_doc = Document(
@@ -704,6 +820,7 @@ class AppLocalPathTests(unittest.TestCase):
         with (
             patch.dict("os.environ", {"MARXOS_DEV_MODE": "1", "MARXOS_TRACE_ONLY": "1"}, clear=False),
             patch("app.load_vectorstore", return_value=FakeDb()) as load_vectorstore,
+            patch("app.paragraph_vectorstore_exists", return_value=False),
             patch("app.OpenAI") as openai,
             patch("sys.stderr", new_callable=io.StringIO),
         ):
@@ -923,7 +1040,11 @@ class AppLocalPathTests(unittest.TestCase):
             )
         )
 
-        with patch("app.load_vectorstore", return_value=FakeDb()), patch("app.OpenAI", return_value=fake_client) as openai:
+        with (
+            patch("app.load_vectorstore", return_value=FakeDb()),
+            patch("app.paragraph_vectorstore_exists", return_value=False),
+            patch("app.OpenAI", return_value=fake_client) as openai,
+        ):
             answer = app.run_query("请概括共产党宣言关于阶级斗争的观点")
 
         self.assertIn("《共产党宣言》", answer)
