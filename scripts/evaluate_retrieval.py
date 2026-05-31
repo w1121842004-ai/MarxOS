@@ -7,15 +7,13 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from langchain_community.vectorstores import FAISS
-from marxos_embeddings import HuggingFaceEmbeddings
-
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from rag.core_classics import classic_entries_for_query, load_core_classics
 from rag.exact_quote_lookup import exact_quote_lookup
+from app import load_vectorstore as app_load_vectorstore
 from app import retrieve_documents
 
 
@@ -26,7 +24,6 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 
-EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 VECTORSTORE_DIR = Path("vectorstore/marx_reader_core")
 ARTICLE_MAP_PATH = Path("rag/article_map_core.json")
 
@@ -309,18 +306,12 @@ def format_metadata(metadata: dict) -> str:
     return ", ".join(f"{key}={value}" for key, value in fields if value not in (None, ""))
 
 
-def load_vectorstore() -> FAISS:
+def load_vectorstore():
     if not VECTORSTORE_DIR.exists():
         raise FileNotFoundError(
             f"Vectorstore not found: {VECTORSTORE_DIR}. Build it before running evaluation."
         )
-
-    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-    return FAISS.load_local(
-        str(VECTORSTORE_DIR),
-        embeddings,
-        allow_dangerous_deserialization=True,
-    )
+    return app_load_vectorstore()
 
 
 def page_in_entry(metadata: dict, entry: dict) -> bool:

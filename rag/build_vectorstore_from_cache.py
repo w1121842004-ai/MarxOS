@@ -18,14 +18,15 @@ except ModuleNotFoundError:
 
 
 OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "data/ocr_cache")
-VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_knowledge_base")
+VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader_core")
 TEMP_VECTORSTORE_DIR = f"{VECTORSTORE_DIR}_tmp"
-ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map.json")
+ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json")
+PARAGRAPH_CACHE_PATH = os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache_core.jsonl")
 
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
-CHUNK_SIZE = 300
-CHUNK_OVERLAP = 50
+CHUNK_SIZE = int(os.getenv("SEMANTIC_CHILD_CHUNK_SIZE", "180"))
+CHUNK_OVERLAP = int(os.getenv("SEMANTIC_CHILD_CHUNK_OVERLAP", "40"))
 MIN_TEXT_LENGTH = 20
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1024"))
 READ_PROGRESS_EVERY = int(os.getenv("READ_PROGRESS_EVERY", "5000"))

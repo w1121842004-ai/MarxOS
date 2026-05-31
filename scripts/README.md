@@ -6,13 +6,14 @@
 
 - `build_page_map.py`
 - `build_paragraph_cache.py`
+- `build_semantic_child_vectorstore.py`
 - `build_paragraph_vectorstore.py`
 - `detect_printed_page_start.py`
 
 用途：
 
 - 处理 OCR/cache/page map
-- 构建 chunk / paragraph 向量库
+- 构建“小块召回、大块返回”检索用的 semantic child / paragraph 向量库
 
 ## 2. 评测类
 

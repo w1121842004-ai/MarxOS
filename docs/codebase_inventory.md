@@ -67,7 +67,8 @@ PDF
 | `rag/ocr_to_cache.py` | 从 PDF 提取文本层或跑 OCR，写入 OCR cache | `data/ocr_cache/`、`rag/clean_ocr_text.py`、`rag/page_number_detection.py` |
 | `rag/clean_ocr_text.py` | OCR 文本清洗 | `rag/ocr_to_cache.py`、`rag/build_vectorstore_from_cache.py` |
 | `rag/page_number_detection.py` | 页码、页眉页脚、版心信号判断 | `rag/ocr_to_cache.py`、`rag/build_vectorstore_from_cache.py` |
-| `rag/build_vectorstore_from_cache.py` | 从 OCR cache 构建 chunk 向量库 | `vectorstore/marx_reader_core/` |
+| `rag/build_vectorstore_from_cache.py` | 历史 OCR cache 建库脚本与页面元数据工具 | `vectorstore/marx_reader_core/` |
+| `rag/semantic_retrieval.py` | 段落子块构建、父段落窗口回捞 | `scripts/build_semantic_child_vectorstore.py`、`app.py` |
 | `rag/paragraph_cache.py` | 段落 cache 构建与处理 | `scripts/build_paragraph_cache.py`、`scripts/build_paragraph_vectorstore.py` |
 | `rag/exact_quote_lookup.py` | 精确引文检索，优先绕过向量检索 | `data/ocr_cache/`、`rag/core_classics.py` |
 | `rag/core_classics.py` | 核心经典目录、别名、书目分组加载 | `rag/core_classics.json`、`rag/core_bibliography_catalog.json` |
@@ -99,6 +100,7 @@ PDF
 | `scripts/evaluate_eval_dataset.py` | 端到端评测 | `full` |
 | `scripts/build_page_map.py` | 预生成 `data/page_map.json` | 可选辅助 |
 | `scripts/build_paragraph_cache.py` | 构建 paragraph cache | 构建脚本 |
+| `scripts/build_semantic_child_vectorstore.py` | 从 paragraph cache 构建 semantic child 向量库 | 构建脚本 |
 | `scripts/build_paragraph_vectorstore.py` | 构建 paragraph vectorstore | 构建脚本 |
 
 ### 7.2 审计与诊断
