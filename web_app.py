@@ -826,6 +826,8 @@ def main():
         ) from exc
 
     print(f"MarxOS Web running at http://{HOST}:{PORT}")
+    for line in app.phoenix.startup_status_lines():
+        print(line)
     server.serve_forever()
 
 

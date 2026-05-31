@@ -240,6 +240,7 @@ RAG / OCR：
 
 - [docs/codebase_inventory.md](C:/Users/Administrator/Desktop/MarxOS/docs/codebase_inventory.md)
 - [docs/architecture.md](C:/Users/Administrator/Desktop/MarxOS/docs/architecture.md)
+- [docs/maintenance_guide.md](C:/Users/Administrator/Desktop/MarxOS/docs/maintenance_guide.md)
 - [docs/eval_questions.md](C:/Users/Administrator/Desktop/MarxOS/docs/eval_questions.md)
 - [docs/dev_logs/README.md](C:/Users/Administrator/Desktop/MarxOS/docs/dev_logs/README.md)
 - [scripts/README.md](C:/Users/Administrator/Desktop/MarxOS/scripts/README.md)
@@ -252,3 +253,70 @@ RAG / OCR：
 chcp 65001
 $OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::UTF8
 ```
+
+## Grouped Test Entry
+
+Use `scripts/test.py` when you want to run unittest suites by responsibility:
+
+```powershell
+venv\Scripts\python.exe scripts\test.py list
+venv\Scripts\python.exe scripts\test.py app
+venv\Scripts\python.exe scripts\test.py web
+venv\Scripts\python.exe scripts\test.py rag
+venv\Scripts\python.exe scripts\test.py all
+```
+
+See also: [docs/testing_guide.md](C:/Users/Administrator/Desktop/MarxOS/docs/testing_guide.md)
+
+## Optional Arize Phoenix Tracing
+
+MarxOS supports optional Arize Phoenix tracing for the main `run_query(...)`
+pipeline. The integration is disabled by default and becomes active only when
+`MARXOS_PHOENIX_ENABLED=1`.
+
+Install the optional tracing dependencies with:
+
+```powershell
+venv\Scripts\pip.exe install -r requirements-phoenix.txt
+```
+
+If you want a local Phoenix server, a common setup is:
+
+```powershell
+venv\Scripts\python.exe -m phoenix.server.main serve
+```
+
+Recommended environment variables:
+
+```powershell
+$env:MARXOS_PHOENIX_ENABLED="1"
+$env:MARXOS_PHOENIX_AUTO_INSTRUMENT="1"
+$env:MARXOS_PHOENIX_PROJECT_NAME="MarxOS"
+$env:MARXOS_PHOENIX_SERVICE_NAME="marxos"
+$env:PHOENIX_COLLECTOR_ENDPOINT="http://127.0.0.1:6006/v1/traces"
+```
+
+If you use Phoenix Cloud, also set:
+
+```powershell
+$env:PHOENIX_API_KEY="your_api_key"
+```
+
+Then start MarxOS in the same shell:
+
+```powershell
+$env:MARXOS_PHOENIX_ENABLED="1"
+venv\Scripts\python.exe app.py
+```
+
+The current tracing hooks cover:
+
+- request preparation and routing
+- local lookup and local view answer branches
+- retrieval constraints and top retrieved docs
+- prompt construction
+- DeepSeek generation through the OpenAI-compatible client
+- citation audit and filtered evidence
+
+If the OpenTelemetry or OpenInference packages are not installed, MarxOS will
+continue to run normally and skip exporting traces.

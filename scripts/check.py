@@ -1,5 +1,4 @@
 import argparse
-import sys
 from pathlib import Path
 
 from common_cli import python_command, run_step
@@ -9,20 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 QUICK_STEPS = [
+    ("validate_maps", python_command(ROOT / "scripts" / "validate_maps.py")),
     ("regression_smoke", python_command(ROOT / "scripts" / "regression_smoke.py")),
-    (
-        "run_query_regressions",
-        [
-            sys.executable,
-            "-m",
-            "unittest",
-            "discover",
-            "-s",
-            str(ROOT / "tests"),
-            "-p",
-            "test_run_query_regressions.py",
-        ],
-    ),
+    ("tests_app", python_command(ROOT / "scripts" / "test.py", "app")),
 ]
 
 FULL_EXTRA_STEPS = [

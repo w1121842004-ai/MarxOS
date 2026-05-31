@@ -10,9 +10,10 @@ from pathlib import Path
 import marxos_citations as citations
 import marxos_answers as answer_utils
 import marxos_orchestration as orchestration
+import marxos_phoenix as phoenix
 import marxos_prompts as prompts
 import marxos_query_intent as query_intent
-import marxos_retrieval as retrieval_utils
+import retrieval as retrieval_utils
 import marxos_trace as trace_utils
 from marxos_runtime import RuntimeState
 from rag.core_classics import classic_entries_for_query, load_core_classics
@@ -407,6 +408,8 @@ def _retrieval_ctx():
         "score_concept_focus": score_concept_focus,
         "score_concept_source_priority": score_concept_source_priority,
         "score_document_quality": score_document_quality,
+        "is_front_matter_candidate": is_front_matter_candidate,
+        "requests_derivative_material": requests_derivative_material,
         "is_classic_sayings_query": is_classic_sayings_query,
     }
 
@@ -491,6 +494,83 @@ def is_noisy_article_title(title):
     if len(normalized) > 45 and not any(
         marker in title for marker in ["《", "论", "批判", "宣言", "提纲", "手稿", "资本", "国家", "家庭", "劳动"]
     ):
+        return True
+
+    return False
+
+
+DERIVATIVE_TITLE_MARKERS = [
+    "序言",
+    "导言",
+    "前言",
+    "后记",
+    "跋",
+    "附录",
+    "编者注",
+    "译者注",
+    "译后记",
+    "出版说明",
+    "凡例",
+    "说明",
+    "绪言",
+]
+
+FRONT_MATTER_LEAD_MARKERS = [
+    "本版序言",
+    "德文版序言",
+    "俄文版序言",
+    "英文版序言",
+    "法文版序言",
+    "波兰文版序言",
+    "意大利文版序言",
+    "译后记",
+    "编者注",
+    "译者注",
+    "出版说明",
+    "凡例",
+    "本卷的开篇是",
+    "在这个马克思主义纲领性文献中",
+]
+
+
+def requests_derivative_material(query, constraints=None):
+    haystacks = [clean_text(query, "")]
+    constraints = constraints or {}
+    haystacks.extend(
+        clean_text(constraints.get(key), "")
+        for key in ("title", "classic_title", "locator_title")
+    )
+    normalized = normalize_for_match(" ".join(item for item in haystacks if item))
+    if not normalized:
+        return False
+    return any(normalize_for_match(marker) in normalized for marker in DERIVATIVE_TITLE_MARKERS)
+
+
+def is_front_matter_candidate(metadata, content, constraints=None):
+    if requests_derivative_material("", constraints):
+        return False
+
+    metadata = metadata or {}
+    title_fields = [
+        metadata.get("raw_article"),
+        metadata.get("raw_section"),
+        metadata.get("section"),
+        metadata.get("article"),
+        metadata.get("locator_title"),
+    ]
+    title_norm = normalize_for_match(" ".join(clean_text(item, "") for item in title_fields if item))
+    if any(normalize_for_match(marker) in title_norm for marker in DERIVATIVE_TITLE_MARKERS):
+        return True
+
+    lead = clean_text(content, "")[:260]
+    lead_norm = normalize_for_match(lead)
+    if any(normalize_for_match(marker) in lead_norm for marker in FRONT_MATTER_LEAD_MARKERS):
+        return True
+
+    if re.search(r"(18|19)\d{2}年.{0,12}(版)?序言", lead):
+        return True
+
+    if "——编者注" in lead or "———编者注" in lead:
         return True
 
     return False
@@ -999,8 +1079,9 @@ def answer_quote_query(query, limit=5, trace=False):
         lines.append(f"({index}){format_citation(doc.metadata, include_article=True)}")
 
     answer = "\n".join(lines)
-    display_evidence = filter_evidence_to_answer(answer, evidence)
-    audit = audit_answer_citations(answer, display_evidence)
+    repaired_answer = repair_answer_citations(answer, evidence)
+    display_evidence = filter_evidence_to_answer(repaired_answer, evidence)
+    audit = audit_answer_citations(repaired_answer, display_evidence)
     set_last_evidence(display_evidence, audit)
     return audit["answer"]
 
@@ -1826,6 +1907,12 @@ def score_document_quality(metadata, content):
     if any(marker in article_norm for marker in ["目录", "目次", "索引", "注释", "编者注"]):
         score -= 45
 
+    if any(normalize_for_match(marker) in article_norm for marker in DERIVATIVE_TITLE_MARKERS):
+        score -= 95
+
+    if is_front_matter_candidate(metadata, content):
+        score -= 120
+
     if "索引" in content_norm:
         score -= 35
 
@@ -2331,6 +2418,16 @@ def filter_evidence_to_answer(answer, evidence, fallback_limit=3):
     )
 
 
+def repair_answer_citations(answer, evidence, fallback_limit=4):
+    return citations.repair_answer_citations(
+        answer,
+        evidence,
+        fallback_limit,
+        normalize_final_answer,
+        normalize_for_match,
+    )
+
+
 def audit_answer_citations(answer, evidence):
     return citations.audit_answer_citations(
         answer,
@@ -2375,122 +2472,252 @@ def normalize_final_answer(answer):
     return "\n".join(normalized_lines)
 
 def run_query(query, route_query=None):
-    set_last_evidence([])
-    set_last_topic_info({})
-    request = orchestration.prepare_query_request(
-        query,
-        route_query,
-        clean_text,
-        is_unreadable_query,
-        answer_unsupported_claim,
-        classify_query,
-    )
-    if request.get("early_answer"):
-        return request["early_answer"]
+    with phoenix.trace_manager.start_as_current_span("marxos.run_query") as root_span:
+        try:
+            set_last_evidence([])
+            set_last_topic_info({})
+            request = orchestration.prepare_query_request(
+                query,
+                route_query,
+                clean_text,
+                is_unreadable_query,
+                answer_unsupported_claim,
+                classify_query,
+            )
+            if request.get("early_answer"):
+                phoenix.set_attributes(
+                    root_span,
+                    {
+                        "app.query": phoenix.compact_text(query, limit=240),
+                        "answer.path": "early_answer",
+                        "answer.length": len(request["early_answer"]),
+                    },
+                )
+                return request["early_answer"]
 
-    query = request["query"]
-    route_query = request["route_query"]
-    query_intent = request["query_intent"]
-    trace = trace_enabled()
-    trace_only = trace_only_enabled()
-    dual_retrieval = dual_retrieval_enabled()
+            query = request["query"]
+            route_query = request["route_query"]
+            query_intent = request["query_intent"]
+            trace = trace_enabled()
+            trace_only = trace_only_enabled()
+            dual_retrieval = dual_retrieval_enabled()
 
-    if trace or trace_only:
-        print_query_trace(route_query, query_intent)
+            phoenix.set_attributes(
+                root_span,
+                {
+                    "app.query": phoenix.compact_text(query, limit=240),
+                    "app.route_query": phoenix.compact_text(route_query, limit=240),
+                    "app.query_intent": query_intent,
+                    "app.trace_enabled": trace,
+                    "app.trace_only": trace_only,
+                    "app.dual_retrieval": dual_retrieval,
+                    "phoenix.enabled": phoenix.trace_manager.enabled(),
+                },
+            )
+            init_error = phoenix.trace_manager.init_error()
+            if init_error:
+                root_span.add_event(
+                    "phoenix.init_warning",
+                    {"message": phoenix.compact_text(init_error, limit=240)},
+                )
 
-    local_answer = orchestration.maybe_answer_local_lookup(
-        query,
-        route_query,
-        query_intent,
-        trace,
-        trace_only,
-        answer_bibliographic_query,
-        extract_bibliographic_title,
-        answer_quote_query,
-        print_trace_line,
-    )
-    if local_answer:
-        return local_answer
+            if trace or trace_only:
+                print_query_trace(route_query, query_intent)
 
-    constraints = constraints_from_query(route_query)
-    retrieval_state = orchestration.collect_retrieval_materials(
-        query,
-        route_query,
-        query_intent,
-        constraints,
-        PARAGRAPH_VECTORSTORE_DIR,
-        trace,
-        trace_only,
-        topic_info_from_constraints,
-        set_last_topic_info,
-        print_trace_line,
-        print_constraints_trace,
-        load_vectorstore,
-        retrieve_documents,
-        paragraph_vectorstore_exists,
-        load_paragraph_vectorstore,
-        filter_paragraph_docs_by_text_overlap,
-        merge_prefer_paragraph_docs,
-        refine_docs_citation_pages_for_query,
-        evidence_from_docs,
-        is_topic_view_list_query,
-    )
-    docs = retrieval_state["docs"]
-    evidence = retrieval_state["evidence"]
-    paragraph_docs = retrieval_state["paragraph_docs"] if dual_retrieval else []
+            with phoenix.trace_manager.start_as_current_span("marxos.local_lookup") as span:
+                phoenix.set_attributes(
+                    span,
+                    {
+                        "app.query_intent": query_intent,
+                    },
+                )
+                local_answer = orchestration.maybe_answer_local_lookup(
+                    query,
+                    route_query,
+                    query_intent,
+                    trace,
+                    trace_only,
+                    answer_bibliographic_query,
+                    extract_bibliographic_title,
+                    answer_quote_query,
+                    print_trace_line,
+                )
+                if local_answer:
+                    phoenix.set_attributes(
+                        span,
+                        {
+                            "answer.path": "local_lookup",
+                            "answer.length": len(local_answer),
+                        },
+                    )
+                    phoenix.set_attributes(
+                        root_span,
+                        {
+                            "answer.path": "local_lookup",
+                            "answer.length": len(local_answer),
+                        },
+                    )
+                    return local_answer
 
-    local_view_answer = orchestration.maybe_answer_local_view_query(
-        query,
-        route_query,
-        query_intent,
-        constraints,
-        docs,
-        evidence,
-        set_last_evidence,
-        filter_evidence_to_answer,
-        audit_answer_citations,
-        is_topic_view_list_query,
-        build_topic_view_list_answer,
-        topic_answer_evidence,
-        is_view_list_query,
-        build_strict_title_view_list_answer,
-        strict_title_answer_evidence,
-    )
-    if local_view_answer:
-        return local_view_answer
-    set_last_evidence([])
-    context = build_context(docs, query_intent)
-    prompt = clean_text(build_prompt(query_intent, query, context) + build_constraint_guard(constraints))
-    if trace or trace_only:
-        print_docs_trace(docs)
-        if dual_retrieval and paragraph_docs:
-            print_docs_trace(paragraph_docs, label="paragraph_retrieved_docs")
-        print_prompt_trace(prompt)
+            constraints = constraints_from_query(route_query)
+            with phoenix.trace_manager.start_as_current_span("marxos.retrieval") as span:
+                phoenix.set_attributes(span, phoenix.summarize_constraints(constraints))
+                retrieval_state = orchestration.collect_retrieval_materials(
+                    query,
+                    route_query,
+                    query_intent,
+                    constraints,
+                    PARAGRAPH_VECTORSTORE_DIR,
+                    trace,
+                    trace_only,
+                    topic_info_from_constraints,
+                    set_last_topic_info,
+                    print_trace_line,
+                    print_constraints_trace,
+                    load_vectorstore,
+                    retrieve_documents,
+                    paragraph_vectorstore_exists,
+                    load_paragraph_vectorstore,
+                    filter_paragraph_docs_by_text_overlap,
+                    merge_prefer_paragraph_docs,
+                    refine_docs_citation_pages_for_query,
+                    evidence_from_docs,
+                    is_topic_view_list_query,
+                )
+                docs = retrieval_state["docs"]
+                evidence = retrieval_state["evidence"]
+                paragraph_docs = retrieval_state["paragraph_docs"] if dual_retrieval else []
+                phoenix.set_attributes(span, phoenix.summarize_docs(docs, normalize_metadata))
+                if paragraph_docs:
+                    phoenix.set_attributes(
+                        span,
+                        phoenix.summarize_docs(
+                            paragraph_docs,
+                            normalize_metadata,
+                            limit=2,
+                        ),
+                    )
+                phoenix.set_attributes(span, phoenix.summarize_evidence(evidence))
 
-    if trace_only:
-        return build_trace_only_answer(query_intent, docs, prompt, paragraph_docs=paragraph_docs)
+            with phoenix.trace_manager.start_as_current_span("marxos.local_view_answer") as span:
+                local_view_answer = orchestration.maybe_answer_local_view_query(
+                    query,
+                    route_query,
+                    query_intent,
+                    constraints,
+                    docs,
+                    evidence,
+                    set_last_evidence,
+                    filter_evidence_to_answer,
+                    audit_answer_citations,
+                    is_topic_view_list_query,
+                    build_topic_view_list_answer,
+                    topic_answer_evidence,
+                    is_view_list_query,
+                    build_strict_title_view_list_answer,
+                    strict_title_answer_evidence,
+                )
+                if local_view_answer:
+                    phoenix.set_attributes(
+                        span,
+                        {
+                            "answer.path": "local_view",
+                            "answer.length": len(local_view_answer),
+                        },
+                    )
+                    phoenix.set_attributes(
+                        root_span,
+                        {
+                            "answer.path": "local_view",
+                            "answer.length": len(local_view_answer),
+                        },
+                    )
+                    return local_view_answer
 
-    client = OpenAI(
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-        base_url="https://api.deepseek.com",
-    )
-    response = client.chat.completions.create(
-        model="deepseek-chat",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
-    )
+            set_last_evidence([])
+            with phoenix.trace_manager.start_as_current_span("marxos.prompt_build") as span:
+                context = build_context(docs, query_intent)
+                prompt = clean_text(build_prompt(query_intent, query, context) + build_constraint_guard(constraints))
+                phoenix.set_attributes(
+                    span,
+                    {
+                        "prompt.length": len(prompt),
+                        "prompt.preview": phoenix.compact_text(prompt, limit=240),
+                    },
+                )
+            if trace or trace_only:
+                print_docs_trace(docs)
+                if dual_retrieval and paragraph_docs:
+                    print_docs_trace(paragraph_docs, label="paragraph_retrieved_docs")
+                print_prompt_trace(prompt)
 
-    display_evidence = filter_evidence_to_answer(response.choices[0].message.content, evidence)
-    audit = audit_answer_citations(response.choices[0].message.content, display_evidence)
-    set_last_evidence(display_evidence, audit)
-    return audit["answer"]
+            if trace_only:
+                answer = build_trace_only_answer(query_intent, docs, prompt, paragraph_docs=paragraph_docs)
+                phoenix.set_attributes(
+                    root_span,
+                    {
+                        "answer.path": "trace_only",
+                        "answer.length": len(answer),
+                    },
+                )
+                return answer
+
+            with phoenix.trace_manager.start_as_current_span("marxos.llm_generate") as span:
+                client = OpenAI(
+                    api_key=os.getenv("DEEPSEEK_API_KEY"),
+                    base_url="https://api.deepseek.com",
+                )
+                response = client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt,
+                        }
+                    ],
+                )
+                raw_answer = response.choices[0].message.content
+                phoenix.set_attributes(
+                    span,
+                    {
+                        "llm.vendor": "deepseek",
+                        "llm.api_style": "openai_compatible",
+                        "llm.model": "deepseek-chat",
+                        "llm.output_length": len(raw_answer or ""),
+                    },
+                )
+
+            with phoenix.trace_manager.start_as_current_span("marxos.citation_audit") as span:
+                repaired_answer = repair_answer_citations(raw_answer, evidence)
+                display_evidence = filter_evidence_to_answer(repaired_answer, evidence)
+                audit = audit_answer_citations(repaired_answer, display_evidence)
+                set_last_evidence(display_evidence, audit)
+                phoenix.set_attributes(
+                    span,
+                    {
+                        "citation.audit_ok": bool(audit.get("ok")),
+                        "citation.issue_count": len(audit.get("issues") or []),
+                        "answer.length": len(audit["answer"]),
+                    },
+                )
+                phoenix.set_attributes(span, phoenix.summarize_evidence(display_evidence))
+                phoenix.set_attributes(
+                    root_span,
+                    {
+                        "answer.path": "llm",
+                        "answer.length": len(audit["answer"]),
+                        "citation.audit_ok": bool(audit.get("ok")),
+                    },
+                )
+                return audit["answer"]
+        except Exception as exc:
+            root_span.record_exception(exc)
+            raise
 
 
 def main():
+    for line in phoenix.startup_status_lines():
+        print(line)
     query = input("请输入问题：")
     answer = run_query(query)
     print("\n===== MarxOS =====\n")

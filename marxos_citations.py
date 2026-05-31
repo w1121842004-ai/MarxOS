@@ -15,7 +15,7 @@ def citation_page_label(metadata, normalize_metadata, clean_text):
         return f"第{clean_text(citation_page)}页"
     if pdf_page is not None:
         return f"第{clean_text(pdf_page)}页"
-    return "未知页码"
+    return "页码不详"
 
 
 def source_page_label(metadata, normalize_metadata, clean_text):
@@ -27,10 +27,12 @@ def format_citation(metadata, include_article, normalize_metadata, normalize_boo
     metadata = normalize_metadata(metadata)
     author, title, volume, year = normalize_book_parts(metadata)
     article = clean_text(metadata.get("section") or metadata.get("article"), "")
-    author_text = f"{author}：" if author else ""
+    author_text = f"{author}，" if author else ""
     volume_text = volume if volume else ""
-    article_text = f"，{article}" if include_article and article else ""
-    year_text = f"，{year}" if year else ""
+    article_text = ""
+    if include_article and article and article != title:
+        article_text = f"，《{article}》"
+    year_text = year if year else ""
     page_text = citation_page_label(metadata, normalize_metadata, clean_text)
     return f"{author_text}《{title}》{volume_text}{article_text}，北京：人民出版社{year_text}，{page_text}。"
 
@@ -142,7 +144,12 @@ def evidence_matches_citation(item, citation, normalize_for_match):
     if citation_page and citation_page in item_pages:
         series = citation_match_key(item.get("series") or "", normalize_for_match)
         source = citation_match_key(item.get("source") or item.get("source_file") or "", normalize_for_match)
-        if (series and series in citation_key) or (source and source in citation_key):
+        article = citation_match_key(item.get("article") or item.get("section") or "", normalize_for_match)
+        if (
+            (series and series in citation_key)
+            or (source and source in citation_key)
+            or (article and article in citation_key)
+        ):
             return True
 
     return False
@@ -179,16 +186,89 @@ def filter_evidence_to_answer(answer, evidence, fallback_limit, normalize_final_
     return [{**item, "id": f"E{index}"} for index, item in enumerate(matched, start=1)]
 
 
+def _split_answer_body_and_citations(answer):
+    marker_re = re.compile(r"(?im)^\s*(?:\*+)?\s*引(?:文|用)注释\s*(?:\*+)?\s*$")
+    lines = answer.splitlines()
+    for index, line in enumerate(lines):
+        if marker_re.match(line):
+            body = "\n".join(lines[:index]).rstrip()
+            return body, True
+    return answer.rstrip(), False
+
+
+def _preferred_citation_text(item):
+    return (
+        item.get("answer_citation")
+        or item.get("detailed_citation")
+        or item.get("citation")
+        or item.get("sentence_citation")
+    )
+
+
+def _build_citation_section_lines(evidence, limit):
+    lines = ["*引文注释*"]
+    for index, item in enumerate((evidence or [])[:limit], start=1):
+        citation = _preferred_citation_text(item)
+        if not citation:
+            continue
+        lines.append(f"{index}. {citation}")
+    return lines if len(lines) > 1 else []
+
+
+def repair_answer_citations(
+    answer,
+    evidence,
+    fallback_limit,
+    normalize_final_answer,
+    normalize_for_match,
+):
+    normalized = normalize_final_answer(answer)
+    evidence = evidence or []
+    if not normalized.strip() or not evidence:
+        return normalized
+
+    citation_lines = extract_answer_citation_lines(normalized, normalize_final_answer)
+    matched = []
+    seen = set()
+    for citation in citation_lines:
+        for item in evidence:
+            if not evidence_matches_citation(item, citation, normalize_for_match):
+                continue
+            key = (
+                item.get("source"),
+                item.get("printed_page"),
+                item.get("citation_page"),
+                item.get("paragraph_id"),
+                item.get("excerpt"),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            matched.append({**item, "answer_citation": citation})
+            break
+
+    replacement = matched if matched and len(matched) == len(citation_lines) else evidence[:fallback_limit]
+    section_lines = _build_citation_section_lines(replacement, fallback_limit)
+    if not section_lines:
+        return normalized
+
+    body, _had_marker = _split_answer_body_and_citations(normalized)
+    if body.strip():
+        return body.rstrip() + "\n\n" + "\n".join(section_lines)
+    return "\n".join(section_lines)
+
+
 def audit_answer_citations(answer, evidence, normalize_final_answer, normalize_for_match):
     normalized = normalize_final_answer(answer)
     issues = []
-    forbidden = ["PDF第", "pdf_page", "PDF page", "同上"]
+    forbidden = ["PDF第", "pdf_page", "PDF page", "打印页低信任"]
     for token in forbidden:
         if token in normalized:
             issues.append({"type": "forbidden_token", "token": token})
 
     evidence_citations = {item.get("citation") for item in evidence or []}
     evidence_citations |= {item.get("sentence_citation") for item in evidence or []}
+    evidence_citations |= {item.get("detailed_citation") for item in evidence or []}
     evidence_citations = {item for item in evidence_citations if item}
     citation_lines = extract_answer_citation_lines(normalized, normalize_final_answer)
 
@@ -196,7 +276,9 @@ def audit_answer_citations(answer, evidence, normalize_final_answer, normalize_f
         issues.append({"type": "citation_without_verified_evidence"})
 
     for citation in citation_lines:
-        if evidence_citations and not any(evidence_matches_citation(item, citation, normalize_for_match) for item in evidence or []):
+        if evidence_citations and not any(
+            evidence_matches_citation(item, citation, normalize_for_match) for item in evidence or []
+        ):
             issues.append({"type": "citation_not_in_evidence", "citation": citation})
 
     return {

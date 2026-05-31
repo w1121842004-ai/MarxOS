@@ -584,6 +584,21 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertIn("来源：《马克思恩格斯文集 第1卷》对黑格尔的辩证法和整个哲学的批判，第210页", context)
         self.assertNotIn("PDF第240页（印刷页210低信任）", context)
 
+    def test_format_citation_include_article_wraps_work_title(self):
+        citation = app.format_citation(
+            {
+                "book": "\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6 \u7b2c1\u5377",
+                "article": "\u5171\u4ea7\u515a\u5ba3\u8a00",
+                "section": "\u5171\u4ea7\u515a\u5ba3\u8a00",
+                "printed_page": 376,
+                "source": "mes01.pdf",
+            },
+            include_article=True,
+        )
+
+        self.assertIn("\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u300a\u5171\u4ea7\u515a\u5ba3\u8a00\u300b", citation)
+        self.assertIn("\u7b2c376\u9875", citation)
+
     def test_query_routing_enhanced_concept_and_analysis_patterns(self):
         self.assertEqual(app.classify_query("\u4eba\u7684\u672c\u8d28\u662f\u4ec0\u4e48\uff1f"), "concept_explain")
         self.assertEqual(app.classify_query("如何理解剩余价值这个概念？"), "concept_explain")
@@ -704,6 +719,16 @@ class AppLocalPathTests(unittest.TestCase):
         query = "\u5f53\u524d\uff0cAI\u65f6\u4ee3\u7684\u201c\u70bc\u4e39\u201d\u5176\u80cc\u540e\u7684\u672c\u8d28\u662f\u4ec0\u4e48"
 
         self.assertEqual(app.classify_query(query), "concept_explain")
+
+    def test_long_analytical_rebuttal_query_is_not_routed_to_bibliography(self):
+        query = "\u5982\u679c\u6709\u4eba\u628a\u5386\u53f2\u552f\u7269\u4e3b\u4e49\u7406\u89e3\u4e3a\u201c\u7ecf\u6d4e\u81ea\u52a8\u51b3\u5b9a\u4e00\u5207\u201d\uff0c\u8bf7\u4f60\u57fa\u4e8e\u524d\u9762\u8ba8\u8bba\u4f5c\u51fa\u53cd\u9a73\uff0c\u5e76\u660e\u786e\u6307\u51fa\u8fd9\u79cd\u8bef\u89e3\u9519\u5728\u54ea\u91cc\u3002"
+
+        self.assertNotEqual(app.classify_query(query), "bibliographic_lookup")
+
+    def test_long_summary_query_is_not_routed_to_quote_lookup(self):
+        query = "\u6700\u540e\u8bf7\u5bf9\u6211\u4eec\u8fd9 50 \u8f6e\u8ba8\u8bba\u505a\u4e00\u4e2a\u5b66\u672f\u6027\u603b\u7ed3\uff1a\u6982\u62ec\u9a6c\u514b\u601d\u4e3b\u4e49\u7406\u8bba\u4f53\u7cfb\u5185\u90e8\u6700\u6838\u5fc3\u7684\u51e0\u6761\u65b9\u6cd5\u8bba\u7ebf\u7d22\uff0c\u5e76\u518d\u6b21\u6ce8\u660e\u5173\u952e\u51fa\u5904\u3002"
+
+        self.assertNotEqual(app.classify_query(query), "quote_lookup")
 
     def test_query_about_communism_realization_routes_to_theory_analysis(self):
         query = "\u5171\u4ea7\u4e3b\u4e49\u662f\u4e0d\u662f\u4e00\u5b9a\u4f1a\u5b9e\u73b0\uff1f"
@@ -962,6 +987,57 @@ class AppLocalPathTests(unittest.TestCase):
         result = app.filter_evidence_to_answer(answer, [], fallback_limit=3)
 
         self.assertEqual(result, [])
+
+    def test_repair_answer_citations_rebuilds_annotation_block_from_evidence(self):
+        answer = (
+            "\u8fd9\u662f\u7b54\u6848\u3002\n\n"
+            "*\u5f15\u7528\u6ce8\u91ca*\n"
+            "1. \u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c9\u5377\uff0c\u7b2c999\u9875\u3002"
+        )
+        evidence = [
+            {
+                "citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c401\u9875\u3002",
+                "sentence_citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c401\u9875\u3002",
+                "detailed_citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u300a\u5171\u4ea7\u515a\u5ba3\u8a00\u300b\uff0c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e2012\u5e74\uff0c\u7b2c401\u9875\u3002",
+                "source": "mes01.pdf",
+                "printed_page": 401,
+                "excerpt": "matched",
+            }
+        ]
+
+        repaired = app.repair_answer_citations(answer, evidence, fallback_limit=2)
+
+        self.assertIn("\u5f15\u6587\u6ce8\u91ca", repaired)
+        self.assertIn("\u300a\u5171\u4ea7\u515a\u5ba3\u8a00\u300b", repaired)
+        self.assertIn("\u7b2c1\u5377", repaired)
+        self.assertIn("\u7b2c401\u9875", repaired)
+        self.assertNotIn("\u7b2c9\u5377\uff0c\u7b2c999\u9875", repaired)
+
+    def test_repair_answer_citations_uses_detailed_entries_for_multi_work_visibility(self):
+        answer = "\u8fd9\u662f\u4e00\u6bb5\u56de\u7b54\u3002"
+        evidence = [
+            {
+                "citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c376\u9875\u3002",
+                "sentence_citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c376\u9875\u3002",
+                "detailed_citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u300a\u5171\u4ea7\u515a\u5ba3\u8a00\u300b\uff0c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e2012\u5e74\uff0c\u7b2c376\u9875\u3002",
+                "source": "mes01.pdf",
+                "printed_page": 376,
+                "excerpt": "A",
+            },
+            {
+                "citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c401\u9875\u3002",
+                "sentence_citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c401\u9875\u3002",
+                "detailed_citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u300a\u5173\u4e8e\u8d39\u5c14\u5df4\u54c8\u7684\u63d0\u7eb2\u300b\uff0c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e2012\u5e74\uff0c\u7b2c401\u9875\u3002",
+                "source": "mes01.pdf",
+                "printed_page": 401,
+                "excerpt": "B",
+            },
+        ]
+
+        repaired = app.repair_answer_citations(answer, evidence, fallback_limit=2)
+
+        self.assertIn("\u300a\u5171\u4ea7\u515a\u5ba3\u8a00\u300b", repaired)
+        self.assertIn("\u300a\u5173\u4e8e\u8d39\u5c14\u5df4\u54c8\u7684\u63d0\u7eb2\u300b", repaired)
 
     def test_web_ask_metrics_marks_fallback_usage(self):
         answer = (

@@ -1,3 +1,4 @@
+import io
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -177,6 +178,7 @@ class RunQueryRegressionTests(unittest.TestCase):
             ),
             patch("app.load_vectorstore", return_value=FakeDb()),
             patch("app.paragraph_vectorstore_exists", return_value=False),
+            patch("sys.stderr", new_callable=io.StringIO),
             patch("app.OpenAI") as openai,
         ):
             answer = app.run_query("测试概念说明")
@@ -184,6 +186,74 @@ class RunQueryRegressionTests(unittest.TestCase):
         openai.assert_not_called()
         self.assertIn("TRACE_ONLY", answer)
         self.assertIn("Top chunks", answer)
+
+    def test_run_query_keeps_working_when_phoenix_enabled_without_packages(self):
+        doc = Document(
+            page_content="Phoenix fallback span test",
+            metadata={
+                "book": "test book",
+                "article": "test article",
+                "source": "test.pdf",
+                "printed_page": 11,
+                "pdf_page": 13,
+            },
+        )
+
+        class FakeDb:
+            def similarity_search(self, _query, k):
+                return [doc]
+
+        fake_response = SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content="Phoenix enabled fallback test."
+                    )
+                )
+            ]
+        )
+        fake_client = SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=lambda **kwargs: fake_response)
+            )
+        )
+
+        trace_manager = app.phoenix.trace_manager
+        original_state = (
+            trace_manager._initialized,
+            trace_manager._tracer,
+            trace_manager._enabled,
+            trace_manager._init_error,
+        )
+
+        try:
+            trace_manager._initialized = False
+            trace_manager._tracer = None
+            trace_manager._enabled = False
+            trace_manager._init_error = ""
+            with (
+                patch.dict(
+                    "os.environ",
+                    {
+                        "MARXOS_PHOENIX_ENABLED": "1",
+                    },
+                    clear=False,
+                ),
+                patch("app.load_vectorstore", return_value=FakeDb()),
+                patch("app.paragraph_vectorstore_exists", return_value=False),
+                patch("app.OpenAI", return_value=fake_client),
+            ):
+                answer = app.run_query("Phoenix fallback test?")
+        finally:
+            (
+                trace_manager._initialized,
+                trace_manager._tracer,
+                trace_manager._enabled,
+                trace_manager._init_error,
+            ) = original_state
+
+        self.assertTrue(answer)
+        self.assertIn("Phoenix", answer)
 
 
 if __name__ == "__main__":

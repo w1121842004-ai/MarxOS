@@ -40,7 +40,7 @@ def extract_unquoted_title(query: str, clean_text) -> str | None:
         return None
 
     title = query[: min(positions)]
-    title = re.sub(r"[，。：、\s\"'“”《》（）()]+$", "", title).strip()
+    title = re.sub(r"""[，。：、《》\s"'“”‘’（）()？?]+$""", "", title).strip()
     return title or None
 
 
@@ -50,12 +50,16 @@ def extract_bibliographic_title(query: str, clean_text) -> str | None:
 
 def normalize_for_match(text: str, clean_text) -> str:
     text = clean_text(text, "")
-    text = re.sub(r"[《》“”\"'（）()，。；：、\s·\-.—–]", "", text)
+    text = re.sub(r"""[《》“”"'，。：；、\s\-—()（）？?]""", "", text)
     return text.lower()
 
 
 def is_bibliographic_query(query: str, clean_text) -> bool:
     query = clean_text(query, "")
+    title = extract_bibliographic_title(query, clean_text)
+    if not title:
+        return False
+
     keywords = [
         "在哪一卷",
         "在哪卷",
@@ -78,7 +82,26 @@ def is_bibliographic_query(query: str, clean_text) -> bool:
         "开始页",
         "收录页",
     ]
-    return any(keyword in query for keyword in keywords)
+    if not any(keyword in query for keyword in keywords):
+        return False
+
+    if len(title) >= 24:
+        return False
+
+    analytical_markers = [
+        "说明",
+        "阐明",
+        "概括",
+        "总结",
+        "反驳",
+        "分析",
+        "进一步",
+        "基于",
+        "结合",
+        "讨论",
+        "线索",
+    ]
+    return not any(marker in query for marker in analytical_markers)
 
 
 def is_quote_lookup_query(query: str, clean_text) -> bool:
@@ -100,11 +123,33 @@ def is_quote_lookup_query(query: str, clean_text) -> bool:
     if any(marker in query for marker in interrogative_markers):
         return False
 
+    analytical_markers = [
+        "总结",
+        "概括",
+        "线索",
+        "系统",
+        "说明",
+        "阐明",
+        "分析",
+        "进一步",
+        "基于",
+        "结合",
+        "讨论",
+        "方法论",
+        "再次注明",
+    ]
+    if any(marker in query for marker in analytical_markers):
+        return False
+
     quote_keywords = ["引文", "出处", "出自", "哪一页", "哪页", "页码", "原文", "这句话", "这段话"]
     if any(keyword in query for keyword in quote_keywords):
         return True
 
-    return len(query) >= 24 and not re.search(r"[。！？!?]", query)
+    return (
+        len(query) >= 24
+        and any(marker in query for marker in ["“", "”", "\"", "《", "》"])
+        and not re.search(r"[。！？!?]", query)
+    )
 
 
 def is_analysis_query(query: str, clean_text) -> bool:

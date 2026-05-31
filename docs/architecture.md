@@ -194,3 +194,28 @@ venv\Scripts\python.exe scripts\audit.py list
 4. [docs/eval_questions.md](./eval_questions.md)
 5. [app.py](../app.py)
 6. `marxos_*` 主线模块
+## 7. Retrieval Package Status
+
+retrieval 层已经开始从顶层平铺模块收口到 `retrieval/` 包：
+
+- `retrieval/__init__.py`
+  - 对外 facade，供 `app.py` 统一导入
+- `retrieval/constraints.py`
+  - title/topic/source/page range constraints 与 seed queries
+- `retrieval/ranking.py`
+  - rerank、diversify、constraint annotation、topic document selection
+- `retrieval/modes.py`
+  - 实际 retrieval 执行、strict-title backstop、paragraph/dual retrieval、citation-page refinement
+
+为避免一次性搬家带来的兼容风险，旧的 `marxos_retrieval*.py` 文件目前只保留为兼容导入层。新的检索逻辑优先放进 `retrieval/` 包，不再继续扩展旧前缀模块。
+
+## 8. Refactor Triggers
+
+出现下面任一信号时，默认认为“可以开始重构”，不再继续靠维护文档和口头约定硬撑：
+
+1. 新增一个检索策略需要同时修改超过 2 个 `retrieval/*` 子模块，或还要回头补 `app.py` glue code。
+2. `app.py` 和 `web_app.py` 出现超过 20 行的重复逻辑，且重复逻辑已经影响修复或测试节奏。
+3. 维护者要解释的“例外规则”已经超出 `docs/maintenance_guide.md` 的既有导航，需要额外口头补充才能安全改动。
+4. `scripts/check.py --mode quick` 已经不足以覆盖高频回归，开始频繁依赖人工挑选脚本组合来判断是否可合并。
+
+这些信号的意义不是说明当前实现“失败了”，而是说明之前为速度做的透支已经到了该还款的时候。

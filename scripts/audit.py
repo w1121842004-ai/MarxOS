@@ -18,6 +18,7 @@ AUDIT_COMMANDS = {
     "page-candidates": ("audit_page_candidates.py", "inspect candidate citation pages for a query"),
     "page-metadata": ("audit_page_metadata.py", "print normalized page metadata summaries"),
     "paragraph-cache": ("audit_paragraph_cache.py", "inspect paragraph cache output quality"),
+    "validate-maps": ("validate_maps.py", "validate page_map and article_map JSON structure"),
 }
 
 
