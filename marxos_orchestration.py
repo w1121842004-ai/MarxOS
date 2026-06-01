@@ -341,6 +341,10 @@ def maybe_answer_local_view_query(
     build_strict_title_view_list_answer,
     strict_title_answer_evidence,
 ):
+    # deep_analysis: always skip local shortcuts → go to LLM
+    if query_intent == "deep_analysis":
+        return None
+
     if constraints.get("strict_title") and not docs:
         title = constraints.get("title") or "该文"
         answer = (

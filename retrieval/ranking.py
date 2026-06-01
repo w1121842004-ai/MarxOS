@@ -3,14 +3,11 @@ import os
 import sys
 
 from retrieval.constraints import (
+    _helper,
     metadata_matches_constraints,
     page_in_expected_range,
     topic_title_allowed,
 )
-
-
-def _helper(ctx, name):
-    return ctx[name]
 
 
 def score_source_match(metadata, constraints):

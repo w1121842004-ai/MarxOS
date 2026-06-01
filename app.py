@@ -16,6 +16,9 @@ import marxos_query_intent as query_intent
 import retrieval as retrieval_utils
 import marxos_trace as trace_utils
 from marxos_runtime import RuntimeState
+from marxos_work_catalog import WorkCatalog
+from marxos_book_locator import BookLocator
+from marxos_citation_verifier import CitationVerifier
 from rag.core_classics import classic_entries_for_query, load_core_classics
 from rag.exact_quote_lookup import exact_quote_lookup
 from rag.semantic_retrieval import expand_semantic_parent_docs as expand_semantic_parent_windows
@@ -378,6 +381,80 @@ TOPIC_TITLE_REWRITES = {
 }
 
 
+# ── Work Catalog ──────────────────────────────────────────────────
+
+_work_catalog = None
+
+def _get_work_catalog():
+    global _work_catalog
+    if _work_catalog is None:
+        _work_catalog = WorkCatalog()
+    return _work_catalog
+
+
+def work_catalog_entries_for_query(query):
+    """Match query to work_catalog and return constraint entries."""
+    catalog = _get_work_catalog()
+    work = catalog.match_query(query, normalize_fn=normalize_for_match)
+    if work is None:
+        concept_hits = catalog.match_by_concepts(query, normalize_fn=normalize_for_match)
+        if concept_hits:
+            work = concept_hits[0][0]
+    if work is None:
+        return []
+    return catalog.get_entries(work)
+
+
+# ── Book Locator Agent ────────────────────────────────────────────
+
+_book_locator = None
+
+def _get_book_locator():
+    global _book_locator
+    if _book_locator is None:
+        from openai import OpenAI
+        client = OpenAI(
+            api_key=os.getenv("DEEPSEEK_API_KEY"),
+            base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        )
+        catalog = _get_work_catalog()
+        _book_locator = BookLocator(client, catalog)
+    return _book_locator
+
+
+def book_locator_constraints(query):
+    """LLM-driven fallback: when rule-based matching fails, ask DeepSeek."""
+    if trace_only_enabled():
+        return {}
+    locator = _get_book_locator()
+    result = locator.get_constraints(query)
+    return result if result else {}
+
+
+# ── Citation Verifier ─────────────────────────────────────────────
+
+_citation_verifier = None
+
+def _get_citation_verifier():
+    global _citation_verifier
+    if _citation_verifier is None:
+        from openai import OpenAI
+        client = OpenAI(
+            api_key=os.getenv("DEEPSEEK_API_KEY"),
+            base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        )
+        _citation_verifier = CitationVerifier(client, OCR_CACHE_DIR)
+    return _citation_verifier
+
+
+def verify_citations(answer_text, evidence_cards):
+    """Content-level citation verification against OCR text."""
+    if trace_only_enabled():
+        return None
+    verifier = _get_citation_verifier()
+    return verifier.verify(answer_text, evidence_cards)
+
+
 def _retrieval_ctx():
     return {
         "TOPIC_CATALOG": TOPIC_CATALOG,
@@ -396,6 +473,8 @@ def _retrieval_ctx():
         "clean_text": clean_text,
         "find_toc_entries": find_toc_entries,
         "extract_bibliographic_title": extract_bibliographic_title,
+        "work_catalog_entries_for_query": work_catalog_entries_for_query,
+        "book_locator_constraints": book_locator_constraints,
         "locator_entries_for_query": locator_entries_for_query,
         "classic_entries_for_query": classic_entries_for_query,
         "enrich_core_classic_entries": enrich_core_classic_entries,
@@ -682,10 +761,16 @@ def normalize_metadata(metadata):
         normalized["citation_page_type"] = "printed_page"
 
     mapped_article = article_from_article_map(normalized)
-    if mapped_article and should_fill_article_from_map(normalized):
+    # Prefer work_catalog title over OCR article_map when available
+    work_title = normalized.get("classic_title") or normalized.get("locator_title") or normalized.get("work_title")
+    has_work_title = bool(work_title and len(clean_article_title(work_title)) >= 4)
+    if mapped_article and should_fill_article_from_map(normalized) and not has_work_title:
         normalized["article"] = mapped_article
         if not normalized.get("section") or normalized.get("section") == normalized.get("book"):
             normalized["section"] = mapped_article
+    elif has_work_title and (not normalized.get("article") or is_noisy_article_title(clean_article_title(normalized.get("article","")))):
+        normalized["article"] = work_title
+        normalized["section"] = work_title
 
     for key in ["article", "section"]:
         if key not in normalized:
@@ -697,6 +782,21 @@ def normalize_metadata(metadata):
             normalized[key] = None
         elif cleaned_title:
             normalized[key] = cleaned_title
+
+    # Final override: work_catalog title always wins over OCR article_map
+    work_title = normalized.get("classic_title") or normalized.get("locator_title") or normalized.get("work_title")
+    if work_title:
+        clean_work = clean_article_title(work_title)
+        current_article = clean_article_title(normalized.get("article") or "")
+        current_section = clean_article_title(normalized.get("section") or "")
+        if clean_work and (not current_article or len(current_article) < 4 or
+                           current_article == "实践" or  # known bad metadata
+                           is_noisy_article_title(current_article)):
+            normalized["article"] = work_title
+        if clean_work and (not current_section or len(current_section) < 4 or
+                           current_section == "实践" or
+                           is_noisy_article_title(current_section)):
+            normalized["section"] = work_title
 
     if normalized.get("citation_page") is None:
         if normalized.get("printed_page") is not None:
@@ -803,26 +903,44 @@ def is_classic_sayings_query(query):
 
 
 def classify_query(query):
-    """Classify a user query so retrieval and prompting can stay task-specific.
+    """Classify a user query with work_catalog-aware routing.
 
-    bibliographic_lookup: locate a work in the local table of contents.
-    quote_lookup: confirm the source/page for an exact sentence or paragraph.
-    concept_explain: explain a Marxist concept with retrieved primary text.
-    theory_analysis: analyze a question through Marxist theoretical categories.
-    rag_answer: answer ordinary retrieval questions without special routing.
+    bibliographic_lookup: locate a work → work_catalog or TOC.
+    quote_lookup: confirm source/page for exact text → quote index + constrained search.
+    concept_explain: explain a concept → primary_concept work match + constrained retrieval.
+    deep_analysis: multi-work synthesis, contemporary application → LLM analysis mode.
+    theory_analysis: analyze through Marxist theory → broad multi-work retrieval.
+    rag_answer: default fallback → standard hybrid retrieval.
     """
+    q_clean = clean_text(query, "")
+
+    # 1. Bibliographic: direct work lookup
     if is_bibliographic_query(query) and extract_bibliographic_title(query):
+        catalog = _get_work_catalog()
+        if catalog.match_query(query, normalize_fn=normalize_for_match):
+            return "bibliographic_lookup"
         return "bibliographic_lookup"
 
+    # 2. Quote lookup: exact text matching
     if is_quote_lookup_query(query):
+        catalog = _get_work_catalog()
+        if catalog.match_query(query, normalize_fn=normalize_for_match):
+            return "quote_lookup"
         return "quote_lookup"
 
+    # 3. Deep analysis: LLM-powered multi-work synthesis (checked before concept)
+    if query_intent.is_deep_analysis_query(query, clean_text):
+        return "deep_analysis"
+
+    # 4. Concept explain: prefer primary_concept works
     if is_concept_query(query):
         return "concept_explain"
 
+    # 5. Theory analysis
     if is_analysis_query(query):
         return "theory_analysis"
 
+    # 6. Default: standard RAG
     return "rag_answer"
 
 
@@ -2514,19 +2632,21 @@ def normalize_final_answer(answer):
 
     return "\n".join(normalized_lines)
 
-def run_query(query, route_query=None):
+def run_query(query, route_query=None, force_intent=None):
     with phoenix.trace_manager.start_as_current_span("marxos.run_query") as root_span:
         try:
             set_last_evidence([])
             set_last_topic_info({})
             set_last_crag_report({})
+
+            # Use provided classification function or default
+            _classify = classify_query
+            if force_intent:
+                _classify = lambda q: force_intent
+
             request = orchestration.prepare_query_request(
-                query,
-                route_query,
-                clean_text,
-                is_unreadable_query,
-                answer_unsupported_claim,
-                classify_query,
+                query, route_query, clean_text, is_unreadable_query,
+                answer_unsupported_claim, _classify,
             )
             if request.get("early_answer"):
                 phoenix.set_attributes(
@@ -2599,6 +2719,10 @@ def run_query(query, route_query=None):
                     repaired_answer = repair_answer_citations(raw_answer, active_evidence)
                     display_evidence = filter_evidence_to_answer(repaired_answer, active_evidence)
                     audit = audit_answer_citations(repaired_answer, display_evidence)
+                    # Content verification against OCR text
+                    content_verify = verify_citations(repaired_answer, display_evidence)
+                    if content_verify:
+                        audit["content_verification"] = content_verify
                     audit["crag_report"] = dict(active_crag_report or {})
                     audit["crag_recovery_used"] = recovery_used
                     phoenix.set_attributes(
@@ -2784,62 +2908,62 @@ def run_query(query, route_query=None):
                 "marxos.citation_audit",
             )
 
-            if not audit.get("ok"):
-                with phoenix.trace_manager.start_as_current_span("marxos.citation_recovery") as span:
+            recovery_round = 0
+
+            def _try_recover(audit, docs, evidence, paragraph_docs, crag_report, prompt,
+                             display_evidence, recovery_reason="citation_format"):
+                """Attempt one round of recovery: re-retrieve + regenerate + re-audit."""
+                nonlocal recovery_round
+                recovery_round += 1
+                if recovery_round > 2:
+                    return audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence
+
+                with phoenix.trace_manager.start_as_current_span(
+                    f"marxos.recovery_{recovery_round}_{recovery_reason}"
+                ) as span:
                     recovery_state = orchestration.collect_retrieval_materials(
-                        query,
-                        route_query,
-                        query_intent,
-                        constraints,
-                        PARAGRAPH_VECTORSTORE_DIR,
-                        trace,
-                        trace_only,
-                        topic_info_from_constraints,
-                        set_last_topic_info,
-                        print_trace_line,
-                        print_constraints_trace,
-                        load_vectorstore,
-                        retrieve_documents,
-                        paragraph_vectorstore_exists,
-                        load_paragraph_vectorstore,
+                        query, route_query, query_intent, constraints,
+                        PARAGRAPH_VECTORSTORE_DIR, trace, trace_only,
+                        topic_info_from_constraints, set_last_topic_info,
+                        print_trace_line, print_constraints_trace,
+                        load_vectorstore, retrieve_documents,
+                        paragraph_vectorstore_exists, load_paragraph_vectorstore,
                         filter_paragraph_docs_by_text_overlap,
                         merge_prefer_paragraph_docs,
                         refine_docs_citation_pages_for_query,
-                        evidence_from_docs,
-                        is_topic_view_list_query,
+                        evidence_from_docs, is_topic_view_list_query,
                         force_corrective=True,
                     )
-                    recovery_docs = recovery_state["docs"]
-                    recovery_evidence = recovery_state["evidence"]
-                    recovery_crag_report = recovery_state.get("crag_report") or {}
-                    recovery_paragraph_docs = recovery_state["paragraph_docs"] if dual_retrieval else []
-                    recovery_prompt = _build_prompt_for_docs(recovery_docs, "marxos.prompt_build_recovery")
-                    recovery_raw_answer = _generate_raw_answer(recovery_prompt, "marxos.llm_generate_recovery")
-                    recovery_audit, recovery_display_evidence = _finalize_answer(
-                        recovery_raw_answer,
-                        recovery_evidence,
-                        recovery_crag_report,
-                        "marxos.citation_audit_recovery",
+                    new_docs = recovery_state["docs"]
+                    new_evidence = recovery_state["evidence"]
+                    new_crag = recovery_state.get("crag_report") or {}
+                    new_para = recovery_state["paragraph_docs"] if dual_retrieval else []
+                    new_prompt = _build_prompt_for_docs(new_docs, f"marxos.prompt_build_recovery_{recovery_round}")
+                    new_raw = _generate_raw_answer(new_prompt, f"marxos.llm_generate_recovery_{recovery_round}")
+                    new_audit, new_display = _finalize_answer(
+                        new_raw, new_evidence, new_crag,
+                        f"marxos.citation_audit_recovery_{recovery_round}",
                         recovery_used=True,
                     )
-                    phoenix.set_attributes(
-                        span,
-                        {
-                            "recovery.used": True,
-                            "recovery.audit_ok": bool(recovery_audit.get("ok")),
-                            "recovery.issue_count": len(recovery_audit.get("issues") or []),
-                            "recovery.crag_path": recovery_crag_report.get("path") or "",
-                        },
-                    )
-                    if _audit_rank(recovery_audit) >= _audit_rank(audit):
-                        docs = recovery_docs
-                        evidence = recovery_evidence
-                        paragraph_docs = recovery_paragraph_docs
-                        crag_report = recovery_crag_report
-                        prompt = recovery_prompt
-                        audit = recovery_audit
-                        display_evidence = recovery_display_evidence
-                        set_last_crag_report(crag_report)
+                    if _audit_rank(new_audit) >= _audit_rank(audit):
+                        set_last_crag_report(new_crag)
+                        return new_audit, new_docs, new_evidence, new_para, new_crag, new_prompt, new_display
+                return audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence
+
+            # Round 1: citation format recovery (existing)
+            if not audit.get("ok"):
+                audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence = _try_recover(
+                    audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence,
+                    "citation_format")
+
+            # Round 2: content verification recovery (new)
+            content_verify = audit.get("content_verification") or {}
+            if content_verify and content_verify.get("total", 0) > 0:
+                hall_rate = content_verify.get("hallucinated", 0) / content_verify["total"]
+                if hall_rate > 0.5:  # >50% citations flagged → verify-driven recovery
+                    audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence = _try_recover(
+                        audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence,
+                        "content_verification")
 
             set_last_evidence(display_evidence, audit)
             phoenix.set_attributes(

@@ -1,5 +1,6 @@
 import json
 import re
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from langchain_core.documents import Document
@@ -21,6 +22,39 @@ STRICT_SCOPED_CLASSIC_IDS = {"critique_gotha_programme"}
 def normalize_quote(text):
     text = str(text or "")
     return re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]", "", text).lower()
+
+def fuzzy_quote_match(norm_quote, norm_text, threshold=0.65):
+    """Check if quote appears in text, tolerating OCR garbled characters.
+
+    Two-stage: (1) fast character overlap pre-filter, (2) sliding window ratio.
+    Returns (matched: bool, best_ratio: float).
+    """
+    if not norm_quote or len(norm_quote) < 5:
+        return False, 0.0
+
+    # Stage 1: character overlap pre-filter (fast)
+    q_chars = set(norm_quote)
+    t_chars = set(norm_text)
+    overlap = len(q_chars & t_chars) / len(q_chars) if q_chars else 0
+    if overlap < 0.55:
+        return False, overlap
+
+    # Stage 2: sliding window ratio check
+    q_len = len(norm_quote)
+    t_len = len(norm_text)
+    window_size = max(q_len + 20, int(q_len * 1.5))
+    best_ratio = 0.0
+    step = max(1, q_len // 3)
+
+    for start in range(0, max(1, t_len - q_len + 1), step):
+        window = norm_text[start:start + window_size]
+        ratio = SequenceMatcher(None, norm_quote, window).ratio()
+        if ratio > best_ratio:
+            best_ratio = ratio
+        if ratio >= threshold:
+            return True, ratio
+
+    return best_ratio >= threshold, best_ratio
 
 
 def extract_query_quote(query):
@@ -199,6 +233,86 @@ def hit_quality_rank(page, text, normalized_quote):
     return 1
 
 
+def collect_hits_with_constraints(query, normalized_quote, ocr_cache_dir, constraints):
+    """Scoped OCR search using work_catalog constraints (source + page_ranges)."""
+    entries = constraints.get("entries") or []
+    if not entries:
+        return []
+
+    quote = extract_query_quote(query)
+    seen = set()
+    hits = []
+
+    # Load page map for printed→PDF conversion
+    from pathlib import Path as _Path
+    import json as _json, os as _os
+    _pm_path = _Path(_os.getenv('PAGE_MAP_PATH', 'data/page_map.json'))
+    page_map = {}
+    if _pm_path.exists():
+        with open(_pm_path, encoding='utf-8') as _f:
+            _pm = _json.load(_f)
+        for _src, _data in _pm.get('sources', {}).items():
+            for _pp, _info in _data.get('pages', {}).items():
+                _printed = _info.get('printed_page')
+                _pdf = _info.get('pdf_page')
+                if _printed is not None and _pdf is not None:
+                    page_map.setdefault(_src, {})[_printed] = _pdf
+
+    for entry in entries:
+        source = entry.get('source')
+        start = entry.get('start_page')
+        end = entry.get('end_page')
+        if not source or start is None or end is None:
+            continue
+
+        for printed_page in range(start, end + 1):
+            # Convert printed page to PDF page
+            pdf_page = page_map.get(source, {}).get(printed_page) if page_map else printed_page
+            if pdf_page is None:
+                pdf_page = printed_page  # fallback: try as-is
+            path = cache_path_for_page(ocr_cache_dir, source, pdf_page)
+            if not path.exists():
+                continue
+
+            with path.open("r", encoding="utf-8") as f:
+                page = json.load(f)
+
+            if page.get("page_type") == "toc":
+                continue
+
+            cleaned_text = page.get("cleaned_text") or ""
+            norm_text = normalize_quote(cleaned_text)
+            exact_hit = normalized_quote in norm_text
+            if not exact_hit:
+                matched, _ = fuzzy_quote_match(normalized_quote, norm_text)
+                if not matched:
+                    continue
+
+            metadata = metadata_from_page(page, entry, path)
+            metadata["lookup_scope"] = "work_catalog" if exact_hit else "work_catalog_fuzzy"
+            key = (metadata["source"], metadata.get("pdf_page"))
+            if key in seen:
+                continue
+            seen.add(key)
+
+            quality = hit_quality_rank(page, cleaned_text, normalized_quote)
+            if not exact_hit:
+                quality += 3  # fuzzy hits rank below exact, but still usable
+            hits.append(
+                (
+                    (quality, entry.get("priority", 1)),
+                    Document(
+                        page_content=snippet_around(cleaned_text, quote),
+                        metadata=metadata,
+                    ),
+                )
+            )
+
+    hits.sort(key=lambda item: (item[0], item[1].metadata.get("source", ""),
+                                  item[1].metadata.get("pdf_page") or 0))
+    return hits
+
+
 def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
     quote = extract_query_quote(query)
     preferred_entries = classic_entries_for_query(query)
@@ -223,7 +337,9 @@ def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
             continue
 
         cleaned_text = page.get("cleaned_text") or ""
-        if normalized_quote not in normalize_quote(cleaned_text):
+        norm_text = normalize_quote(cleaned_text)
+        matched, _ = fuzzy_quote_match(normalized_quote, norm_text)
+        if not matched:
             continue
 
         metadata = metadata_from_page(page, entry, path, preferred_entries=preferred_entries)
@@ -258,12 +374,28 @@ def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
     return hits
 
 
-def exact_quote_lookup(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, limit=5):
+def exact_quote_lookup(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, limit=5, constraints=None):
+    """Search OCR cache for exact quote matches.
+
+    Args:
+        query: User query containing a quote.
+        ocr_cache_dir: Path to OCR cache directory.
+        limit: Max results to return.
+        constraints: Optional dict from work_catalog with 'entries' and 'page_ranges'.
+                     When provided, OCR search is scoped to these pages (much faster + precise).
+    """
     quote = extract_query_quote(query)
     normalized_quote = normalize_quote(quote)
 
     if len(normalized_quote) < 5:
         return []
+
+    # If work_catalog constraints are available, use them for scoping
+    if constraints and constraints.get("entries"):
+        hits = collect_hits_with_constraints(query, normalized_quote, ocr_cache_dir, constraints)
+        if hits:
+            return [doc for _, doc in hits[:limit]]
+        # If scoped search finds nothing, fall through to global search below
 
     preferred_entries = classic_entries_for_query(query)
     hits = collect_hits(query, normalized_quote, ocr_cache_dir, scoped=True)

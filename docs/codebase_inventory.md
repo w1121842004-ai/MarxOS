@@ -49,16 +49,16 @@ PDF
 
 ## 4. 检索分层
 
-检索现在已经从 `app.py` 中拆出，并继续细分：
+检索现在已经从 `app.py` 中拆出，并继续细分为 `retrieval/` 包：
 
 | 文件 | 核心功能 | 关联 |
 | --- | --- | --- |
-| `marxos_retrieval.py` | 对外 facade，保留统一调用面 | `app.py` |
-| `marxos_retrieval_constraints.py` | title/topic/source/page range constraints，seed queries，candidate pdf pages | `marxos_retrieval.py` |
-| `marxos_retrieval_ranking.py` | rerank、diversify、constraint annotation、topic selection | `marxos_retrieval.py` |
-| `marxos_retrieval_modes.py` | 实际 retrieval 执行、strict-title backstop、paragraph/dual retrieval、citation-page refinement | `marxos_retrieval.py` |
+| `retrieval/__init__.py` | 对外 facade，统一 public API | `app.py` |
+| `retrieval/constraints.py` | title/topic/source/page range constraints，seed queries，candidate pdf pages | `retrieval/__init__.py` |
+| `retrieval/ranking.py` | rerank、diversify、constraint annotation、topic selection | `retrieval/__init__.py` |
+| `retrieval/modes.py` | 实际 retrieval 执行、strict-title backstop、paragraph/dual retrieval、citation-page refinement | `retrieval/__init__.py` |
 
-这组模块共同替代了原先 `app.py` 中那一大段 retrieval 实现。
+这组模块共同替代了原先 `app.py` 中那一大段 retrieval 实现。旧的 `marxos_retrieval*.py` 兼容层已移除。
 
 ## 5. OCR / RAG / 语料处理
 
@@ -83,7 +83,7 @@ PDF
 | `rag/core_bibliography_catalog.json` | 核心书目目录 | `rag/core_classics.py` |
 | `rag/article_map.json` | 全量篇目映射 | 语料构建脚本 |
 | `rag/article_map_core.json` | 核心篇目映射 | `app.py`、`rag/build_vectorstore_from_cache.py` |
-| `rag/topic_catalog.json` | 专题检索目录 | `app.py`、`marxos_retrieval_*` |
+| `rag/topic_catalog.json` | 专题检索目录 | `app.py`、`retrieval/` |
 | `eval_dataset.json` | 端到端评测集 | `scripts/evaluate_eval_dataset.py` |
 | `data/page_map.json` | PDF 页与印刷页映射 | `app.py` |
 
@@ -148,12 +148,12 @@ PDF
 - OpenAI / DeepSeek client 调用包装
 - CLI `main()` 与交互层
 
-### B. retrieval facade 还可以再薄
+### B. retrieval facade 已经收口
 
-`marxos_retrieval.py` 现在只是 facade，这已经比之前好很多，但后面可以考虑：
+`retrieval/__init__.py` 现在是统一 public API（41 符号），内部 helper（`_helper`）已从 `__all__` 移除。后续可考虑：
 
-- 明确公共 API
-- 把内部 helper 只保留在子模块，不再全部从 facade 导出
+- 将 `app.py` 中 40+ 个薄 wrapper 函数的 ctx 注入逻辑下沉到 retrieval 包内部
+- 让 retrieval 包直接接受 ctx 参数，消除 `app.py` 的间接层
 
 ### C. 文档和中文编码
 
@@ -172,10 +172,9 @@ PDF
 
 如果继续做下一轮整理，建议顺序是：
 
-1. 继续压薄 `app.py`
-2. 收紧 `marxos_retrieval.py` facade 的公共导出
-3. 视需要整理 `docs/dev_logs/`
-4. 最后再考虑更大规模的目录重组
+1. 继续压薄 `app.py`（消除 retrieval 薄 wrapper）
+2. 视需要整理 `docs/dev_logs/`
+3. 最后再考虑更大规模的目录重组
 
 ## 12. 一句话总结
 

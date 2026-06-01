@@ -4,10 +4,11 @@ from pathlib import Path
 from langchain_core.documents import Document
 
 from retrieval.constraints import (
-    controlled_multi_queries,
+    _helper,
     candidate_pdf_pages_from_metadata,
     concept_seed_queries,
     constraints_from_query,
+    controlled_multi_queries,
     metadata_matches_constraints,
     page_in_expected_range,
     topic_seed_queries,
@@ -20,10 +21,6 @@ from retrieval.ranking import (
     rerank_documents,
     select_topic_documents,
 )
-
-
-def _helper(ctx, name):
-    return ctx[name]
 
 
 def _candidate_key(doc, ctx):
@@ -393,7 +390,9 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
         return locator_backstop_documents(constraints, limit=k)
 
     if allow_exact_quote and is_quote_lookup_query(query):
-        exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k)
+        # Pass work_catalog constraints to scope OCR search
+        exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k,
+                                        constraints=constraints if constraints.get("entries") else None)
         if exact_docs:
             docs = annotate_docs_with_constraints(exact_docs, constraints, ctx)
             return append_locator_backstops(docs, constraints, k, ctx)

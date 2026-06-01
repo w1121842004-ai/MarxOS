@@ -1,0 +1,1636 @@
+[
+  {
+    "id": 1,
+    "question": "哲学家们只是用不同的方式解释世界，问题在于改变世界。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "theses-feuerbach",
+    "discipline": "philosophy",
+    "difficulty": "easy",
+    "hard_negative": [
+      "german-ideology",
+      "communist-manifesto"
+    ],
+    "notes": "高频误检句"
+  },
+  {
+    "id": 2,
+    "question": "人的本质不是单个人所固有的抽象物，在其现实性上，它是一切社会关系的总和。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "theses-feuerbach",
+    "discipline": "philosophy",
+    "difficulty": "easy",
+    "hard_negative": [
+      "german-ideology"
+    ]
+  },
+  {
+    "id": 3,
+    "question": "费尔巴哈的实践观是怎么样的？",
+    "question_type": "concept_explain",
+    "expected_work_id": "theses-feuerbach",
+    "discipline": "philosophy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 4,
+    "question": "马克思如何理解实践这个概念？",
+    "question_type": "concept_explain",
+    "expected_work_id": "theses-feuerbach",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 5,
+    "question": "《关于费尔巴哈的提纲》中马克思批判了费尔巴哈唯物主义的什么缺陷？",
+    "question_type": "analysis",
+    "expected_work_id": "theses-feuerbach",
+    "discipline": "philosophy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 6,
+    "question": "意识在任何时候都只能是被意识到了的存在。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "german-ideology",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 7,
+    "question": "不是意识决定生活，而是生活决定意识。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "german-ideology",
+    "discipline": "philosophy",
+    "difficulty": "easy",
+    "hard_negative": [
+      "preface-critique-political-economy"
+    ],
+    "notes": "易与《政治经济学批判序言》混淆"
+  },
+  {
+    "id": 8,
+    "question": "什么是历史唯物主义的基本原理？",
+    "question_type": "concept_explain",
+    "expected_work_id": "german-ideology",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 9,
+    "question": "马克思和恩格斯在《德意志意识形态》中如何论述分工与所有制的关系？",
+    "question_type": "analysis",
+    "expected_work_id": "german-ideology",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 10,
+    "question": "《德意志意识形态》中'消灭分工'的含义是什么？",
+    "question_type": "concept_explain",
+    "expected_work_id": "german-ideology",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 11,
+    "question": "马克思在《1844年经济学哲学手稿》中如何论述异化劳动的四个规定？",
+    "question_type": "analysis",
+    "expected_work_id": "economic-philosophic-manuscripts-1844",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 12,
+    "question": "异化劳动这个概念在马克思著作中是什么意思？",
+    "question_type": "concept_explain",
+    "expected_work_id": "economic-philosophic-manuscripts-1844",
+    "discipline": "philosophy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 13,
+    "question": "马克思在手稿中如何批判黑格尔的辩证法？",
+    "question_type": "analysis",
+    "expected_work_id": "economic-philosophic-manuscripts-1844",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 14,
+    "question": "《1844年手稿》中'劳动为富人生产了奇迹般的东西，但是为工人生产了赤贫'的含义",
+    "question_type": "quote_lookup",
+    "expected_work_id": "economic-philosophic-manuscripts-1844",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 15,
+    "question": "马克思的'人的本质'思想在《1844年手稿》和《关于费尔巴哈的提纲》中有何不同？",
+    "question_type": "analysis",
+    "expected_work_id": "economic-philosophic-manuscripts-1844",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 16,
+    "question": "宗教是人民的鸦片。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "critique-hegel-law-intro",
+    "discipline": "philosophy",
+    "difficulty": "easy",
+    "hard_negative": [
+      "german-ideology",
+      "on-the-jewish-question"
+    ],
+    "notes": "极易误检"
+  },
+  {
+    "id": 17,
+    "question": "批判的武器当然不能代替武器的批判，物质力量只能用物质力量来摧毁。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "critique-hegel-law-intro",
+    "discipline": "philosophy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 18,
+    "question": "马克思在《〈黑格尔法哲学批判〉导言》中如何论述无产阶级的历史使命？",
+    "question_type": "analysis",
+    "expected_work_id": "critique-hegel-law-intro",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 19,
+    "question": "全部哲学，特别是近代哲学的重大的基本问题，是思维和存在的关系问题。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "ludwig-feuerbach",
+    "discipline": "philosophy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 20,
+    "question": "恩格斯如何论述哲学基本问题？",
+    "question_type": "concept_explain",
+    "expected_work_id": "ludwig-feuerbach",
+    "discipline": "philosophy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 21,
+    "question": "恩格斯在《路德维希·费尔巴哈和德国古典哲学的终结》中如何评价黑格尔哲学？",
+    "question_type": "analysis",
+    "expected_work_id": "ludwig-feuerbach",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 22,
+    "question": "恩格斯在《反杜林论》中如何阐述唯物辩证法？",
+    "question_type": "analysis",
+    "expected_work_id": "anti-duhring",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 23,
+    "question": "《反杜林论》哲学编的主要内容是什么？",
+    "question_type": "analysis",
+    "expected_work_id": "anti-duhring",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 24,
+    "question": "劳动创造了人本身。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "dialectics-nature",
+    "discipline": "philosophy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 25,
+    "question": "恩格斯在《自然辩证法》中如何论述劳动在从猿到人转变过程中的作用？",
+    "question_type": "analysis",
+    "expected_work_id": "dialectics-nature",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 26,
+    "question": "《自然辩证法》中关于物质运动形式的论述",
+    "question_type": "analysis",
+    "expected_work_id": "dialectics-nature",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 27,
+    "question": "历史活动是群众的活动，随着历史活动的深入，必将是群众队伍的扩大。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "holy-family",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 28,
+    "question": "《神圣家族》中马克思和恩格斯如何批判青年黑格尔派？",
+    "question_type": "analysis",
+    "expected_work_id": "holy-family",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 29,
+    "question": "《神圣家族》对法国唯物主义的论述",
+    "question_type": "analysis",
+    "expected_work_id": "holy-family",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 30,
+    "question": "《哲学的贫困》中马克思如何批判蒲鲁东的经济学方法？",
+    "question_type": "analysis",
+    "expected_work_id": "poverty-philosophy",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 31,
+    "question": "不是人们的意识决定人们的存在，而是人们的社会存在决定人们的意识。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "preface-critique-political-economy",
+    "discipline": "philosophy",
+    "difficulty": "easy",
+    "hard_negative": [
+      "german-ideology"
+    ],
+    "notes": "易与《德意志意识形态》混淆"
+  },
+  {
+    "id": 32,
+    "question": "物质生活的生产方式制约着整个社会生活、政治生活和精神生活的过程。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "preface-critique-political-economy",
+    "discipline": "philosophy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 33,
+    "question": "马克思在《〈政治经济学批判〉序言》中对历史唯物主义的经典表述",
+    "question_type": "analysis",
+    "expected_work_id": "preface-critique-political-economy",
+    "discipline": "philosophy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 34,
+    "question": "马克思的意识形态概念是如何形成的？",
+    "question_type": "concept_explain",
+    "expected_work_id": "german-ideology",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 35,
+    "question": "什么是唯物辩证法？",
+    "question_type": "concept_explain",
+    "expected_work_id": "anti-duhring",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 36,
+    "question": "马克思如何理解社会存在和社会意识的关系？",
+    "question_type": "concept_explain",
+    "expected_work_id": "preface-critique-political-economy",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 37,
+    "question": "马克思的共产主义思想与空想社会主义有何区别？",
+    "question_type": "analysis",
+    "expected_work_id": "communist-manifesto",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 38,
+    "question": "如何理解'人也按照美的规律来构造'？",
+    "question_type": "quote_lookup",
+    "expected_work_id": "economic-philosophic-manuscripts-1844",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 39,
+    "question": "恩格斯在《国民经济学批判大纲》中如何批判私有制？",
+    "question_type": "analysis",
+    "expected_work_id": "outlines-critique-political-economy",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 40,
+    "question": "马克思对宗教批判的核心观点是什么？",
+    "question_type": "concept_explain",
+    "expected_work_id": "critique-hegel-law-intro",
+    "discipline": "philosophy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 41,
+    "question": "资本来到世间，从头到脚，每个毛孔都滴着血和肮脏的东西。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "easy",
+    "hard_negative": [
+      "wage-labour-capital"
+    ]
+  },
+  {
+    "id": 42,
+    "question": "商品是天生的平等派。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 43,
+    "question": "马克思在哪里论述了商品拜物教？",
+    "question_type": "bibliographic",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "easy",
+    "hard_negative": [
+      "economic-philosophic-manuscripts-1844"
+    ]
+  },
+  {
+    "id": 44,
+    "question": "什么是商品拜物教？",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 45,
+    "question": "马克思的劳动二重性理论",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 46,
+    "question": "剩余价值是怎么产生的？",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 47,
+    "question": "绝对剩余价值和相对剩余价值的区别是什么？",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 48,
+    "question": "马克思如何论述资本原始积累？",
+    "question_type": "analysis",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 49,
+    "question": "什么是资本的有机构成？",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 50,
+    "question": "马克思在《资本论》中如何论述价值形式的发展？",
+    "question_type": "analysis",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 51,
+    "question": "资本主义积累的一般规律是什么？",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 52,
+    "question": "马克思如何理解'货币转化为资本'？",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 53,
+    "question": "《资本论》第一卷中工作日一章的主要内容",
+    "question_type": "analysis",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 54,
+    "question": "马克思如何分析资本的循环和周转？",
+    "question_type": "analysis",
+    "expected_work_id": "capital-vol2",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 55,
+    "question": "社会总资本的再生产理论",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol2",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 56,
+    "question": "马克思的平均利润率理论",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol3",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 57,
+    "question": "马克思的地租理论",
+    "question_type": "analysis",
+    "expected_work_id": "capital-vol3",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 58,
+    "question": "利润率趋向下降的规律",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol3",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 59,
+    "question": "什么是雇佣劳动？",
+    "question_type": "concept_explain",
+    "expected_work_id": "wage-labour-capital",
+    "discipline": "political_economy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 60,
+    "question": "《雇佣劳动与资本》中工资的本质是什么？",
+    "question_type": "analysis",
+    "expected_work_id": "wage-labour-capital",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 61,
+    "question": "工资和利润的关系是怎样的？",
+    "question_type": "concept_explain",
+    "expected_work_id": "value-price-profit",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 62,
+    "question": "马克思在《工资、价格和利润》中如何论述工人阶级争取提高工资的斗争？",
+    "question_type": "analysis",
+    "expected_work_id": "value-price-profit",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 63,
+    "question": "马克思在《1857-1858年经济学手稿》中如何论述前资本主义所有制形式？",
+    "question_type": "analysis",
+    "expected_work_id": "grundrisse-selections",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 64,
+    "question": "马克思如何区分生产劳动和非生产劳动？",
+    "question_type": "concept_explain",
+    "expected_work_id": "manuscripts-1861-1863-selections",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 65,
+    "question": "马克思在《政治经济学批判》导言中如何论述生产与消费的关系？",
+    "question_type": "analysis",
+    "expected_work_id": "grundrisse-introduction",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 66,
+    "question": "《1861-1863年手稿》中关于机器的论述",
+    "question_type": "analysis",
+    "expected_work_id": "manuscripts-1861-1863-selections",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 67,
+    "question": "'资本主义生产以前的各种形式'出自哪部著作？",
+    "question_type": "bibliographic",
+    "expected_work_id": "grundrisse-selections",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 68,
+    "question": "关于自由贸易问题的演说中马克思的核心观点",
+    "question_type": "analysis",
+    "expected_work_id": "speech-free-trade",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 69,
+    "question": "恩格斯如何论述保护关税和自由贸易？",
+    "question_type": "analysis",
+    "expected_work_id": "protection-and-free-trade",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 70,
+    "question": "国民经济学批判大纲中恩格斯的政治经济学批判",
+    "question_type": "analysis",
+    "expected_work_id": "outlines-critique-political-economy",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 71,
+    "question": "马克思对法国动产信用公司的分析",
+    "question_type": "analysis",
+    "expected_work_id": "credit-mobilier",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 72,
+    "question": "什么是价值规律？",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 73,
+    "question": "马克思如何分析经济危机？",
+    "question_type": "analysis",
+    "expected_work_id": "manuscripts-1861-1863-selections",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 74,
+    "question": "《资本论》中'原始积累的秘密'指的是什么？",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "easy"
+  },
+  {
+    "id": 75,
+    "question": "马克思的剩余价值理论的主要内容",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 76,
+    "question": "恩格斯在《国民经济学批判大纲》中对马尔萨斯人口论的批判",
+    "question_type": "analysis",
+    "expected_work_id": "outlines-critique-political-economy",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 77,
+    "question": "《哲学的贫困》中马克思的政治经济学方法",
+    "question_type": "analysis",
+    "expected_work_id": "poverty-philosophy",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 78,
+    "question": "'资本是死劳动，它像吸血鬼一样，只有吮吸活劳动才有生命'出自哪里？",
+    "question_type": "bibliographic",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 79,
+    "question": "马克思的劳动价值论的主要内容",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 80,
+    "question": "资本主义生产的总过程",
+    "question_type": "analysis",
+    "expected_work_id": "capital-vol3",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 81,
+    "question": "一个幽灵，共产主义的幽灵，在欧洲游荡。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "communist-manifesto",
+    "discipline": "scientific_socialism",
+    "difficulty": "easy"
+  },
+  {
+    "id": 82,
+    "question": "全世界无产者，联合起来！",
+    "question_type": "quote_lookup",
+    "expected_work_id": "communist-manifesto",
+    "discipline": "scientific_socialism",
+    "difficulty": "easy",
+    "hard_negative": [
+      "principles-communism",
+      "capital-vol1"
+    ]
+  },
+  {
+    "id": 83,
+    "question": "每个人的自由发展是一切人的自由发展的条件。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "communist-manifesto",
+    "discipline": "scientific_socialism",
+    "difficulty": "easy",
+    "hard_negative": [
+      "critique-gotha-programme"
+    ]
+  },
+  {
+    "id": 84,
+    "question": "共产党宣言的主要内容是什么？",
+    "question_type": "analysis",
+    "expected_work_id": "communist-manifesto",
+    "discipline": "scientific_socialism",
+    "difficulty": "easy"
+  },
+  {
+    "id": 85,
+    "question": "《共产党宣言》中关于阶级斗争的论述",
+    "question_type": "analysis",
+    "expected_work_id": "communist-manifesto",
+    "discipline": "scientific_socialism",
+    "difficulty": "easy"
+  },
+  {
+    "id": 86,
+    "question": "《共产党宣言》中'工人没有祖国'的含义是什么？",
+    "question_type": "concept_explain",
+    "expected_work_id": "communist-manifesto",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 87,
+    "question": "马克思关于无产阶级专政的论述出自哪部著作？",
+    "question_type": "bibliographic",
+    "expected_work_id": "class-struggles-france",
+    "discipline": "state_revolution_military",
+    "difficulty": "medium"
+  },
+  {
+    "id": 88,
+    "question": "人们自己创造自己的历史，但并不是随心所欲地创造。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "eighteenth-brumaire",
+    "discipline": "state_revolution_military",
+    "difficulty": "easy"
+  },
+  {
+    "id": 89,
+    "question": "马克思在《路易·波拿巴的雾月十八日》中如何分析国家机器？",
+    "question_type": "analysis",
+    "expected_work_id": "eighteenth-brumaire",
+    "discipline": "state_revolution_military",
+    "difficulty": "medium"
+  },
+  {
+    "id": 90,
+    "question": "马克思如何分析法国农民阶级？",
+    "question_type": "analysis",
+    "expected_work_id": "eighteenth-brumaire",
+    "discipline": "state_revolution_military",
+    "difficulty": "medium"
+  },
+  {
+    "id": 91,
+    "question": "'革命是历史的火车头'出自哪部著作？",
+    "question_type": "bibliographic",
+    "expected_work_id": "class-struggles-france",
+    "discipline": "state_revolution_military",
+    "difficulty": "medium"
+  },
+  {
+    "id": 92,
+    "question": "工人阶级不能简单地掌握现成的国家机器，并运用它来达到自己的目的。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "civil-war-france",
+    "discipline": "state_revolution_military",
+    "difficulty": "easy"
+  },
+  {
+    "id": 93,
+    "question": "马克思如何总结巴黎公社的经验教训？",
+    "question_type": "analysis",
+    "expected_work_id": "civil-war-france",
+    "discipline": "state_revolution_military",
+    "difficulty": "medium"
+  },
+  {
+    "id": 94,
+    "question": "《法兰西内战》中关于打碎旧国家机器的论述",
+    "question_type": "analysis",
+    "expected_work_id": "civil-war-france",
+    "discipline": "state_revolution_military",
+    "difficulty": "medium"
+  },
+  {
+    "id": 95,
+    "question": "各尽所能，按需分配。",
+    "question_type": "quote_lookup",
+    "expected_work_id": "critique-gotha-programme",
+    "discipline": "scientific_socialism",
+    "difficulty": "easy"
+  },
+  {
+    "id": 96,
+    "question": "马克思在《哥达纲领批判》中如何论述共产主义社会的两个阶段？",
+    "question_type": "analysis",
+    "expected_work_id": "critique-gotha-programme",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 97,
+    "question": "过渡时期的国家只能是无产阶级的革命专政",
+    "question_type": "quote_lookup",
+    "expected_work_id": "critique-gotha-programme",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 98,
+    "question": "恩格斯如何论述社会主义从空想到科学的发展？",
+    "question_type": "analysis",
+    "expected_work_id": "socialism-utopian-scientific",
+    "discipline": "scientific_socialism",
+    "difficulty": "easy"
+  },
+  {
+    "id": 99,
+    "question": "科学社会主义与空想社会主义的根本区别是什么？",
+    "question_type": "concept_explain",
+    "expected_work_id": "socialism-utopian-scientific",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 100,
+    "question": "恩格斯如何论述国家的起源？",
+    "question_type": "concept_explain",
+    "expected_work_id": "origin-family-private-property-state",
+    "discipline": "state_revolution_military",
+    "difficulty": "easy"
+  },
+  {
+    "id": 101,
+    "question": "《家庭、私有制和国家的起源》中关于妇女解放的论述",
+    "question_type": "analysis",
+    "expected_work_id": "origin-family-private-property-state",
+    "discipline": "state_revolution_military",
+    "difficulty": "medium"
+  },
+  {
+    "id": 102,
+    "question": "恩格斯在《德国农民战争》中如何分析宗教改革时期的阶级关系？",
+    "question_type": "analysis",
+    "expected_work_id": "peasant-war-germany",
+    "discipline": "peasant_land",
+    "difficulty": "hard"
+  },
+  {
+    "id": 103,
+    "question": "《德国的革命和反革命》的主要内容",
+    "question_type": "analysis",
+    "expected_work_id": "revolution-counterrevolution-germany",
+    "discipline": "state_revolution_military",
+    "difficulty": "hard"
+  },
+  {
+    "id": 104,
+    "question": "恩格斯在《法德农民问题》中如何论述农民合作社？",
+    "question_type": "analysis",
+    "expected_work_id": "peasant-question-france-germany",
+    "discipline": "peasant_land",
+    "difficulty": "medium"
+  },
+  {
+    "id": 105,
+    "question": "恩格斯关于工农联盟的思想",
+    "question_type": "concept_explain",
+    "expected_work_id": "peasant-question-france-germany",
+    "discipline": "peasant_land",
+    "difficulty": "medium"
+  },
+  {
+    "id": 106,
+    "question": "恩格斯为什么说权威在任何社会都是必要的？",
+    "question_type": "concept_explain",
+    "expected_work_id": "on-authority",
+    "discipline": "state_revolution_military",
+    "difficulty": "medium"
+  },
+  {
+    "id": 107,
+    "question": "恩格斯的《论住宅问题》主要批判了哪种观点？",
+    "question_type": "analysis",
+    "expected_work_id": "housing-question",
+    "discipline": "state_revolution_military",
+    "difficulty": "hard"
+  },
+  {
+    "id": 108,
+    "question": "《国际工人协会成立宣言》的主要内容",
+    "question_type": "analysis",
+    "expected_work_id": "inaugural-address-iwa",
+    "discipline": "party_labor",
+    "difficulty": "hard"
+  },
+  {
+    "id": 109,
+    "question": "《国际工人协会共同章程》的核心原则",
+    "question_type": "analysis",
+    "expected_work_id": "inaugural-address-iwa",
+    "discipline": "party_labor",
+    "difficulty": "hard"
+  },
+  {
+    "id": 110,
+    "question": "马克思如何论述英国对印度的殖民统治？",
+    "question_type": "analysis",
+    "expected_work_id": "british-rule-india",
+    "discipline": "national_colonial",
+    "difficulty": "medium"
+  },
+  {
+    "id": 111,
+    "question": "马克思论鸦片贸易",
+    "question_type": "analysis",
+    "expected_work_id": "opium-trade",
+    "discipline": "national_colonial",
+    "difficulty": "medium"
+  },
+  {
+    "id": 112,
+    "question": "马克思如何分析中国革命和欧洲革命的关系？",
+    "question_type": "analysis",
+    "expected_work_id": "revolution-china-europe",
+    "discipline": "national_colonial",
+    "difficulty": "medium"
+  },
+  {
+    "id": 113,
+    "question": "恩格斯在1895年《〈法兰西阶级斗争〉导言》中如何论述革命策略？",
+    "question_type": "analysis",
+    "expected_work_id": "introduction-class-struggles-france-1895",
+    "discipline": "state_revolution_military",
+    "difficulty": "hard"
+  },
+  {
+    "id": 114,
+    "question": "恩格斯如何论述俄国沙皇政府的对外政策？",
+    "question_type": "analysis",
+    "expected_work_id": "foreign-policy-russian-tsarism",
+    "discipline": "national_colonial",
+    "difficulty": "hard"
+  },
+  {
+    "id": 115,
+    "question": "《1891年社会民主党纲领草案批判》的主要内容",
+    "question_type": "analysis",
+    "expected_work_id": "critique-social-democratic-program-1891",
+    "discipline": "party_labor",
+    "difficulty": "hard"
+  },
+  {
+    "id": 116,
+    "question": "恩格斯在《共产主义原理》中如何回答'什么是共产主义'？",
+    "question_type": "concept_explain",
+    "expected_work_id": "principles-communism",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 117,
+    "question": "废除私有制的主张在恩格斯著作中是如何阐述的？",
+    "question_type": "analysis",
+    "expected_work_id": "principles-communism",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 118,
+    "question": "马克思主义的国家学说",
+    "question_type": "concept_explain",
+    "expected_work_id": "origin-family-private-property-state",
+    "discipline": "state_revolution_military",
+    "difficulty": "medium"
+  },
+  {
+    "id": 119,
+    "question": "无产阶级政党的性质和作用",
+    "question_type": "analysis",
+    "expected_work_id": "communist-manifesto",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 120,
+    "question": "马克思和恩格斯如何看待民族问题？",
+    "question_type": "analysis",
+    "expected_work_id": "speech-on-poland",
+    "discipline": "national_colonial",
+    "difficulty": "hard"
+  },
+  {
+    "id": 121,
+    "question": "恩格斯如何分析原始基督教的历史？",
+    "question_type": "analysis",
+    "expected_work_id": "primitive-christianity",
+    "discipline": "history_religion_culture",
+    "difficulty": "medium"
+  },
+  {
+    "id": 122,
+    "question": "《家庭、私有制和国家的起源》如何论述从原始社会到文明社会的过渡？",
+    "question_type": "analysis",
+    "expected_work_id": "origin-family-private-property-state",
+    "discipline": "history_religion_culture",
+    "difficulty": "medium"
+  },
+  {
+    "id": 123,
+    "question": "马克思在《论犹太人问题》中如何区分政治解放和人类解放？",
+    "question_type": "analysis",
+    "expected_work_id": "on-the-jewish-question",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 124,
+    "question": "宗教是人民的鸦片——马克思这句话的上下文是什么？",
+    "question_type": "quote_lookup",
+    "expected_work_id": "critique-hegel-law-intro",
+    "discipline": "history_religion_culture",
+    "difficulty": "easy"
+  },
+  {
+    "id": 125,
+    "question": "《英国工人阶级状况》中恩格斯如何描述工人的居住条件？",
+    "question_type": "analysis",
+    "expected_work_id": "condition-working-class-england",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 126,
+    "question": "恩格斯《论封建制度的瓦解和民族国家的产生》的核心观点",
+    "question_type": "analysis",
+    "expected_work_id": "decline-feudalism-rise-nation-states",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 127,
+    "question": "马克思如何评价蒲鲁东？",
+    "question_type": "analysis",
+    "expected_work_id": "on-proudhon",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 128,
+    "question": "正像达尔文发现有机界的发展规律一样，马克思发现了人类历史的发展规律",
+    "question_type": "quote_lookup",
+    "expected_work_id": "marx-graveside-speech",
+    "discipline": "history_religion_culture",
+    "difficulty": "easy"
+  },
+  {
+    "id": 129,
+    "question": "恩格斯在《关于普鲁士农民的历史》中如何论述农奴制的废除？",
+    "question_type": "analysis",
+    "expected_work_id": "prussian-peasant-history",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 130,
+    "question": "《英国状况 十八世纪》中恩格斯如何分析工业革命的社会影响？",
+    "question_type": "analysis",
+    "expected_work_id": "condition-england-18th-century",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 131,
+    "question": "《国际工人协会成立宣言》中马克思提出了什么核心主张？",
+    "question_type": "analysis",
+    "expected_work_id": "inaugural-address-iwa",
+    "discipline": "party_labor",
+    "difficulty": "medium"
+  },
+  {
+    "id": 132,
+    "question": "恩格斯在《关于共产主义者同盟的历史》中如何回顾同盟的创建？",
+    "question_type": "analysis",
+    "expected_work_id": "history-communist-league",
+    "discipline": "party_labor",
+    "difficulty": "medium"
+  },
+  {
+    "id": 133,
+    "question": "《共产主义者同盟中央委员会告同盟书》中不断革命的口号",
+    "question_type": "quote_lookup",
+    "expected_work_id": "address-central-authority",
+    "discipline": "party_labor",
+    "difficulty": "medium"
+  },
+  {
+    "id": 134,
+    "question": "《1891年社会民主党纲领草案批判》中恩格斯对爱尔福特纲领的批评",
+    "question_type": "analysis",
+    "expected_work_id": "critique-social-democratic-program-1891",
+    "discipline": "party_labor",
+    "difficulty": "hard"
+  },
+  {
+    "id": 135,
+    "question": "恩格斯在《美国工人运动》中如何看待美国无产阶级？",
+    "question_type": "analysis",
+    "expected_work_id": "american-labor-movement",
+    "discipline": "party_labor",
+    "difficulty": "hard"
+  },
+  {
+    "id": 136,
+    "question": "恩格斯在《法德农民问题》中提出如何对待小农？",
+    "question_type": "analysis",
+    "expected_work_id": "peasant-question-france-germany",
+    "discipline": "peasant_land",
+    "difficulty": "medium"
+  },
+  {
+    "id": 137,
+    "question": "恩格斯论述农民合作社的原则是什么？",
+    "question_type": "concept_explain",
+    "expected_work_id": "peasant-question-france-germany",
+    "discipline": "peasant_land",
+    "difficulty": "medium"
+  },
+  {
+    "id": 138,
+    "question": "《德国农民战争》中恩格斯如何分析1525年起义失败的原因？",
+    "question_type": "analysis",
+    "expected_work_id": "peasant-war-germany",
+    "discipline": "peasant_land",
+    "difficulty": "medium"
+  },
+  {
+    "id": 139,
+    "question": "恩格斯如何分析德国农民阶级的历史变化？",
+    "question_type": "analysis",
+    "expected_work_id": "prussian-peasant-history",
+    "discipline": "peasant_land",
+    "difficulty": "hard"
+  },
+  {
+    "id": 140,
+    "question": "马克思在《路易·波拿巴的雾月十八日》中如何分析法国小农？",
+    "question_type": "analysis",
+    "expected_work_id": "eighteenth-brumaire",
+    "discipline": "peasant_land",
+    "difficulty": "medium"
+  },
+  {
+    "id": 141,
+    "question": "不列颠在印度的统治具有哪双重使命？",
+    "question_type": "analysis",
+    "expected_work_id": "future-results-british-rule-india",
+    "discipline": "national_colonial",
+    "difficulty": "medium"
+  },
+  {
+    "id": 142,
+    "question": "马克思如何评价英国对印度的殖民统治？",
+    "question_type": "analysis",
+    "expected_work_id": "british-rule-india",
+    "discipline": "national_colonial",
+    "difficulty": "easy"
+  },
+  {
+    "id": 144,
+    "question": "恩格斯在《波斯和中国》中如何分析亚洲民族的抵抗？",
+    "question_type": "analysis",
+    "expected_work_id": "persia-and-china",
+    "discipline": "national_colonial",
+    "difficulty": "hard"
+  },
+  {
+    "id": 145,
+    "question": "马克思论英中条约的不平等性质",
+    "question_type": "analysis",
+    "expected_work_id": "anglo-chinese-treaty",
+    "discipline": "national_colonial",
+    "difficulty": "medium"
+  },
+  {
+    "id": 146,
+    "question": "《关于波兰的演说》中马克思和恩格斯对民族解放的态度",
+    "question_type": "analysis",
+    "expected_work_id": "speech-on-poland",
+    "discipline": "national_colonial",
+    "difficulty": "medium"
+  },
+  {
+    "id": 147,
+    "question": "马克思在《国际工人协会成立宣言》中如何论述工人阶级的解放？",
+    "question_type": "analysis",
+    "expected_work_id": "inaugural-address-iwa",
+    "discipline": "party_labor",
+    "difficulty": "medium"
+  },
+  {
+    "id": 148,
+    "question": "《共产主义者同盟中央委员会告同盟书》的核心内容",
+    "question_type": "analysis",
+    "expected_work_id": "address-central-authority",
+    "discipline": "party_labor",
+    "difficulty": "hard"
+  },
+  {
+    "id": 149,
+    "question": "恩格斯论述美国工人运动的特点",
+    "question_type": "analysis",
+    "expected_work_id": "american-labor-movement",
+    "discipline": "party_labor",
+    "difficulty": "hard"
+  },
+  {
+    "id": 150,
+    "question": "《给倍倍尔、李卜克内西、白拉克等人的通告信》的背景",
+    "question_type": "analysis",
+    "expected_work_id": "circular-letter-bebel-liebknecht",
+    "discipline": "party_labor",
+    "difficulty": "hard"
+  },
+  {
+    "id": 151,
+    "question": "恩格斯在《德国的社会主义》中如何评价德国社会民主党？",
+    "question_type": "analysis",
+    "expected_work_id": "socialism-germany",
+    "discipline": "party_labor",
+    "difficulty": "hard"
+  },
+  {
+    "id": 152,
+    "question": "马克思和恩格斯关于党的纪律的论述",
+    "question_type": "concept_explain",
+    "expected_work_id": "circular-letter-bebel-liebknecht",
+    "discipline": "party_labor",
+    "difficulty": "hard"
+  },
+  {
+    "id": 153,
+    "question": "第一国际时期马克思和恩格斯的主要活动",
+    "question_type": "analysis",
+    "expected_work_id": "inaugural-address-iwa",
+    "discipline": "party_labor",
+    "difficulty": "medium"
+  },
+  {
+    "id": 154,
+    "question": "马克思在《资本论》中如何论述土地私有制？",
+    "question_type": "analysis",
+    "expected_work_id": "capital-vol1",
+    "discipline": "peasant_land",
+    "difficulty": "hard"
+  },
+  {
+    "id": 155,
+    "question": "恩格斯对法国和德国农民问题的比较分析",
+    "question_type": "analysis",
+    "expected_work_id": "peasant-question-france-germany",
+    "discipline": "peasant_land",
+    "difficulty": "hard"
+  },
+  {
+    "id": 156,
+    "question": "《德国农民战争》中恩格斯对闵采尔的评价",
+    "question_type": "analysis",
+    "expected_work_id": "peasant-war-germany",
+    "discipline": "peasant_land",
+    "difficulty": "hard"
+  },
+  {
+    "id": 157,
+    "question": "马克思论小块土地所有制",
+    "question_type": "concept_explain",
+    "expected_work_id": "eighteenth-brumaire",
+    "discipline": "peasant_land",
+    "difficulty": "hard"
+  },
+  {
+    "id": 158,
+    "question": "恩格斯论农民同盟军的作用",
+    "question_type": "analysis",
+    "expected_work_id": "peasant-question-france-germany",
+    "discipline": "peasant_land",
+    "difficulty": "medium"
+  },
+  {
+    "id": 159,
+    "question": "《法德农民问题》中合作社的具体组织形式",
+    "question_type": "analysis",
+    "expected_work_id": "peasant-question-france-germany",
+    "discipline": "peasant_land",
+    "difficulty": "hard"
+  },
+  {
+    "id": 160,
+    "question": "马克思和恩格斯对农民阶级的革命性分析",
+    "question_type": "concept_explain",
+    "expected_work_id": "class-struggles-france",
+    "discipline": "peasant_land",
+    "difficulty": "medium"
+  },
+  {
+    "id": 161,
+    "question": "马克思论英国在印度的双重使命",
+    "question_type": "analysis",
+    "expected_work_id": "future-results-british-rule-india",
+    "discipline": "national_colonial",
+    "difficulty": "medium"
+  },
+  {
+    "id": 162,
+    "question": "《英人在华的残暴行动》中马克思对鸦片战争的谴责",
+    "question_type": "analysis",
+    "expected_work_id": "english-atrocities-china",
+    "discipline": "national_colonial",
+    "difficulty": "medium"
+  },
+  {
+    "id": 163,
+    "question": "马克思论俄国在远东的扩张",
+    "question_type": "analysis",
+    "expected_work_id": "russian-success-far-east",
+    "discipline": "national_colonial",
+    "difficulty": "hard"
+  },
+  {
+    "id": 164,
+    "question": "恩格斯论波兰民族解放运动的意义",
+    "question_type": "analysis",
+    "expected_work_id": "speech-on-poland",
+    "discipline": "national_colonial",
+    "difficulty": "hard"
+  },
+  {
+    "id": 165,
+    "question": "马克思对自由贸易的批判与殖民地问题",
+    "question_type": "analysis",
+    "expected_work_id": "speech-free-trade",
+    "discipline": "national_colonial",
+    "difficulty": "hard"
+  },
+  {
+    "id": 166,
+    "question": "恩格斯在《共产主义原理》中如何描述未来共产主义社会？",
+    "question_type": "analysis",
+    "expected_work_id": "principles-communism",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 167,
+    "question": "《社会主义从空想到科学的发展》中唯物史观与剩余价值的关系",
+    "question_type": "analysis",
+    "expected_work_id": "socialism-utopian-scientific",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 168,
+    "question": "马克思在《哥达纲领批判》中批判了拉萨尔主义的哪些观点？",
+    "question_type": "analysis",
+    "expected_work_id": "critique-gotha-programme",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 169,
+    "question": "《共产党宣言》1872年德文版序言的主要内容",
+    "question_type": "analysis",
+    "expected_work_id": "communist-manifesto",
+    "discipline": "scientific_socialism",
+    "difficulty": "hard"
+  },
+  {
+    "id": 170,
+    "question": "共产主义社会两个阶段的理论",
+    "question_type": "concept_explain",
+    "expected_work_id": "critique-gotha-programme",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  },
+  {
+    "id": 171,
+    "question": "恩格斯在《德国的革命和反革命》中如何分析1848年革命的失败？",
+    "question_type": "analysis",
+    "expected_work_id": "revolution-counterrevolution-germany",
+    "discipline": "state_revolution_military",
+    "difficulty": "hard"
+  },
+  {
+    "id": 172,
+    "question": "马克思论波拿巴主义的历史特征",
+    "question_type": "concept_explain",
+    "expected_work_id": "eighteenth-brumaire",
+    "discipline": "state_revolution_military",
+    "difficulty": "hard"
+  },
+  {
+    "id": 173,
+    "question": "恩格斯军事理论的核心观点",
+    "question_type": "concept_explain",
+    "expected_work_id": "conditions-war-1852",
+    "discipline": "state_revolution_military",
+    "difficulty": "hard"
+  },
+  {
+    "id": 174,
+    "question": "马克思和恩格斯对巴枯宁无政府主义的批判",
+    "question_type": "analysis",
+    "expected_work_id": "bakunin-state-anarchism-summary",
+    "discipline": "state_revolution_military",
+    "difficulty": "hard"
+  },
+  {
+    "id": 175,
+    "question": "恩格斯晚年对革命策略的重新思考",
+    "question_type": "analysis",
+    "expected_work_id": "introduction-class-struggles-france-1895",
+    "discipline": "state_revolution_military",
+    "difficulty": "medium"
+  },
+  {
+    "id": 176,
+    "question": "恩格斯论原始基督教与现代社会主义的相似性",
+    "question_type": "analysis",
+    "expected_work_id": "primitive-christianity",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 177,
+    "question": "马克思和恩格斯如何评价费尔巴哈的历史地位？",
+    "question_type": "analysis",
+    "expected_work_id": "ludwig-feuerbach",
+    "discipline": "history_religion_culture",
+    "difficulty": "medium"
+  },
+  {
+    "id": 178,
+    "question": "《马克思和新莱茵报》中恩格斯对1848年革命的回顾",
+    "question_type": "analysis",
+    "expected_work_id": "marx-and-neue-rheinische-zeitung",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 179,
+    "question": "论封建制度的瓦解和民族国家的产生——恩格斯的历史分析",
+    "question_type": "analysis",
+    "expected_work_id": "decline-feudalism-rise-nation-states",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 180,
+    "question": "资本主义为什么首先在西欧产生",
+    "question_type": "analysis",
+    "expected_work_id": "capital-vol1",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 181,
+    "question": "《关于费尔巴哈的提纲》中革命的实践的含义",
+    "question_type": "concept_explain",
+    "expected_work_id": "theses-feuerbach",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 182,
+    "question": "恩格斯在《自然辩证法》中如何论述辩证法的三大规律？",
+    "question_type": "analysis",
+    "expected_work_id": "dialectics-nature",
+    "discipline": "philosophy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 183,
+    "question": "《神圣家族》中历史活动是群众的活动这一命题",
+    "question_type": "concept_explain",
+    "expected_work_id": "holy-family",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 184,
+    "question": "马克思对黑格尔唯心主义辩证法的批判与继承",
+    "question_type": "analysis",
+    "expected_work_id": "economic-philosophic-manuscripts-1844",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 185,
+    "question": "《德意志意识形态》中市民社会概念的含义",
+    "question_type": "concept_explain",
+    "expected_work_id": "german-ideology",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 186,
+    "question": "马克思对重农学派的评价",
+    "question_type": "analysis",
+    "expected_work_id": "manuscripts-1861-1863-selections",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 187,
+    "question": "马克思论资本主义信用制度",
+    "question_type": "analysis",
+    "expected_work_id": "capital-vol3",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 188,
+    "question": "《资本论》中自由的工人的含义",
+    "question_type": "concept_explain",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 189,
+    "question": "马克思如何分析简单商品流通与资本主义流通的区别？",
+    "question_type": "analysis",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 190,
+    "question": "马克思论机器大工业对工人阶级的影响",
+    "question_type": "analysis",
+    "expected_work_id": "capital-vol1",
+    "discipline": "political_economy",
+    "difficulty": "medium"
+  },
+  {
+    "id": 191,
+    "question": "恩格斯对洛贝尔图斯地租理论的批判",
+    "question_type": "analysis",
+    "expected_work_id": "marx-and-rodbertus",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 192,
+    "question": "马克思致安年科夫的信（1846年12月28日）的主要内容",
+    "question_type": "analysis",
+    "expected_work_id": "letters-1842-1848",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 193,
+    "question": "恩格斯致康拉德施米特信中关于历史唯物主义的论述",
+    "question_type": "analysis",
+    "expected_work_id": "letters-1884-1895",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 194,
+    "question": "马克思致魏德迈信中关于阶级专政的论述",
+    "question_type": "analysis",
+    "expected_work_id": "letters-1849-1859",
+    "discipline": "state_revolution_military",
+    "difficulty": "hard"
+  },
+  {
+    "id": 195,
+    "question": "恩格斯致博尔吉乌斯信中关于历史唯物主义的阐述",
+    "question_type": "analysis",
+    "expected_work_id": "letters-1884-1895",
+    "discipline": "philosophy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 196,
+    "question": "马克思致查苏利奇信中关于俄国农村公社的论述",
+    "question_type": "analysis",
+    "expected_work_id": "letter-to-zasulich",
+    "discipline": "history_religion_culture",
+    "difficulty": "hard"
+  },
+  {
+    "id": 197,
+    "question": "《政治经济学批判（1857-1858年手稿）》中关于自动化与共产主义",
+    "question_type": "analysis",
+    "expected_work_id": "grundrisse-selections",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 198,
+    "question": "马克思论资本主义条件下机器的应用",
+    "question_type": "analysis",
+    "expected_work_id": "manuscripts-1861-1863-selections",
+    "discipline": "political_economy",
+    "difficulty": "hard"
+  },
+  {
+    "id": 199,
+    "question": "恩格斯在《论住宅问题》中如何批判蒲鲁东主义的解决方案？",
+    "question_type": "analysis",
+    "expected_work_id": "housing-question",
+    "discipline": "state_revolution_military",
+    "difficulty": "hard"
+  },
+  {
+    "id": 200,
+    "question": "法国工人党纲领导言的主要内容",
+    "question_type": "analysis",
+    "expected_work_id": "french-worker-party-program",
+    "discipline": "party_labor",
+    "difficulty": "hard"
+  },
+  {
+    "id": 201,
+    "question": "马克思对劳动所得这一口号的批判",
+    "question_type": "quote_lookup",
+    "expected_work_id": "critique-gotha-programme",
+    "discipline": "scientific_socialism",
+    "difficulty": "medium"
+  }
+]

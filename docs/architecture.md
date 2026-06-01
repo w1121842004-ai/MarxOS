@@ -87,17 +87,17 @@
 
 ### 检索与引文
 
-- [marxos_retrieval.py](../marxos_retrieval.py)
-  - facade 层，对外暴露检索接口
+- [retrieval/__init__.py](../retrieval/__init__.py)
+  - facade 层，对外暴露检索公共 API（41 符号）
 
-- [marxos_retrieval_constraints.py](../marxos_retrieval_constraints.py)
-  - 标题/专题/概念约束
+- [retrieval/constraints.py](../retrieval/constraints.py)
+  - 标题/专题/概念约束、seed queries
 
-- [marxos_retrieval_ranking.py](../marxos_retrieval_ranking.py)
-  - rerank 和排序规则
+- [retrieval/ranking.py](../retrieval/ranking.py)
+  - rerank、diversify、dedup、topic selection
 
-- [marxos_retrieval_modes.py](../marxos_retrieval_modes.py)
-  - dual retrieval、strict-title backstop、页码 refine 等模式化检索逻辑
+- [retrieval/modes.py](../retrieval/modes.py)
+  - hybrid (dense+BM25) retrieval、strict-title backstop、paragraph/dual retrieval、citation refinement
 
 - [marxos_citations.py](../marxos_citations.py)
   - 引文格式
@@ -207,7 +207,7 @@ retrieval 层已经开始从顶层平铺模块收口到 `retrieval/` 包：
 - `retrieval/modes.py`
   - 实际 retrieval 执行、strict-title backstop、paragraph/dual retrieval、citation-page refinement
 
-为避免一次性搬家带来的兼容风险，旧的 `marxos_retrieval*.py` 文件目前只保留为兼容导入层。新的检索逻辑优先放进 `retrieval/` 包，不再继续扩展旧前缀模块。
+检索逻辑已全部迁入 `retrieval/` 包，旧的 `marxos_retrieval*.py` 兼容层已移除。
 
 ## 8. Refactor Triggers
 

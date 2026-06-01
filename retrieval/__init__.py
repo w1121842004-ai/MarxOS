@@ -1,5 +1,4 @@
 from retrieval.constraints import (
-    _helper,
     build_page_ranges,
     candidate_pdf_pages_from_metadata,
     controlled_multi_queries,
@@ -49,7 +48,6 @@ from retrieval.ranking import (
 
 
 __all__ = [
-    "_helper",
     "annotate_docs_with_constraints",
     "append_locator_backstops",
     "build_page_ranges",

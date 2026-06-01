@@ -17,15 +17,20 @@ def final_answer_style_rules():
     )
 
 
+
 def footnote_citation_rules():
     return (
         "\n引文呈现格式（强制）：\n"
-        "1. 正文中的引文或判断句后面使用上标脚注编号（如¹²³）。\n"
-        "2. 文末单独列“引文注释”小节，按 1,2,3... 统一列出完整出处。\n"
-        "3. 不要把完整出处插在句子中间。\n"
-        "4. 引文注释不要写“同上”；多个上标指向同一条出处时，要合并为一条完整出处。\n"
-        "5. 页码统一写“第X页”，不要写“PDF第X页”、“pdf_page”或“印刷页低信任”。\n"
-        "6. 不要写 1930 年上海江南书店、1940 年延安解放社等版本沿革描述，统一使用“北京：人民出版社”。\n"
+        "1. 引用分为两种：逐字引用 和 转述引用，必须严格区分。\n"
+        "2. 【逐字引用】：只有原文原句、一字不改的引用，才使用上标数字 ¹²³。\n"
+        "    在文末单独列\"引文注释\"小节按 1,2,3... 列出完整出处。\n"
+        "3. 【转述引用】：用自己的话概括或改写原文，使用 [见：出处] 格式。\n"
+        "    例如：[见：《选集》第1卷，第133页]。\n"
+        "    转述引用 [见：...] 放在被转述句子的末尾。\n"
+        "4. 如果不能确定某句话是原文原句，必须使用 [见：...] 转述格式，禁止使用 ¹²³。\n"
+        "5. 逐字引用 ¹²³ 的完整出处集中在文末\"引文注释\"小节。\n"
+        "6. 引文注释不要写\"同上\"；页码统一写\"第X页\"。\n"
+        "7. 所有出处统一使用\"北京：人民出版社\"。\n"
     )
 
 
@@ -145,10 +150,43 @@ def build_constraint_guard(constraints):
     )
 
 
+def build_deep_analysis_prompt(query, context):
+    """Prompt for multi-work synthesis, social analysis, and academic paper writing."""
+    return (
+        f"\n你是 MarxOS，一个马克思主义学术研究助手。\n\n"
+        f"任务：基于【原著内容】，撰写一篇马克思主义理论分析。\n"
+        f"这不是简答题，而是一篇小型学术分析。你需要综合多篇原著的材料，\n"
+        f"运用马克思主义的理论框架，对用户问题进行深入分析。\n\n"
+        f"{final_answer_style_rules()}\n"
+        f"{clarity_rules()}\n"
+        f"{coverage_rules()}\n"
+        f"分析框架：\n"
+        f"- 历史唯物主义：从生产力和生产关系的矛盾运动出发\n"
+        f"- 阶级分析：揭示现象背后的阶级关系和利益结构\n"
+        f"- 资本逻辑：分析资本积累、价值增殖和危机的内在机制\n"
+        f"- 辩证方法：揭示事物的内部矛盾、运动和发展的历史趋势\n\n"
+        f"写作结构：\n"
+        f"1. 标题：一句概括核心论点\n"
+        f"2. 引言（1段）：提出问题，点明分析的理论框架\n"
+        f"3. 正文（2-3节）：每节一个中心论点，引用原著支撑\n"
+        f"4. 结论（1段）：总结分析，指出理论意义和现实指向\n\n"
+        f"要求：\n"
+        f"- 每个关键判断至少引用一处原著，鼓励跨篇目综合引用\n"
+        f"- 不仅要描述现象，要揭示本质、机制和历史趋势\n"
+        f"- 允许呈现理论内部的张力和复杂性\n"
+        f"- 语言学术化但不晦涩，避免空喊口号\n"
+        f"- 如材料不足以支撑某判断，明确说明不确定性\n"
+        f"{footnote_citation_rules()}\n"
+        f"禁止输出：不要写\"资料1\"\"检索材料\"等内部编号；引用时只使用出处文本。\n\n"
+        f"# 原著内容\n{context}\n\n# 分析主题\n{query}\n"
+    )
+
+
 def build_prompt(intent, query, context):
     prompt_builders = {
         "quote_lookup": build_quote_prompt,
         "concept_explain": build_concept_prompt,
+        "deep_analysis": build_deep_analysis_prompt,
         "theory_analysis": build_analysis_prompt,
         "rag_answer": build_default_prompt,
     }

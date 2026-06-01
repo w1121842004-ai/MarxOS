@@ -23,10 +23,10 @@
 
 优先看：
 
-- `marxos_retrieval.py`
-- `marxos_retrieval_constraints.py`
-- `marxos_retrieval_ranking.py`
-- `marxos_retrieval_modes.py`
+- `retrieval/__init__.py`
+- `retrieval/constraints.py`
+- `retrieval/ranking.py`
+- `retrieval/modes.py`
 
 适用场景：
 
@@ -100,9 +100,9 @@
 
 先看：
 
-- `marxos_retrieval_constraints.py`
-- `marxos_retrieval_ranking.py`
-- `marxos_retrieval_modes.py`
+- `retrieval/constraints.py`
+- `retrieval/ranking.py`
+- `retrieval/modes.py`
 
 建议验证：
 
@@ -187,6 +187,6 @@ venv\Scripts\python.exe scripts\audit.py list
 ## 5. 维护时的几个边界
 
 - `app.py` 和 `web_app.py` 现在已经更偏“入口层”，后续尽量不要把大段业务逻辑重新塞回去。
-- `marxos_retrieval.py` 适合作为 facade；新的检索细节优先落到 `constraints / ranking / modes` 子模块。
+- `retrieval/__init__.py` 是 facade；新的检索细节优先落到 `retrieval/constraints / ranking / modes` 子模块。
 - 语料、OCR、页码问题通常不是 LLM 能自动补救的，涉及引用质量时优先先查 `rag/` 和 `data/`。
 - 历史 `docs/dev_logs/` 更适合追溯背景，不适合作为当前行为规范；当前规范以 `README.md`、`docs/architecture.md`、本文件为准。

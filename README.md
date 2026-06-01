@@ -186,10 +186,10 @@ venv\Scripts\python.exe scripts\audit.py exact-quote-top1
 
 检索分层：
 
-- `marxos_retrieval.py`: 对外 facade
-- `marxos_retrieval_constraints.py`: title/topic/source constraints 与 seed queries
-- `marxos_retrieval_ranking.py`: rerank、diversify、constraint annotation
-- `marxos_retrieval_modes.py`: 实际检索执行、backstop、paragraph/dual retrieval、页码 refinement
+- `retrieval/__init__.py`: 统一 public API
+- `retrieval/constraints.py`: title/topic/source/page range constraints 与 seed queries
+- `retrieval/ranking.py`: rerank、diversify、constraint annotation、topic selection
+- `retrieval/modes.py`: 实际检索执行、hybrid (dense+BM25)、backstop、paragraph/dual retrieval、citation refinement
 
 RAG / OCR：
 

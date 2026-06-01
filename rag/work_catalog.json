@@ -1,0 +1,3604 @@
+{
+  "$schema": "work_catalog_v2",
+  "description": "MarxOS 著作元数据目录 — 覆盖《文集》10卷 +《选集》4卷全部主要著作",
+  "version": "2.0.0",
+  "editions": {
+    "wenji": {
+      "name": "马克思恩格斯文集",
+      "publisher": "人民出版社",
+      "year": 2009,
+      "volumes": 10,
+      "isbn": "9787010076534",
+      "volume_map": {
+        "1": {
+          "source": "mea01.pdf",
+          "cover": "1843—1848年著作"
+        },
+        "2": {
+          "source": "mea02.pdf",
+          "cover": "1848—1859年著作"
+        },
+        "3": {
+          "source": "mea03.pdf",
+          "cover": "1864—1883年著作"
+        },
+        "4": {
+          "source": "mea04.pdf",
+          "cover": "1884—1895年著作"
+        },
+        "5": {
+          "source": "mea05.pdf",
+          "cover": "资本论 第一卷"
+        },
+        "6": {
+          "source": "mea06.pdf",
+          "cover": "资本论 第二卷"
+        },
+        "7": {
+          "source": "mea07.pdf",
+          "cover": "资本论 第三卷"
+        },
+        "8": {
+          "source": "mea08.pdf",
+          "cover": "资本论手稿选编"
+        },
+        "9": {
+          "source": "mea09.pdf",
+          "cover": "反杜林论 / 自然辩证法"
+        },
+        "10": {
+          "source": "mea10.pdf",
+          "cover": "书信选编"
+        }
+      }
+    },
+    "xuanji": {
+      "name": "马克思恩格斯选集",
+      "publisher": "人民出版社",
+      "year": 2012,
+      "edition": "第3版",
+      "volumes": 4,
+      "isbn": "9787010106861",
+      "volume_map": {
+        "1": {
+          "source": "mes01.pdf",
+          "cover": "1843—1859年著作"
+        },
+        "2": {
+          "source": "mes02.pdf",
+          "cover": "政治经济学专卷"
+        },
+        "3": {
+          "source": "mes03.pdf",
+          "cover": "1864—1883年著作"
+        },
+        "4": {
+          "source": "mes04.pdf",
+          "cover": "1884—1895年著作 / 书信选编"
+        }
+      }
+    }
+  },
+  "discipline_taxonomy": {
+    "philosophy": {
+      "label": "马克思主义哲学",
+      "sub_categories": [
+        "历史唯物主义",
+        "辩证唯物主义",
+        "实践哲学",
+        "异化理论",
+        "意识形态批判"
+      ]
+    },
+    "political_economy": {
+      "label": "政治经济学",
+      "sub_categories": [
+        "剩余价值理论",
+        "资本积累",
+        "地租理论",
+        "劳动价值论",
+        "经济危机理论"
+      ]
+    },
+    "scientific_socialism": {
+      "label": "科学社会主义",
+      "sub_categories": [
+        "阶级斗争",
+        "无产阶级革命",
+        "共产主义理论"
+      ]
+    },
+    "party_labor": {
+      "label": "党的建设与工人运动",
+      "sub_categories": [
+        "无产阶级政党",
+        "第一国际",
+        "工会运动",
+        "党纲党章"
+      ]
+    },
+    "peasant_land": {
+      "label": "农民问题与土地问题",
+      "sub_categories": [
+        "农民合作社",
+        "土地所有制",
+        "工农联盟",
+        "农业问题"
+      ]
+    },
+    "national_colonial": {
+      "label": "民族问题与殖民主义",
+      "sub_categories": [
+        "殖民主义批判",
+        "民族解放",
+        "东方问题",
+        "中国与印度"
+      ]
+    },
+    "state_revolution_military": {
+      "label": "国家、革命与军事",
+      "sub_categories": [
+        "国家学说",
+        "无产阶级专政",
+        "革命策略",
+        "军事理论"
+      ]
+    },
+    "history_religion_culture": {
+      "label": "历史、宗教与文化",
+      "sub_categories": [
+        "原始社会",
+        "宗教批判",
+        "德国历史",
+        "人物传记"
+      ]
+    }
+  },
+  "works": [
+    {
+      "work_id": "critique-hegel-law-intro",
+      "title": "《黑格尔法哲学批判》导言",
+      "aliases": [
+        "黑格尔法哲学批判导言",
+        "黑格尔法哲学批判 导言"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1843",
+      "work_type": "essay",
+      "discipline": [
+        "philosophy",
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "宗教批判",
+        "无产阶级历史使命",
+        "哲学与革命",
+        "德国解放"
+      ],
+      "quotes": [
+        "宗教是人民的鸦片",
+        "批判的武器当然不能代替武器的批判"
+      ],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "《黑格尔法哲学批判》导言",
+          "start_page": 3,
+          "end_page": 18,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "《黑格尔法哲学批判》导言",
+          "start_page": 1,
+          "end_page": 16,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "宗教批判",
+        "无产阶级历史使命"
+      ]
+    },
+    {
+      "work_id": "on-the-jewish-question",
+      "title": "论犹太人问题",
+      "aliases": [
+        "犹太人问题"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1843",
+      "work_type": "essay",
+      "discipline": [
+        "philosophy",
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "政治解放",
+        "人类解放",
+        "宗教与国家",
+        "市民社会",
+        "人权批判"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "论犹太人问题",
+          "start_page": 21,
+          "end_page": 55,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "outlines-critique-political-economy",
+      "title": "国民经济学批判大纲",
+      "aliases": [
+        "政治经济学批判大纲"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1843",
+      "work_type": "essay",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "政治经济学批判",
+        "私有制",
+        "竞争",
+        "价值",
+        "资本与劳动对立"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "国民经济学批判大纲",
+          "start_page": 56,
+          "end_page": 86,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "国民经济学批判大纲",
+          "start_page": 17,
+          "end_page": 48,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "communists-and-karl-heinzen",
+      "title": "共产主义者和卡尔·海因岑",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1847",
+      "work_type": "article",
+      "discipline": [
+        "scientific_socialism"
+      ],
+      "concepts": [
+        "共产主义宣传",
+        "小资产阶级激进主义批判"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "共产主义者和卡尔·海因岑",
+          "start_page": 75,
+          "end_page": 85,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "共产主义者和卡尔·海因岑",
+          "start_page": 276,
+          "end_page": 294,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "condition-england-18th-century",
+      "title": "英国状况 十八世纪",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1844",
+      "work_type": "essay",
+      "discipline": [
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "英国工业革命",
+        "社会状况",
+        "阶级形成"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "英国状况 十八世纪",
+          "start_page": 87,
+          "end_page": 108,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "economic-philosophic-manuscripts-1844",
+      "title": "1844年经济学哲学手稿",
+      "aliases": [
+        "经济学哲学手稿",
+        "巴黎手稿",
+        "1844年手稿",
+        "异化劳动理论",
+        "黑格尔辩证法批判"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1844",
+      "work_type": "manuscript",
+      "discipline": [
+        "philosophy",
+        "political_economy"
+      ],
+      "concepts": [
+        "异化劳动",
+        "私有财产",
+        "共产主义",
+        "黑格尔辩证法批判",
+        "人的本质"
+      ],
+      "quotes": [
+        "劳动为富人生产了奇迹般的东西，但是为工人生产了赤贫",
+        "人也按照美的规律来构造"
+      ],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "1844年经济学哲学手稿",
+          "start_page": 109,
+          "end_page": 248,
+          "entry_type": "primary",
+          "is_full_text": true,
+          "note": "选集为节选（异化劳动和私有财产）"
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "1844年经济学哲学手稿",
+          "start_page": 49,
+          "end_page": 63,
+          "entry_type": "parallel",
+          "is_full_text": false,
+          "note": "选集为节选（异化劳动和私有财产）"
+        }
+      },
+      "primary_concepts": [
+        "异化劳动",
+        "私有财产和共产主义",
+        "黑格尔辩证法批判"
+      ]
+    },
+    {
+      "work_id": "holy-family",
+      "title": "神圣家族",
+      "aliases": [
+        "对批判的批判所做的批判"
+      ],
+      "author": "卡·马克思",
+      "co_author": "弗·恩格斯",
+      "writing_year": "1844",
+      "work_type": "book",
+      "discipline": [
+        "philosophy"
+      ],
+      "concepts": [
+        "青年黑格尔派批判",
+        "唯物主义史",
+        "群众史观",
+        "思辨哲学批判"
+      ],
+      "quotes": [
+        "历史活动是群众的活动"
+      ],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "神圣家族",
+          "start_page": 249,
+          "end_page": 359,
+          "entry_type": "primary",
+          "is_full_text": false,
+          "note": "文集为节选"
+        }
+      }
+    },
+    {
+      "work_id": "condition-working-class-england",
+      "title": "英国工人阶级状况",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1845",
+      "work_type": "book",
+      "discipline": [
+        "party_labor",
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "工人阶级",
+        "工业革命",
+        "城市化",
+        "工人运动"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "英国工人阶级状况",
+          "start_page": 363,
+          "end_page": 498,
+          "entry_type": "primary",
+          "is_full_text": false,
+          "note": "文集和选集均为节选"
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "英国工人阶级状况",
+          "start_page": 65,
+          "end_page": 132,
+          "entry_type": "parallel",
+          "is_full_text": false,
+          "note": "文集和选集均为节选"
+        }
+      }
+    },
+    {
+      "work_id": "theses-feuerbach",
+      "title": "关于费尔巴哈的提纲",
+      "aliases": [
+        "费尔巴哈提纲",
+        "费尔巴哈论纲",
+        "实践观",
+        "关于费尔巴哈",
+        "费尔巴哈提纲十一条",
+        "马克思的实践观"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1845",
+      "work_type": "thesis",
+      "discipline": [
+        "philosophy"
+      ],
+      "concepts": [
+        "实践",
+        "唯物主义",
+        "感性活动",
+        "社会关系",
+        "改变世界"
+      ],
+      "quotes": [
+        "哲学家们只是用不同的方式解释世界，而问题在于改变世界",
+        "人的本质在其现实性上是一切社会关系的总和",
+        "人的本质不是单个人所固有的抽象物"
+      ],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "关于费尔巴哈的提纲",
+          "start_page": 499,
+          "end_page": 506,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "关于费尔巴哈的提纲",
+          "start_page": 133,
+          "end_page": 140,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "实践",
+        "人的本质"
+      ]
+    },
+    {
+      "work_id": "german-ideology",
+      "title": "德意志意识形态",
+      "aliases": [
+        "德意志意识形态",
+        "德国意识形态",
+        "生活决定意识",
+        "消灭分工"
+      ],
+      "author": "卡·马克思",
+      "co_author": "弗·恩格斯",
+      "writing_year": "1845-1846",
+      "work_type": "manuscript",
+      "discipline": [
+        "philosophy"
+      ],
+      "concepts": [
+        "历史唯物主义",
+        "意识形态",
+        "分工",
+        "所有制形式",
+        "市民社会"
+      ],
+      "quotes": [
+        "不是意识决定生活，而是生活决定意识",
+        "意识在任何时候都只能是被意识到了的存在"
+      ],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "德意志意识形态",
+          "start_page": 507,
+          "end_page": 591,
+          "entry_type": "primary",
+          "is_full_text": false,
+          "note": "文集和选集均为第一卷第一章《费尔巴哈》节选"
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "德意志意识形态",
+          "start_page": 141,
+          "end_page": 215,
+          "entry_type": "parallel",
+          "is_full_text": false,
+          "note": "文集和选集均为第一卷第一章《费尔巴哈》节选"
+        }
+      },
+      "primary_concepts": [
+        "历史唯物主义",
+        "意识形态",
+        "消灭分工",
+        "生活决定意识"
+      ]
+    },
+    {
+      "work_id": "poverty-philosophy",
+      "title": "哲学的贫困",
+      "aliases": [
+        "答蒲鲁东先生的《贫困的哲学》"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1847",
+      "work_type": "book",
+      "discipline": [
+        "political_economy",
+        "philosophy"
+      ],
+      "concepts": [
+        "政治经济学方法",
+        "分工",
+        "竞争",
+        "垄断",
+        "剩余价值萌芽"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "哲学的贫困",
+          "start_page": 595,
+          "end_page": 692,
+          "entry_type": "primary",
+          "is_full_text": false,
+          "note": "文集和选集均为节选"
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "哲学的贫困",
+          "start_page": 217,
+          "end_page": 275,
+          "entry_type": "parallel",
+          "is_full_text": false,
+          "note": "文集和选集均为节选"
+        }
+      }
+    },
+    {
+      "work_id": "principles-communism",
+      "title": "共产主义原理",
+      "aliases": [
+        "共产主义原理",
+        "恩格斯共产主义原理"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1847",
+      "work_type": "essay",
+      "discipline": [
+        "scientific_socialism"
+      ],
+      "concepts": [
+        "共产主义",
+        "无产阶级革命",
+        "废除私有制"
+      ],
+      "quotes": [
+        "废除私有制",
+        "共产主义不是一种状态，而是一种现实的运动"
+      ],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "共产主义原理",
+          "start_page": 673,
+          "end_page": 693,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "共产主义原理",
+          "start_page": 295,
+          "end_page": 312,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "废除私有制",
+        "共产主义原理",
+        "无产阶级革命"
+      ]
+    },
+    {
+      "work_id": "speech-on-poland",
+      "title": "关于波兰的演说",
+      "aliases": [
+        "论波兰",
+        "波兰问题",
+        "民族问题"
+      ],
+      "author": "卡·马克思",
+      "co_author": "弗·恩格斯",
+      "writing_year": "1847",
+      "work_type": "speech",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "波兰问题",
+        "民族解放",
+        "国际主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "关于波兰的演说",
+          "start_page": 694,
+          "end_page": 700,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "关于波兰的演说",
+          "start_page": 313,
+          "end_page": 316,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "民族问题",
+        "波兰问题",
+        "民族解放",
+        "国际主义"
+      ]
+    },
+    {
+      "work_id": "wage-labour-capital",
+      "title": "雇佣劳动与资本",
+      "aliases": [
+        "雇佣劳动与资本",
+        "雇佣劳动和资本"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1847",
+      "work_type": "essay",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "工资",
+        "资本",
+        "剩余价值萌芽",
+        "生产关系"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "雇佣劳动与资本",
+          "start_page": 711,
+          "end_page": 742,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "雇佣劳动与资本",
+          "start_page": 317,
+          "end_page": 359,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "雇佣劳动",
+        "工资",
+        "工资的本质"
+      ]
+    },
+    {
+      "work_id": "speech-free-trade",
+      "title": "关于自由贸易问题的演说",
+      "aliases": [
+        "关于自由贸易的演说",
+        "自由贸易",
+        "自由贸易的演说"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1848",
+      "work_type": "speech",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "自由贸易",
+        "保护关税",
+        "资本主义批判"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v1": {
+          "source": "mea01.pdf",
+          "article_title": "关于自由贸易问题的演说",
+          "start_page": 744,
+          "end_page": 759,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "关于自由贸易问题的演说",
+          "start_page": 360,
+          "end_page": 375,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "自由贸易",
+        "保护关税"
+      ]
+    },
+    {
+      "work_id": "communist-manifesto",
+      "title": "共产党宣言",
+      "aliases": [
+        "共产主义宣言",
+        "共产党宣言",
+        "宣言",
+        "全世界无产者联合起来",
+        "无产者联合起来"
+      ],
+      "author": "卡·马克思",
+      "co_author": "弗·恩格斯",
+      "writing_year": "1848",
+      "work_type": "manifesto",
+      "discipline": [
+        "scientific_socialism",
+        "party_labor"
+      ],
+      "concepts": [
+        "阶级斗争",
+        "资产阶级",
+        "无产阶级",
+        "共产主义",
+        "政党"
+      ],
+      "quotes": [
+        "一个幽灵，共产主义的幽灵，在欧洲游荡",
+        "至今一切社会的历史都是阶级斗争的历史",
+        "无产者在这个革命中失去的只是锁链，他们获得的将是整个世界",
+        "每个人的自由发展是一切人的自由发展的条件",
+        "工人没有祖国"
+      ],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "共产党宣言",
+          "start_page": 3,
+          "end_page": 67,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "共产党宣言",
+          "start_page": 376,
+          "end_page": 435,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "阶级斗争",
+        "共产党",
+        "资产阶级和无产阶级"
+      ]
+    },
+    {
+      "work_id": "crisis-and-counterrevolution",
+      "title": "危机和反革命",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1848",
+      "work_type": "article",
+      "discipline": [
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "革命危机",
+        "反革命",
+        "1848年革命"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "危机和反革命",
+          "start_page": 68,
+          "end_page": 71,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "危机和反革命",
+          "start_page": 436,
+          "end_page": 439,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "bourgeoisie-and-counterrevolution",
+      "title": "资产阶级和反革命",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1848",
+      "work_type": "article",
+      "discipline": [
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "资产阶级",
+        "反革命",
+        "德国革命"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "资产阶级和反革命",
+          "start_page": 72,
+          "end_page": 76,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "资产阶级和反革命",
+          "start_page": 440,
+          "end_page": 444,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "class-struggles-france",
+      "title": "1848年至1850年的法兰西阶级斗争",
+      "aliases": [
+        "法兰西阶级斗争",
+        "1848年至1850年的法兰西阶级斗争",
+        "不断革命",
+        "革命是历史的火车头",
+        "农民阶级的革命性"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1850",
+      "work_type": "book",
+      "discipline": [
+        "state_revolution_military",
+        "scientific_socialism"
+      ],
+      "concepts": [
+        "阶级斗争",
+        "无产阶级专政",
+        "革命",
+        "法国"
+      ],
+      "quotes": [
+        "阶级斗争必然要导致无产阶级专政",
+        "革命是历史的火车头"
+      ],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "1848年至1850年的法兰西阶级斗争",
+          "start_page": 77,
+          "end_page": 187,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "1848年至1850年的法兰西阶级斗争",
+          "start_page": 445,
+          "end_page": 552,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "无产阶级专政",
+        "不断革命",
+        "农民阶级"
+      ]
+    },
+    {
+      "work_id": "address-central-authority",
+      "title": "共产主义者同盟中央委员会告同盟书",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": "弗·恩格斯",
+      "writing_year": "1850",
+      "work_type": "essay",
+      "discipline": [
+        "party_labor"
+      ],
+      "concepts": [
+        "不断革命",
+        "无产阶级独立组织"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "共产主义者同盟中央委员会告同盟书",
+          "start_page": 188,
+          "end_page": 199,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "共产主义者同盟中央委员会告同盟书",
+          "start_page": 553,
+          "end_page": 564,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "peasant-war-germany",
+      "title": "德国农民战争",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1850",
+      "work_type": "book",
+      "discipline": [
+        "peasant_land",
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "农民战争",
+        "宗教改革",
+        "德国历史",
+        "阶级分析"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "德国农民战争",
+          "start_page": 200,
+          "end_page": 283,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "conditions-war-1852",
+      "title": "1852年神圣同盟对法战争的条件与前景",
+      "aliases": [
+        "恩格斯军事思想",
+        "神圣同盟对法战争"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1851",
+      "work_type": "manuscript",
+      "discipline": [
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "军事理论",
+        "神圣同盟",
+        "法国"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "1852年神圣同盟对法战争的条件与前景",
+          "start_page": 347,
+          "end_page": 350,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "军事理论",
+        "恩格斯军事思想"
+      ]
+    },
+    {
+      "work_id": "revolution-counterrevolution-germany",
+      "title": "德国的革命和反革命",
+      "aliases": [
+        "德国的革命与反革命",
+        "1848年德国革命",
+        "德国革命失败"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1851-1852",
+      "work_type": "article",
+      "discipline": [
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "德国革命",
+        "1848年革命",
+        "阶级分析",
+        "民族问题"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "德国的革命和反革命",
+          "start_page": 351,
+          "end_page": 460,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "德国的革命和反革命",
+          "start_page": 565,
+          "end_page": 662,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "1848年革命",
+        "德国革命"
+      ]
+    },
+    {
+      "work_id": "eighteenth-brumaire",
+      "title": "路易·波拿巴的雾月十八日",
+      "aliases": [
+        "路易·波拿巴的雾月十八",
+        "雾月十八日",
+        "路易波拿巴的雾月十八日",
+        "小块土地所有制",
+        "法国小农"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1852",
+      "work_type": "book",
+      "discipline": [
+        "state_revolution_military",
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "国家机器",
+        "阶级分析",
+        "农民阶级",
+        "波拿巴主义"
+      ],
+      "quotes": [
+        "人们自己创造自己的历史，但并不是随心所欲地创造"
+      ],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "路易·波拿巴的雾月十八日",
+          "start_page": 461,
+          "end_page": 578,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "路易·波拿巴的雾月十八日",
+          "start_page": 663,
+          "end_page": 774,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "国家机器",
+        "波拿巴主义",
+        "农民阶级",
+        "小块土地所有制"
+      ]
+    },
+    {
+      "work_id": "speech-peoples-paper",
+      "title": "在《人民报》创刊纪念会上的演说",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1856",
+      "work_type": "speech",
+      "discipline": [
+        "scientific_socialism"
+      ],
+      "concepts": [
+        "无产阶级历史使命",
+        "技术进步"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "在《人民报》创刊纪念会上的演说",
+          "start_page": 579,
+          "end_page": 581,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "在《人民报》创刊纪念会上的演说",
+          "start_page": 775,
+          "end_page": 777,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "credit-mobilier",
+      "title": "法国的动产信用公司",
+      "aliases": [
+        "动产信用公司",
+        "法国的动产信用公司"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1856",
+      "work_type": "article",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "信用制度",
+        "金融资本",
+        "法国经济"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "法国的动产信用公司",
+          "start_page": 582,
+          "end_page": 587,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "动产信用公司",
+        "信用制度"
+      ]
+    },
+    {
+      "work_id": "preface-critique-political-economy",
+      "title": "《政治经济学批判》序言",
+      "aliases": [
+        "政治经济学批判序言"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1859",
+      "work_type": "essay",
+      "discipline": [
+        "philosophy",
+        "political_economy"
+      ],
+      "concepts": [
+        "历史唯物主义",
+        "经济基础",
+        "上层建筑",
+        "社会形态"
+      ],
+      "quotes": [
+        "物质生活的生产方式制约着整个社会生活、政治生活和精神生活的过程",
+        "不是人们的意识决定人们的存在，相反，是人们的社会存在决定人们的意识",
+        "不是人们的意识决定人们的存在",
+        "物质生活的生产方式制约着整个社会生活"
+      ],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "《政治经济学批判》序言",
+          "start_page": 588,
+          "end_page": 594,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "社会存在决定社会意识",
+        "经济基础",
+        "上层建筑",
+        "社会形态"
+      ]
+    },
+    {
+      "work_id": "engels-review-critique-political-economy",
+      "title": "卡尔·马克思《政治经济学批判。第一分册》",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1859",
+      "work_type": "article",
+      "discipline": [
+        "political_economy",
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "政治经济学批判",
+        "马克思经济学"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "卡尔·马克思《政治经济学批判。第一分册》",
+          "start_page": 595,
+          "end_page": 610,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "revolution-china-europe",
+      "title": "中国革命和欧洲革命",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1853",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "中国革命",
+        "欧洲革命",
+        "殖民主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "中国革命和欧洲革命",
+          "start_page": 611,
+          "end_page": 618,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "中国革命和欧洲革命",
+          "start_page": 778,
+          "end_page": 785,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "russian-trade-china",
+      "title": "俄国的对华贸易",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1857",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "对华贸易",
+        "俄国扩张",
+        "殖民主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "俄国的对华贸易",
+          "start_page": 619,
+          "end_page": 622,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "俄国的对华贸易",
+          "start_page": 786,
+          "end_page": 789,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "english-atrocities-china",
+      "title": "英人在华的残暴行动",
+      "aliases": [
+        "鸦片战争",
+        "英国对华暴行"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1857",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "英国殖民主义",
+        "鸦片战争",
+        "中国"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "英人在华的残暴行动",
+          "start_page": 623,
+          "end_page": 626,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "英人在华的残暴行动",
+          "start_page": 790,
+          "end_page": 793,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "鸦片战争",
+        "英国暴行"
+      ]
+    },
+    {
+      "work_id": "persia-and-china",
+      "title": "波斯和中国",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1857",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "波斯",
+        "中国",
+        "殖民主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "波斯和中国",
+          "start_page": 627,
+          "end_page": 633,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "波斯和中国",
+          "start_page": 794,
+          "end_page": 800,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "opium-trade",
+      "title": "鸦片贸易史",
+      "aliases": [
+        "鸦片贸易",
+        "马克思论鸦片贸易",
+        "鸦片贸易史"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1858",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "鸦片贸易",
+        "英国殖民主义",
+        "中国"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "鸦片贸易史",
+          "start_page": 634,
+          "end_page": 641,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "鸦片贸易史",
+          "start_page": 801,
+          "end_page": 808,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "鸦片贸易",
+        "英国殖民主义"
+      ]
+    },
+    {
+      "work_id": "anglo-chinese-treaty",
+      "title": "英中条约",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1858",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "英中条约",
+        "不平等条约",
+        "殖民主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "英中条约",
+          "start_page": 642,
+          "end_page": 647,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "英中条约",
+          "start_page": 809,
+          "end_page": 814,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "china-britain-treaty",
+      "title": "中国和英国的条约",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1858",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "不平等条约",
+        "中英关系",
+        "殖民主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "中国和英国的条约",
+          "start_page": 648,
+          "end_page": 653,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "中国和英国的条约",
+          "start_page": 815,
+          "end_page": 820,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "russian-success-far-east",
+      "title": "俄国在远东的成功",
+      "aliases": [
+        "俄国远东扩张",
+        "俄国在远东"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1858",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "俄国扩张",
+        "远东",
+        "殖民主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "俄国在远东的成功",
+          "start_page": 654,
+          "end_page": 658,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "俄国在远东的成功",
+          "start_page": 821,
+          "end_page": 825,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "俄国扩张",
+        "远东"
+      ]
+    },
+    {
+      "work_id": "new-war-china",
+      "title": "新的对华战争",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1859",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial",
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "第二次鸦片战争",
+        "英国殖民主义",
+        "中国"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "新的对华战争",
+          "start_page": 659,
+          "end_page": 674,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "新的对华战争",
+          "start_page": 826,
+          "end_page": 842,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "trade-with-china",
+      "title": "对华贸易",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1859",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial",
+        "political_economy"
+      ],
+      "concepts": [
+        "对华贸易",
+        "国际贸易",
+        "殖民主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "对华贸易",
+          "start_page": 675,
+          "end_page": 678,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "对华贸易",
+          "start_page": 843,
+          "end_page": 847,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "british-rule-india",
+      "title": "不列颠在印度的统治",
+      "aliases": [
+        "不列颠在印度的统治",
+        "英国对印度的殖民统治",
+        "印度殖民",
+        "印度的殖民统治",
+        "英国在印度的统治"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1853",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "英国殖民主义",
+        "印度",
+        "亚洲社会"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "不列颠在印度的统治",
+          "start_page": 679,
+          "end_page": 685,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "不列颠在印度的统治",
+          "start_page": 848,
+          "end_page": 855,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "英国殖民主义",
+        "印度",
+        "亚洲社会",
+        "不列颠在印度的统治"
+      ]
+    },
+    {
+      "work_id": "future-results-british-rule-india",
+      "title": "不列颠在印度统治的未来结果",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1853",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "英国殖民主义",
+        "印度",
+        "亚洲社会"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v2": {
+          "source": "mea02.pdf",
+          "article_title": "不列颠在印度统治的未来结果",
+          "start_page": 686,
+          "end_page": 693,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v1": {
+          "source": "mes01.pdf",
+          "article_title": "不列颠在印度统治的未来结果",
+          "start_page": 856,
+          "end_page": 863,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "inaugural-address-iwa",
+      "title": "国际工人协会成立宣言",
+      "aliases": [
+        "国际工人协会成立宣言",
+        "国际工人协会共同章程",
+        "第一国际成立宣言",
+        "国际工人协会"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1864",
+      "work_type": "essay",
+      "discipline": [
+        "party_labor"
+      ],
+      "concepts": [
+        "国际工人协会",
+        "第一国际",
+        "工人阶级解放"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v3": {
+          "source": "mea03.pdf",
+          "article_title": "国际工人协会成立宣言",
+          "start_page": 3,
+          "end_page": 15,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "国际工人协会",
+        "第一国际",
+        "工人阶级解放"
+      ]
+    },
+    {
+      "work_id": "on-proudhon",
+      "title": "论蒲鲁东",
+      "aliases": [
+        "论蒲鲁东",
+        "蒲鲁东批判"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1865",
+      "work_type": "essay",
+      "discipline": [
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "蒲鲁东批判",
+        "小资产阶级社会主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v3": {
+          "source": "mea03.pdf",
+          "article_title": "论蒲鲁东",
+          "start_page": 16,
+          "end_page": 24,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "蒲鲁东",
+        "小资产阶级社会主义"
+      ]
+    },
+    {
+      "work_id": "value-price-profit",
+      "title": "工资、价格和利润",
+      "aliases": [
+        "工资价格和利润",
+        "价值价格与利润",
+        "工资、价格和利润"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1865",
+      "work_type": "essay",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "工资",
+        "利润",
+        "剩余价值",
+        "劳动价值论"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v3": {
+          "source": "mea03.pdf",
+          "article_title": "工资、价格和利润",
+          "start_page": 25,
+          "end_page": 77,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v2": {
+          "source": "mes02.pdf",
+          "article_title": "工资、价格和利润",
+          "start_page": 17,
+          "end_page": 69,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "工资价格利润",
+        "工资和利润的关系"
+      ]
+    },
+    {
+      "work_id": "civil-war-france",
+      "title": "法兰西内战",
+      "aliases": [
+        "法兰西内战"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1871",
+      "work_type": "book",
+      "discipline": [
+        "state_revolution_military",
+        "party_labor"
+      ],
+      "concepts": [
+        "巴黎公社",
+        "无产阶级专政",
+        "国家机器"
+      ],
+      "quotes": [
+        "工人阶级不能简单地掌握现成的国家机器，并运用它来达到自己的目的",
+        "工人阶级不能简单地掌握现成的国家机器"
+      ],
+      "editions": {
+        "wenji_v3": {
+          "source": "mea03.pdf",
+          "article_title": "法兰西内战",
+          "start_page": 95,
+          "end_page": 223,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "巴黎公社",
+        "打碎国家机器"
+      ]
+    },
+    {
+      "work_id": "political-indifferentism",
+      "title": "政治冷淡主义",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1873",
+      "work_type": "article",
+      "discipline": [
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "巴枯宁主义批判",
+        "无产阶级政治行动"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v3": {
+          "source": "mea03.pdf",
+          "article_title": "政治冷淡主义",
+          "start_page": 339,
+          "end_page": 345,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "refugee-literature",
+      "title": "流亡者文献",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1874-1875",
+      "work_type": "article",
+      "discipline": [
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "巴枯宁主义",
+        "俄国革命",
+        "工人运动"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v3": {
+          "source": "mea03.pdf",
+          "article_title": "流亡者文献",
+          "start_page": 346,
+          "end_page": 388,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "russian-social-conditions",
+      "title": "论俄国的社会问题",
+      "aliases": [
+        "论俄国的社会问题",
+        "俄国社会问题"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1875",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial"
+      ],
+      "concepts": [
+        "俄国",
+        "农村公社",
+        "革命前景"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v3": {
+          "source": "mea03.pdf",
+          "article_title": "论俄国的社会问题",
+          "start_page": 389,
+          "end_page": 416,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "俄国农村公社",
+        "俄国革命前景"
+      ]
+    },
+    {
+      "work_id": "critique-gotha-programme",
+      "title": "哥达纲领批判",
+      "aliases": [
+        "德国工人党纲领批注",
+        "哥达纲领批判",
+        "哥达纲领"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1875",
+      "work_type": "critique",
+      "discipline": [
+        "scientific_socialism",
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "按需分配",
+        "过渡时期",
+        "无产阶级专政",
+        "劳动"
+      ],
+      "quotes": [
+        "各尽所能，按需分配",
+        "在资本主义社会和共产主义社会之间，有一个从前者变为后者的革命转变时期"
+      ],
+      "editions": {
+        "wenji_v3": {
+          "source": "mea03.pdf",
+          "article_title": "哥达纲领批判",
+          "start_page": 417,
+          "end_page": 460,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v3": {
+          "source": "mes03.pdf",
+          "article_title": "哥达纲领批判",
+          "start_page": 352,
+          "end_page": 380,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "按需分配",
+        "共产主义两个阶段",
+        "过渡时期"
+      ]
+    },
+    {
+      "work_id": "letter-to-otechestvennye-zapiski",
+      "title": "给《祖国纪事》杂志编辑部的信",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1877",
+      "work_type": "letter",
+      "discipline": [
+        "history_religion_culture",
+        "philosophy"
+      ],
+      "concepts": [
+        "历史唯物主义",
+        "俄国道路"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v3": {
+          "source": "mea03.pdf",
+          "article_title": "给《祖国纪事》杂志编辑部的信",
+          "start_page": 463,
+          "end_page": 467,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "circular-letter-bebel-liebknecht",
+      "title": "给倍倍尔、李卜克内西、白拉克等人的通告信",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": "弗·恩格斯",
+      "writing_year": "1879",
+      "work_type": "letter",
+      "discipline": [
+        "party_labor"
+      ],
+      "concepts": [
+        "阶级斗争",
+        "党的领导"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v3": {
+          "source": "mea03.pdf",
+          "article_title": "给倍倍尔、李卜克内西、白拉克等人的通告信",
+          "start_page": 468,
+          "end_page": 486,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "socialism-utopian-scientific",
+      "title": "社会主义从空想到科学的发展",
+      "aliases": [
+        "社会主义从空想到科学",
+        "社会主义从空想到科学的发展",
+        "空想社会主义",
+        "科学社会主义理论"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1880",
+      "work_type": "book",
+      "discipline": [
+        "scientific_socialism"
+      ],
+      "concepts": [
+        "科学社会主义",
+        "唯物史观",
+        "剩余价值",
+        "空想社会主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v3": {
+          "source": "mea03.pdf",
+          "article_title": "社会主义从空想到科学的发展",
+          "start_page": 487,
+          "end_page": 567,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "科学社会主义",
+        "空想社会主义"
+      ]
+    },
+    {
+      "work_id": "marx-and-neue-rheinische-zeitung",
+      "title": "马克思和《新莱茵报》",
+      "aliases": [
+        "马克思和新莱茵报",
+        "新莱茵报",
+        "1848年革命回顾"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1884",
+      "work_type": "article",
+      "discipline": [
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "马克思生平",
+        "新莱茵报",
+        "1848年革命"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "马克思和《新莱茵报》",
+          "start_page": 3,
+          "end_page": 12,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v4": {
+          "source": "mes04.pdf",
+          "article_title": "马克思和《新莱茵报》",
+          "start_page": 1,
+          "end_page": 7,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "origin-family-private-property-state",
+      "title": "家庭、私有制和国家的起源",
+      "aliases": [
+        "家庭私有制和国家的起源",
+        "家庭、私有制和国家的起源",
+        "国家起源",
+        "国家学说",
+        "马克思主义国家学说"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1884",
+      "work_type": "book",
+      "discipline": [
+        "state_revolution_military",
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "家庭",
+        "私有制",
+        "国家",
+        "原始社会",
+        "妇女解放"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "家庭、私有制和国家的起源",
+          "start_page": 13,
+          "end_page": 198,
+          "entry_type": "primary",
+          "is_full_text": true,
+          "note": "选集为摘选"
+        },
+        "xuanji_v4": {
+          "source": "mes04.pdf",
+          "article_title": "家庭、私有制和国家的起源",
+          "start_page": 669,
+          "end_page": 709,
+          "entry_type": "parallel",
+          "is_full_text": false,
+          "note": "选集为摘选"
+        }
+      },
+      "primary_concepts": [
+        "国家起源",
+        "家庭",
+        "私有制",
+        "国家学说",
+        "妇女解放"
+      ]
+    },
+    {
+      "work_id": "marx-and-rodbertus",
+      "title": "马克思和洛贝尔图斯",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1885",
+      "work_type": "essay",
+      "discipline": [
+        "political_economy",
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "洛贝尔图斯",
+        "剩余价值理论",
+        "马克思经济学"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "马克思和洛贝尔图斯",
+          "start_page": 199,
+          "end_page": 214,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v4": {
+          "source": "mes04.pdf",
+          "article_title": "马克思和洛贝尔图斯",
+          "start_page": 8,
+          "end_page": 15,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "decline-feudalism-rise-nation-states",
+      "title": "论封建制度的瓦解和民族国家的产生",
+      "aliases": [
+        "论封建制度的瓦解",
+        "封建制度的瓦解",
+        "民族国家的产生"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1884",
+      "work_type": "manuscript",
+      "discipline": [
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "封建制度",
+        "民族国家",
+        "君主专制"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "论封建制度的瓦解和民族国家的产生",
+          "start_page": 215,
+          "end_page": 225,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "封建制度瓦解",
+        "民族国家",
+        "君主专制"
+      ]
+    },
+    {
+      "work_id": "history-communist-league",
+      "title": "关于共产主义者同盟的历史",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1885",
+      "work_type": "article",
+      "discipline": [
+        "party_labor",
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "共产主义者同盟",
+        "马克思生平",
+        "恩格斯生平"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "关于共产主义者同盟的历史",
+          "start_page": 226,
+          "end_page": 246,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v4": {
+          "source": "mes04.pdf",
+          "article_title": "关于共产主义者同盟的历史",
+          "start_page": 16,
+          "end_page": 35,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "prussian-peasant-history",
+      "title": "关于普鲁士农民的历史",
+      "aliases": [
+        "关于普鲁士农民的历史",
+        "普鲁士农民",
+        "德国农民的历史变化",
+        "德国农民阶级"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1885",
+      "work_type": "article",
+      "discipline": [
+        "peasant_land",
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "普鲁士",
+        "农民问题",
+        "农奴制"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "关于普鲁士农民的历史",
+          "start_page": 247,
+          "end_page": 259,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "普鲁士农民",
+        "农奴制废除",
+        "德国农业"
+      ]
+    },
+    {
+      "work_id": "ludwig-feuerbach",
+      "title": "路德维希·费尔巴哈和德国古典哲学的终结",
+      "aliases": [
+        "费尔巴哈和德国古典哲学的终结",
+        "费尔巴哈论",
+        "费尔巴哈论纲",
+        "费尔巴哈的历史地位",
+        "费尔巴哈评价"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1886",
+      "work_type": "book",
+      "discipline": [
+        "philosophy"
+      ],
+      "concepts": [
+        "费尔巴哈",
+        "德国古典哲学",
+        "黑格尔",
+        "唯物主义",
+        "辩证法"
+      ],
+      "quotes": [
+        "全部哲学，特别是近代哲学的重大的基本问题，是思维和存在的关系问题",
+        "全部哲学特别是近代哲学的重大的基本问题是思维和存在的关系问题"
+      ],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "路德维希·费尔巴哈和德国古典哲学的终结",
+          "start_page": 261,
+          "end_page": 313,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v4": {
+          "source": "mes04.pdf",
+          "article_title": "路德维希·费尔巴哈和德国古典哲学的终结",
+          "start_page": 36,
+          "end_page": 97,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "哲学基本问题",
+        "思维和存在"
+      ]
+    },
+    {
+      "work_id": "american-labor-movement",
+      "title": "美国工人运动",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1887",
+      "work_type": "article",
+      "discipline": [
+        "party_labor"
+      ],
+      "concepts": [
+        "美国工人运动",
+        "无产阶级政党"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "美国工人运动",
+          "start_page": 316,
+          "end_page": 325,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "protection-and-free-trade",
+      "title": "保护关税制度和自由贸易",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1888",
+      "work_type": "article",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "保护关税",
+        "自由贸易",
+        "美国经济"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "保护关税制度和自由贸易",
+          "start_page": 333,
+          "end_page": 350,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "foreign-policy-russian-tsarism",
+      "title": "俄国沙皇政府的对外政策",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1889-1890",
+      "work_type": "article",
+      "discipline": [
+        "national_colonial",
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "俄国",
+        "沙皇制度",
+        "对外政策",
+        "欧洲外交"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "俄国沙皇政府的对外政策",
+          "start_page": 351,
+          "end_page": 394,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "critique-social-democratic-program-1891",
+      "title": "1891年社会民主党纲领草案批判",
+      "aliases": [
+        "爱尔福特纲领批判"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1891",
+      "work_type": "critique",
+      "discipline": [
+        "party_labor",
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "社会民主党",
+        "爱尔福特纲领",
+        "民主共和国"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "1891年社会民主党纲领草案批判",
+          "start_page": 407,
+          "end_page": 422,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "socialism-germany",
+      "title": "德国的社会主义",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1891-1892",
+      "work_type": "article",
+      "discipline": [
+        "party_labor",
+        "scientific_socialism"
+      ],
+      "concepts": [
+        "德国社会主义",
+        "工人运动"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "德国的社会主义",
+          "start_page": 423,
+          "end_page": 441,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "primitive-christianity",
+      "title": "论原始基督教的历史",
+      "aliases": [
+        "原始基督教",
+        "论原始基督教",
+        "早期基督教",
+        "原始基督教的历史"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1894",
+      "work_type": "article",
+      "discipline": [
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "原始基督教",
+        "宗教批判",
+        "早期基督教"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "论原始基督教的历史",
+          "start_page": 473,
+          "end_page": 503,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "原始基督教",
+        "早期基督教",
+        "宗教批判"
+      ]
+    },
+    {
+      "work_id": "peasant-question-france-germany",
+      "title": "法德农民问题",
+      "aliases": [
+        "法德农民问题",
+        "农民问题",
+        "农民合作社",
+        "农民同盟",
+        "农民同盟军"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1894",
+      "work_type": "essay",
+      "discipline": [
+        "peasant_land",
+        "scientific_socialism"
+      ],
+      "concepts": [
+        "农民问题",
+        "土地问题",
+        "合作社",
+        "工农联盟"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "法德农民问题",
+          "start_page": 507,
+          "end_page": 531,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v4": {
+          "source": "mes04.pdf",
+          "article_title": "法德农民问题",
+          "start_page": 98,
+          "end_page": 118,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "农民合作社",
+        "工农联盟",
+        "农民同盟"
+      ]
+    },
+    {
+      "work_id": "introduction-class-struggles-france-1895",
+      "title": "卡·马克思《1848年至1850年的法兰西阶级斗争》一书导言",
+      "aliases": [
+        "《法兰西阶级斗争》导言",
+        "恩格斯晚年导言"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1895",
+      "work_type": "essay",
+      "discipline": [
+        "state_revolution_military",
+        "party_labor"
+      ],
+      "concepts": [
+        "革命策略",
+        "议会斗争",
+        "街垒战"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v4": {
+          "source": "mea04.pdf",
+          "article_title": "卡·马克思《1848年至1850年的法兰西阶级斗争》一书导言",
+          "start_page": 532,
+          "end_page": 554,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v4": {
+          "source": "mes04.pdf",
+          "article_title": "卡·马克思《1848年至1850年的法兰西阶级斗争》一书导言",
+          "start_page": 571,
+          "end_page": 603,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "capital-vol1",
+      "title": "资本论 第一卷",
+      "aliases": [
+        "资本论第一卷",
+        "资本论第1卷",
+        "资本论",
+        "商品拜物教",
+        "资本的生产过程",
+        "绝对剩余价值",
+        "相对剩余价值",
+        "资本有机构成",
+        "劳动价值论",
+        "价值规律理论",
+        "商品拜物教理论",
+        "原始积累",
+        "资本主义的起源",
+        "西欧资本主义"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1867",
+      "work_type": "book",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "商品",
+        "货币",
+        "剩余价值",
+        "资本积累",
+        "原始积累",
+        "价值形式",
+        "劳动力商品",
+        "绝对剩余价值生产",
+        "相对剩余价值生产"
+      ],
+      "quotes": [
+        "资本来到世间，从头到脚，每个毛孔都滴着血和肮脏的东西",
+        "商品是天生的平等派",
+        "资本是死劳动，它像吸血鬼一样，只有吮吸活劳动才有生命",
+        "原来的货币占有者作为资本家，昂首前行；劳动力占有者作为他的工人，尾随于后",
+        "生产剩余价值或赚钱，是这个生产方式的绝对规律",
+        "一切节省，归根到底都归结为时间的节省",
+        "如果按照奥日埃的说法，货币来到世间，在一边脸上带着天生的血斑，那么，资本来到世间，从头到脚，每个毛孔都滴着血和肮脏的东西"
+      ],
+      "editions": {
+        "wenji_v5": {
+          "source": "mea05.pdf",
+          "article_title": "资本论 第一卷",
+          "start_page": 7,
+          "end_page": 887,
+          "entry_type": "primary",
+          "is_full_text": true,
+          "note": "选集为节选"
+        },
+        "xuanji_v2": {
+          "source": "mes02.pdf",
+          "article_title": "资本论 第一卷",
+          "start_page": 81,
+          "end_page": 300,
+          "entry_type": "parallel",
+          "is_full_text": false,
+          "note": "选集为节选（原文见文集第五卷）。页码待PDF验证（core_classics: p185-370 vs article_map: p81-300）"
+        }
+      },
+      "primary_concepts": [
+        "剩余价值",
+        "商品拜物教",
+        "价值形式",
+        "资本原始积累",
+        "劳动二重性",
+        "价值规律",
+        "资本积累",
+        "绝对剩余价值",
+        "相对剩余价值",
+        "资本有机构成",
+        "劳动价值论",
+        "货币转化为资本",
+        "资本主义积累的一般规律",
+        "资本主义起源"
+      ]
+    },
+    {
+      "work_id": "capital-vol2",
+      "title": "资本论 第二卷",
+      "aliases": [
+        "资本论第二卷",
+        "资本论第2卷"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1885",
+      "work_type": "book",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "资本循环",
+        "资本周转",
+        "社会总资本再生产",
+        "流通"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v6": {
+          "source": "mea06.pdf",
+          "article_title": "资本论 第二卷",
+          "start_page": 7,
+          "end_page": 672,
+          "entry_type": "primary",
+          "is_full_text": true,
+          "note": "选集为节选"
+        },
+        "xuanji_v2": {
+          "source": "mes02.pdf",
+          "article_title": "资本论 第二卷",
+          "start_page": 301,
+          "end_page": 435,
+          "entry_type": "parallel",
+          "is_full_text": false,
+          "note": "选集为节选"
+        }
+      },
+      "primary_concepts": [
+        "资本循环",
+        "资本周转",
+        "社会总资本再生产",
+        "固定资本",
+        "流动资本",
+        "流通时间",
+        "生产时间"
+      ]
+    },
+    {
+      "work_id": "capital-vol3",
+      "title": "资本论 第三卷",
+      "aliases": [
+        "资本论第三卷",
+        "资本论第3卷",
+        "资本主义生产的总过程"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1894",
+      "work_type": "book",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "利润",
+        "平均利润率",
+        "地租",
+        "生息资本",
+        "各种收入"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v7": {
+          "source": "mea07.pdf",
+          "article_title": "资本论 第三卷",
+          "start_page": 7,
+          "end_page": 1027,
+          "entry_type": "primary",
+          "is_full_text": true,
+          "note": "选集为节选"
+        },
+        "xuanji_v2": {
+          "source": "mes02.pdf",
+          "article_title": "资本论 第三卷",
+          "start_page": 436,
+          "end_page": 655,
+          "entry_type": "parallel",
+          "is_full_text": false,
+          "note": "选集为节选"
+        }
+      },
+      "primary_concepts": [
+        "平均利润率",
+        "利润率趋向下降",
+        "地租",
+        "生息资本",
+        "商业资本",
+        "各种收入及其源泉",
+        "资本主义生产的总过程"
+      ]
+    },
+    {
+      "work_id": "grundrisse-introduction",
+      "title": "《政治经济学批判》导言",
+      "aliases": [
+        "1857年导言"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1857",
+      "work_type": "manuscript",
+      "discipline": [
+        "political_economy",
+        "philosophy"
+      ],
+      "concepts": [
+        "生产",
+        "分配",
+        "交换",
+        "消费",
+        "政治经济学方法"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v8": {
+          "source": "mea08.pdf",
+          "article_title": "《政治经济学批判》导言",
+          "start_page": 5,
+          "end_page": 36,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
+        "xuanji_v2": {
+          "source": "mes02.pdf",
+          "article_title": "《政治经济学批判》导言",
+          "start_page": 683,
+          "end_page": 712,
+          "entry_type": "parallel",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "grundrisse-selections",
+      "title": "《政治经济学批判（1857—1858年手稿）》摘选",
+      "aliases": [
+        "1857-1858年经济学手稿",
+        "大纲",
+        "1857-1858年手稿",
+        "政治经济学批判大纲",
+        "资本主义生产以前",
+        "前资本主义所有制"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1857-1858",
+      "work_type": "manuscript",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "货币",
+        "资本",
+        "前资本主义所有制",
+        "机器体系",
+        "共产主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v8": {
+          "source": "mea08.pdf",
+          "article_title": "《政治经济学批判（1857—1858年手稿）》摘选",
+          "start_page": 37,
+          "end_page": 209,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "前资本主义所有制",
+        "资本主义生产以前",
+        "资本主义生产以前的各种形式",
+        "亚细亚生产方式",
+        "古代所有制",
+        "日耳曼所有制"
+      ]
+    },
+    {
+      "work_id": "manuscripts-1861-1863-selections",
+      "title": "《政治经济学批判（1861—1863年手稿）》摘选",
+      "aliases": [
+        "1861-1863年经济学手稿",
+        "剩余价值理论",
+        "1861-1863年手稿"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1861-1863",
+      "work_type": "manuscript",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "生产劳动",
+        "危机",
+        "机器",
+        "剩余价值理论"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v8": {
+          "source": "mea08.pdf",
+          "article_title": "《政治经济学批判（1861—1863年手稿）》摘选",
+          "start_page": 213,
+          "end_page": 418,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "生产劳动",
+        "非生产劳动",
+        "经济危机",
+        "危机理论"
+      ]
+    },
+    {
+      "work_id": "capital-manuscript-1863-1865",
+      "title": "《资本论（1863—1865年手稿）》摘选",
+      "aliases": [
+        "1863-1865年手稿"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1863-1865",
+      "work_type": "manuscript",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "直接生产过程",
+        "流通",
+        "再生产"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v8": {
+          "source": "mea08.pdf",
+          "article_title": "《资本论（1863—1865年手稿）》摘选",
+          "start_page": 423,
+          "end_page": 754,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "anti-duhring",
+      "title": "反杜林论",
+      "aliases": [
+        "欧根·杜林先生在科学中实行的变革",
+        "反杜林论"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1876-1878",
+      "work_type": "book",
+      "discipline": [
+        "philosophy",
+        "political_economy"
+      ],
+      "concepts": [
+        "唯物主义",
+        "辩证法",
+        "政治经济学",
+        "社会主义",
+        "杜林批判"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v9": {
+          "source": "mea09.pdf",
+          "article_title": "反杜林论",
+          "start_page": 3,
+          "end_page": 398,
+          "entry_type": "primary",
+          "is_full_text": true,
+          "note": "选集为节选"
+        },
+        "xuanji_v3": {
+          "source": "mes03.pdf",
+          "article_title": "反杜林论",
+          "start_page": 477,
+          "end_page": 607,
+          "entry_type": "parallel",
+          "is_full_text": false,
+          "note": "选集为节选"
+        }
+      },
+      "primary_concepts": [
+        "唯物辩证法",
+        "杜林批判"
+      ]
+    },
+    {
+      "work_id": "dialectics-nature",
+      "title": "自然辩证法",
+      "aliases": [
+        "自然辩证法（节选）",
+        "自然辩证法"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1873-1882",
+      "work_type": "manuscript",
+      "discipline": [
+        "philosophy"
+      ],
+      "concepts": [
+        "辩证法",
+        "自然科学",
+        "物质运动",
+        "劳动",
+        "猿到人"
+      ],
+      "quotes": [
+        "劳动创造了人本身"
+      ],
+      "editions": {
+        "wenji_v9": {
+          "source": "mea09.pdf",
+          "article_title": "自然辩证法",
+          "start_page": 399,
+          "end_page": 563,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "自然辩证法",
+        "劳动创造人"
+      ]
+    },
+    {
+      "work_id": "letters-1842-1848",
+      "title": "书信选编 1842—1848年",
+      "aliases": [
+        "安年科夫",
+        "马克思致安年科夫",
+        "早期通信"
+      ],
+      "author": "卡·马克思",
+      "co_author": "弗·恩格斯",
+      "writing_year": "1842-1848",
+      "work_type": "letter",
+      "discipline": [
+        "history_religion_culture",
+        "party_labor"
+      ],
+      "concepts": [
+        "早期通信",
+        "共产主义者同盟"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v10": {
+          "source": "mea10.pdf",
+          "article_title": "书信选编 1842—1848年",
+          "start_page": 3,
+          "end_page": 55,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "安年科夫",
+        "共产主义者同盟",
+        "早期通信"
+      ]
+    },
+    {
+      "work_id": "letters-1849-1859",
+      "title": "书信选编 1849—1859年",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": "弗·恩格斯",
+      "writing_year": "1849-1859",
+      "work_type": "letter",
+      "discipline": [
+        "political_economy",
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "经济危机",
+        "革命",
+        "政治经济学研究"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v10": {
+          "source": "mea10.pdf",
+          "article_title": "书信选编 1849—1859年",
+          "start_page": 57,
+          "end_page": 216,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "letters-1860-1870",
+      "title": "书信选编 1860—1870年",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": "弗·恩格斯",
+      "writing_year": "1860-1870",
+      "work_type": "letter",
+      "discipline": [
+        "political_economy",
+        "party_labor"
+      ],
+      "concepts": [
+        "第一国际",
+        "资本论写作",
+        "工人运动"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v10": {
+          "source": "mea10.pdf",
+          "article_title": "书信选编 1860—1870年",
+          "start_page": 217,
+          "end_page": 346,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "letters-1871-1883",
+      "title": "书信选编 1871—1883年",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": "弗·恩格斯",
+      "writing_year": "1871-1883",
+      "work_type": "letter",
+      "discipline": [
+        "party_labor",
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "巴黎公社",
+        "哥达纲领",
+        "德国党"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v10": {
+          "source": "mea10.pdf",
+          "article_title": "书信选编 1871—1883年",
+          "start_page": 347,
+          "end_page": 496,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "letters-1884-1895",
+      "title": "书信选编 1884—1895年",
+      "aliases": [
+        "恩格斯晚年书信",
+        "施米特",
+        "博尔吉乌斯",
+        "历史唯物主义书信",
+        "恩格斯致施米特",
+        "恩格斯致博尔吉乌斯"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1884-1895",
+      "work_type": "letter",
+      "discipline": [
+        "philosophy",
+        "scientific_socialism"
+      ],
+      "concepts": [
+        "晚年通信",
+        "第二国际",
+        "历史唯物主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "wenji_v10": {
+          "source": "mea10.pdf",
+          "article_title": "书信选编 1884—1895年",
+          "start_page": 497,
+          "end_page": 706,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "历史唯物主义书信",
+        "恩格斯晚年思想",
+        "经济基础与上层建筑"
+      ]
+    },
+    {
+      "work_id": "engels-review-capital-vol1",
+      "title": "卡·马克思《资本论》第一卷书评",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1868",
+      "work_type": "article",
+      "discipline": [
+        "political_economy"
+      ],
+      "concepts": [
+        "资本论",
+        "书评"
+      ],
+      "quotes": [],
+      "editions": {
+        "xuanji_v2": {
+          "source": "mes02.pdf",
+          "article_title": "卡·马克思《资本论》第一卷书评",
+          "start_page": 70,
+          "end_page": 78,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "housing-question",
+      "title": "论住宅问题",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1872-1873",
+      "work_type": "article",
+      "discipline": [
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "住宅问题",
+        "城市",
+        "资本主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "xuanji_v3": {
+          "source": "mes03.pdf",
+          "article_title": "论住宅问题",
+          "start_page": 188,
+          "end_page": 273,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "on-authority",
+      "title": "论权威",
+      "aliases": [
+        "论权威"
+      ],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1872",
+      "work_type": "article",
+      "discipline": [
+        "state_revolution_military",
+        "party_labor"
+      ],
+      "concepts": [
+        "权威",
+        "革命",
+        "自治"
+      ],
+      "quotes": [],
+      "editions": {
+        "xuanji_v3": {
+          "source": "mes03.pdf",
+          "article_title": "论权威",
+          "start_page": 274,
+          "end_page": 277,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "权威"
+      ]
+    },
+    {
+      "work_id": "bakunin-state-anarchism-summary",
+      "title": "巴枯宁《国家制度和无政府状态》一书摘要",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1874-1875",
+      "work_type": "manuscript",
+      "discipline": [
+        "state_revolution_military"
+      ],
+      "concepts": [
+        "巴枯宁批判",
+        "无政府主义",
+        "无产阶级专政"
+      ],
+      "quotes": [],
+      "editions": {
+        "xuanji_v3": {
+          "source": "mes03.pdf",
+          "article_title": "巴枯宁《国家制度和无政府状态》一书摘要",
+          "start_page": 329,
+          "end_page": 340,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "letter-to-bebel-1875",
+      "title": "给奥·倍倍尔的信",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1875",
+      "work_type": "letter",
+      "discipline": [
+        "party_labor"
+      ],
+      "concepts": [
+        "哥达纲领",
+        "德国社会民主党"
+      ],
+      "quotes": [],
+      "editions": {
+        "xuanji_v3": {
+          "source": "mes03.pdf",
+          "article_title": "给奥·倍倍尔的信",
+          "start_page": 341,
+          "end_page": 351,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "french-worker-party-program",
+      "title": "法国工人党纲领导言（草案）",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1880",
+      "work_type": "essay",
+      "discipline": [
+        "party_labor"
+      ],
+      "concepts": [
+        "法国工人党",
+        "纲领"
+      ],
+      "quotes": [],
+      "editions": {
+        "xuanji_v3": {
+          "source": "mes03.pdf",
+          "article_title": "法国工人党纲领导言（草案）",
+          "start_page": 649,
+          "end_page": 652,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "letter-to-zasulich",
+      "title": "给维·伊·查苏利奇的复信",
+      "aliases": [
+        "查苏利奇",
+        "给查苏利奇的复信",
+        "俄国农村公社",
+        "给维·伊·查苏利奇的复信"
+      ],
+      "author": "卡·马克思",
+      "co_author": null,
+      "writing_year": "1881",
+      "work_type": "letter",
+      "discipline": [
+        "history_religion_culture",
+        "national_colonial"
+      ],
+      "concepts": [
+        "俄国农村公社",
+        "历史唯物主义"
+      ],
+      "quotes": [],
+      "editions": {
+        "xuanji_v3": {
+          "source": "mes03.pdf",
+          "article_title": "给维·伊·查苏利奇的复信",
+          "start_page": 653,
+          "end_page": 666,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      },
+      "primary_concepts": [
+        "俄国农村公社",
+        "查苏利奇",
+        "历史唯物主义"
+      ]
+    },
+    {
+      "work_id": "marx-graveside-speech",
+      "title": "在马克思墓前的讲话",
+      "aliases": [],
+      "author": "弗·恩格斯",
+      "co_author": null,
+      "writing_year": "1883",
+      "work_type": "speech",
+      "discipline": [
+        "history_religion_culture"
+      ],
+      "concepts": [
+        "马克思生平"
+      ],
+      "quotes": [
+        "正像达尔文发现有机界的发展规律一样，马克思发现了人类历史的发展规律"
+      ],
+      "editions": {
+        "xuanji_v3": {
+          "source": "mes03.pdf",
+          "article_title": "在马克思墓前的讲话",
+          "start_page": 667,
+          "end_page": 668,
+          "entry_type": "primary",
+          "is_full_text": true
+        }
+      }
+    },
+    {
+      "work_id": "letters-selected-xuanji-4",
+      "title": "书信选编",
+      "aliases": [],
+      "author": "卡·马克思",
+      "co_author": "弗·恩格斯",
+      "writing_year": "1842-1895",
+      "work_type": "letter",
+      "discipline": [
+        "history_religion_culture",
+        "scientific_socialism"
+      ],
+      "concepts": [
+        "历史唯物主义书信",
+        "晚年书信"
+      ],
+      "quotes": [],
+      "editions": {
+        "xuanji_v4": {
+          "source": "mes04.pdf",
+          "article_title": "书信选编",
+          "start_page": 119,
+          "end_page": 668,
+          "entry_type": "primary",
+          "is_full_text": true,
+          "note": "选集精选102封书信"
+        }
+      }
+    }
+  ]
+}

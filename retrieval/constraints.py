@@ -211,7 +211,21 @@ def constraints_from_query(query, ctx):
     classic_entries_for_query = _helper(ctx, "classic_entries_for_query")
     enrich_core_classic_entries = _helper(ctx, "enrich_core_classic_entries")
     find_toc_entries = _helper(ctx, "find_toc_entries")
+    work_catalog_entries_for_query = _helper(ctx, "work_catalog_entries_for_query")
     title = extract_bibliographic_title(query)
+
+    # ── Step 1: Work Catalog lookup (94-work structured metadata) ─
+    catalog_entries = work_catalog_entries_for_query(query)
+    if catalog_entries:
+        title = catalog_entries[0].get("classic_title") or catalog_entries[0].get("article")
+        return {
+            "title": title,
+            "strict_title": True,
+            "entries": catalog_entries,
+            "sources": {entry["source"] for entry in catalog_entries},
+            "page_ranges": build_page_ranges(catalog_entries),
+        }
+
     locator_entries = locator_entries_for_query(query)
     if locator_entries:
         title = locator_entries[0].get("classic_title") or locator_entries[0].get("article")
@@ -248,6 +262,11 @@ def constraints_from_query(query, ctx):
         title = inferred_title
 
     if not title:
+        # ── BookLocator fallback: LLM-driven work identification ──
+        book_locator_constraints_fn = _helper(ctx, "book_locator_constraints")
+        locator_result = book_locator_constraints_fn(query)
+        if locator_result and locator_result.get("entries"):
+            return locator_result
         return {}
 
     entries = find_toc_entries(title)

@@ -1,4 +1,4 @@
-﻿import html
+import html
 import json
 import os
 import sys
@@ -21,524 +21,116 @@ OCR_CACHE_DIR = Path(app.OCR_CACHE_DIR)
 METRICS_LOG_PATH = Path("logs") / "api_ask_metrics.jsonl"
 
 
-HTML_PAGE = """<!doctype html>
+HTML_PAGE = r"""<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MarxOS Web</title>
-  <style>
-    :root {
-      --bg: #f3f4f6;
-      --surface: #ffffff;
-      --panel: #111827;
-      --panel-soft: #1f2937;
-      --text: #111827;
-      --muted: #6b7280;
-      --line: #e5e7eb;
-      --primary: #2563eb;
-      --primary-dark: #1d4ed8;
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0;
-      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
-    .layout {
-      display: grid;
-      grid-template-columns: 280px 1fr;
-      height: 100vh;
-      overflow: hidden;
-    }
-    .sidebar {
-      background: var(--panel);
-      color: #f3f4f6;
-      padding: 14px 12px;
-      border-right: 1px solid #0b1220;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      min-height: 0;
-      height: 100vh;
-      overflow: hidden;
-    }
-    .new-chat-btn {
-      width: 100%;
-      border: 1px solid #374151;
-      background: var(--panel-soft);
-      color: #f9fafb;
-      height: 38px;
-      border-radius: 8px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    .new-chat-btn:hover { background: #273449; }
-    .history-title {
-      font-size: 12px;
-      color: #9ca3af;
-      padding: 0 2px;
-    }
-    .history-list {
-      overflow: auto;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding-right: 2px;
-    }
-    .history-item {
-      text-align: left;
-      border: 1px solid #374151;
-      background: transparent;
-      color: #f3f4f6;
-      border-radius: 8px;
-      padding: 8px 10px;
-      cursor: pointer;
-      width: 100%;
-    }
-    .history-item.active {
-      background: #283548;
-      border-color: #4b5563;
-    }
-    .history-item-title {
-      font-size: 13px;
-      line-height: 1.4;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      overflow: hidden;
-    }
-    .history-item-time {
-      margin-top: 4px;
-      font-size: 11px;
-      color: #9ca3af;
-    }
-    .main {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      height: 100vh;
-      min-height: 0;
-      overflow: hidden;
-    }
-    .topbar {
-      height: 56px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.92);
-      backdrop-filter: blur(6px);
-      padding: 0 18px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 1;
-    }
-    .title { font-size: 16px; font-weight: 700; }
-    .subtitle { font-size: 12px; color: var(--muted); }
-    .chat-wrap {
-      flex: 1;
-      min-height: 0;
-      max-width: 920px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 18px 20px 140px;
-      overflow-y: auto;
-    }
-    .msg {
-      margin: 0 0 14px;
-      padding: 12px 14px;
-      border-radius: 10px;
-      line-height: 1.65;
-      white-space: pre-wrap;
-      word-break: break-word;
-      border: 1px solid var(--line);
-      background: #fff;
-      font-size: 14px;
-    }
-    .msg-user {
-      background: #eaf2ff;
-      border-color: #cfe1ff;
-      margin-left: 56px;
-    }
-    .msg-bot { margin-right: 56px; }
-    .msg-meta {
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-    .evidence-box {
-      margin-top: 8px;
-      border-top: 1px dashed var(--line);
-      padding-top: 8px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-    .evidence-box summary { cursor: pointer; color: #374151; font-weight: 600; }
-    .evidence-item { margin-top: 6px; padding: 6px 8px; background: #f9fafb; border-radius: 6px; }
-    .evidence-cite { color: #111827; }
-    .evidence-excerpt { margin-top: 4px; white-space: pre-wrap; }
-    .composer-shell {
-      position: fixed;
-      bottom: 0;
-      left: 280px;
-      right: 0;
-      padding: 10px 18px 16px;
-      background: linear-gradient(to top, var(--bg) 80%, rgba(243, 244, 246, 0));
-    }
-    .composer {
-      max-width: 920px;
-      margin: 0 auto;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 10px;
-    }
-    textarea {
-      width: 100%;
-      min-height: 66px;
-      max-height: 220px;
-      resize: vertical;
-      border: 0;
-      outline: none;
-      background: transparent;
-      font-size: 15px;
-      line-height: 1.5;
-      color: var(--text);
-    }
-    .toolbar {
-      margin-top: 6px;
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .send-btn {
-      border: 0;
-      background: var(--primary);
-      color: #fff;
-      height: 36px;
-      padding: 0 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .send-btn:hover { background: var(--primary-dark); }
-    .send-btn:disabled { opacity: 0.7; cursor: wait; }
-    .meta { display: flex; gap: 8px; color: var(--muted); font-size: 12px; }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      height: 22px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 0 8px;
-      background: #f9fafb;
-    }
-    @media (max-width: 900px) {
-      .layout { grid-template-columns: 1fr; }
-      .sidebar {
-        min-height: unset;
-        max-height: 220px;
-        height: 220px;
-        border-right: 0;
-        border-bottom: 1px solid #0b1220;
-      }
-      .composer-shell { left: 0; }
-      .msg-user { margin-left: 0; }
-      .msg-bot { margin-right: 0; }
-      .chat-wrap { padding: 14px 14px 145px; }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MarxOS — 马克思主义学术助手</title>
+<style>
+:root{--bg:#f5f5f0;--surface:#fff;--panel:#1a1a2e;--panel-soft:#25253e;--text:#1a1a2e;--muted:#6b7280;--line:#e5e7eb;--primary:#8b0000;--primary-dark:#5c0000;--gold:#b8860b;--green:#2d6a4f;--red:#c0392b;--amber:#d4a017}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;font-family:"Segoe UI","PingFang SC","Noto Serif SC","Microsoft YaHei",serif;background:var(--bg);color:var(--text)}
+.layout{display:grid;grid-template-columns:260px 1fr;height:100vh;overflow:hidden}
+.sidebar{background:var(--panel);color:#e0d6c2;padding:14px 10px;border-right:1px solid #0b0b1a;display:flex;flex-direction:column;gap:8px;min-height:0;height:100vh;overflow:hidden}
+.new-chat-btn{width:100%;border:1px solid #3d3d5c;background:var(--panel-soft);color:#e0d6c2;height:36px;border-radius:6px;font-size:13px;cursor:pointer}
+.new-chat-btn:hover{background:#30305a}
+.history-title{font-size:11px;color:#8a8a9a;padding:0 2px;text-transform:uppercase;letter-spacing:1px}
+.history-list{overflow:auto;min-height:0;display:flex;flex-direction:column;gap:4px}
+.history-item{text-align:left;border:1px solid #3d3d5c;background:transparent;color:#c8bfae;border-radius:6px;padding:6px 8px;cursor:pointer;width:100%}
+.history-item.active{background:#2a2a4a;border-color:var(--gold)}
+.history-item-title{font-size:12px;line-height:1.3;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.history-item-time{margin-top:2px;font-size:10px;color:#6a6a7a}
+.main{display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden}
+.topbar{height:52px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.95);backdrop-filter:blur(6px);padding:0 18px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:16px;font-weight:700;color:var(--primary);letter-spacing:1px}
+.subtitle{font-size:11px;color:var(--muted)}
+.chat-wrap{flex:1;min-height:0;max-width:860px;width:100%;margin:0 auto;padding:16px 18px 150px;overflow-y:auto}
+.msg{margin:0 0 12px;padding:12px 14px;border-radius:8px;line-height:1.7;white-space:pre-wrap;word-break:break-word;border:1px solid var(--line);background:#fff;font-size:14px}
+.msg-user{background:#fef9f0;border-color:#e8d5b0;margin-left:48px}
+.msg-bot{margin-right:48px;border-left:3px solid var(--primary)}
+.msg-meta{margin-top:6px;color:var(--muted);font-size:11px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-flex;align-items:center;height:20px;border:1px solid var(--line);border-radius:4px;padding:0 6px;background:#fafaf5;font-size:11px}
+.badge-ok{border-color:var(--green);color:var(--green)}
+.badge-warn{border-color:var(--amber);color:var(--amber)}
+.badge-err{border-color:var(--red);color:var(--red)}
+.evidence-box{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px;color:var(--muted);font-size:11px}
+.evidence-box summary{cursor:pointer;color:#374151;font-weight:600;font-size:12px}
+.evidence-item{margin-top:4px;padding:4px 6px;background:#fafaf5;border-radius:4px}
+.evidence-cite{color:#111827;font-weight:500}
+.evidence-mini{color:var(--muted);font-size:10px;margin-left:8px}
+.evidence-excerpt{margin-top:3px;white-space:pre-wrap;font-size:12px;color:#555}
+.mode-bar{display:flex;gap:6px;margin-right:10px}
+.mode-btn{border:1px solid var(--line);background:#fff;color:var(--text);height:30px;padding:0 12px;border-radius:15px;font-size:12px;cursor:pointer;transition:all .15s}
+.mode-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.composer-shell{position:fixed;bottom:0;left:260px;right:0;padding:8px 16px 14px;background:linear-gradient(to top,var(--bg) 80%,rgba(245,245,240,0))}
+.composer{max-width:860px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px}
+textarea{width:100%;min-height:56px;max-height:180px;resize:vertical;border:0;outline:none;background:transparent;font-size:14px;line-height:1.5;color:var(--text)}
+.toolbar{margin-top:4px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.send-btn{border:0;background:var(--primary);color:#fff;height:32px;padding:0 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer}
+.send-btn:hover{background:var(--primary-dark)}.send-btn:disabled{opacity:.6;cursor:wait}
+.meta{display:flex;gap:6px;color:var(--muted);font-size:11px;align-items:center}
+.welcome{text-align:center;color:var(--muted);padding:40px 20px}
+.welcome h2{color:var(--primary);margin-bottom:8px;font-size:20px}
+.welcome p{font-size:13px;line-height:1.8}
+@media(max-width:860px){.layout{grid-template-columns:1fr}.sidebar{min-height:unset;max-height:180px;height:180px}.composer-shell{left:0}.msg-user{margin-left:0}.msg-bot{margin-right:0}.chat-wrap{padding:12px 12px 150px}}
+</style>
 </head>
 <body>
-  <div class="layout">
-    <aside class="sidebar">
-      <button id="newChatBtn" class="new-chat-btn" type="button">+ 新建对话</button>
-      <div class="history-title">历史会话</div>
-      <div id="historyList" class="history-list"></div>
-    </aside>
-    <section class="main">
-      <header class="topbar">
-        <div class="title">MarxOS</div>
-        <div class="subtitle">马克思主义文献问答与引文检索</div>
-      </header>
-      <main id="chat" class="chat-wrap"></main>
-      <section class="composer-shell">
-        <div class="composer">
-          <textarea id="q" placeholder="给 MarxOS 发送消息（Enter 发送，Shift+Enter 换行）"></textarea>
-          <div class="toolbar">
-            <button id="askBtn" class="send-btn" type="button">发送</button>
-            <div class="meta">
-              <span class="badge" id="intent">意图：-</span>
-              <span class="badge" id="cost">耗时：-</span>
-            </div>
-          </div>
-        </div>
-      </section>
-    </section>
-  </div>
-  <script>
-    const qEl = document.getElementById("q");
-    const btnEl = document.getElementById("askBtn");
-    const chatEl = document.getElementById("chat");
-    const intentEl = document.getElementById("intent");
-    const costEl = document.getElementById("cost");
-    const historyListEl = document.getElementById("historyList");
-    const newChatBtnEl = document.getElementById("newChatBtn");
-
-    const STORE_KEY = "marxos_conversations_v1";
-    const memoryTurns = 6;
-    let conversations = [];
-    let currentId = "";
-
-    function escapeHtml(s) {
-      return String(s)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
-    }
-
-    function nowLabel(ts) {
-      try { return new Date(ts).toLocaleString(); }
-      catch (_) { return ""; }
-    }
-
-    function createConversation() {
-      const now = Date.now();
-      return {
-        id: String(now) + "_" + Math.random().toString(36).slice(2, 8),
-        title: "新对话",
-        createdAt: now,
-        updatedAt: now,
-        messages: [],
-      };
-    }
-
-    function getCurrentConversation() {
-      return conversations.find((x) => x.id === currentId);
-    }
-
-    function setConversationTitle(conv) {
-      if (!conv) return;
-      const firstUser = conv.messages.find((m) => m.role === "user" && m.text.trim());
-      if (!firstUser) {
-        conv.title = "新对话";
-        return;
-      }
-      conv.title = firstUser.text.trim().slice(0, 24);
-    }
-
-    function persistConversations() {
-      try {
-        const nonEmpty = conversations.filter((conv) => conv.messages && conv.messages.length);
-        localStorage.setItem(STORE_KEY, JSON.stringify(nonEmpty));
-      } catch (_) {}
-    }
-
-    function pruneConversations() {
-      conversations = conversations
-        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-        .slice(0, 50);
-    }
-
-    function startNewConversation() {
-      conversations = conversations.filter((conv) => conv.messages && conv.messages.length);
-      const fresh = createConversation();
-      conversations.unshift(fresh);
-      pruneConversations();
-      currentId = fresh.id;
-      persistConversations();
-      renderAll();
-    }
-
-    function loadConversationsAndStartFresh() {
-      try {
-        const raw = localStorage.getItem(STORE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            conversations = parsed.filter((x) => x && typeof x === "object" && Array.isArray(x.messages) && x.messages.length);
-          }
-        }
-      } catch (_) {}
-
-      if (!conversations.length) {
-        conversations = [createConversation()];
-        currentId = conversations[0].id;
-      } else {
-        startNewConversation();
-        return;
-      }
-      persistConversations();
-      renderAll();
-    }
-
-    function buildHistoryPayload() {
-      const conv = getCurrentConversation();
-      if (!conv) return [];
-      const compact = [];
-      for (const m of conv.messages) {
-        if (m.role === "user") compact.push({ role: "user", text: m.text });
-        if (m.role === "bot") compact.push({
-          role: "bot",
-          text: m.text,
-          evidence: m.evidence || [],
-          topic: {
-            topic_id: m.topicId || "",
-            topic_label: m.topicLabel || "",
-            topic_section: m.topicSection || ""
-          }
-        });
-      }
-      return compact.slice(-memoryTurns * 2);
-    }
-
-    function evidenceHtml(evidence) {
-      if (!Array.isArray(evidence) || !evidence.length) return "";
-      const label = "\u67e5\u770b\u8bc1\u636e";
-      const items = evidence.slice(0, 8).map((e, idx) => {
-        const cite = escapeHtml(e.citation || e.sentence_citation || "");
-        const source = escapeHtml(e.source || "");
-        const page = escapeHtml(e.printed_page || e.citation_page || "");
-        const lines = e.line_start ? ("L" + escapeHtml(e.line_start) + (e.line_end ? "-" + escapeHtml(e.line_end) : "")) : "";
-        const meta = source + (page ? ' | \u7b2c' + page + '\u9875' : '') + (lines ? ' | ' + lines : '');
-        const excerpt = escapeHtml(String(e.excerpt || "").slice(0, 260));
-        return '<details class="evidence-item">' +
-          '<summary><span class="evidence-cite">E' + String(idx + 1) + ': ' + cite + '</span>' +
-          '<span class="evidence-mini">' + escapeHtml(meta) + '</span></summary>' +
-          (excerpt ? '<div class="evidence-excerpt">' + excerpt + '</div>' : '') +
-          '</details>';
-      }).join("");
-      return '<details class="evidence-box"><summary>' + label + ' (' + evidence.length + ')</summary>' + items + '</details>';
-    }
-
-    function renderHistory() {
-      const visibleConversations = conversations.filter((conv) => conv.messages && conv.messages.length);
-      if (!visibleConversations.length) {
-        historyListEl.innerHTML = "";
-        return;
-      }
-      historyListEl.innerHTML = visibleConversations.map((conv) => {
-        const active = conv.id === currentId ? " active" : "";
-        const title = escapeHtml(conv.title || "新对话");
-        const when = escapeHtml(nowLabel(conv.updatedAt || conv.createdAt));
-        return '<button class="history-item' + active + '" data-id="' + escapeHtml(conv.id) + '">' +
-          '<div class="history-item-title">' + title + '</div>' +
-          '<div class="history-item-time">' + when + '</div>' +
-          '</button>';
-      }).join("");
-
-      for (const node of historyListEl.querySelectorAll(".history-item")) {
-        node.addEventListener("click", () => {
-          const id = node.getAttribute("data-id");
-          if (!id) return;
-          currentId = id;
-          renderAll();
-        });
-      }
-    }
-
-    function renderChat() {
-      const conv = getCurrentConversation();
-      const messages = conv ? conv.messages : [];
-      if (!messages.length) {
-        chatEl.innerHTML = '<div class="msg msg-bot">欢迎使用 MarxOS。你可以询问概念、请求引文，或进行理论分析。</div>';
-        return;
-      }
-      chatEl.innerHTML = messages.map((m) => {
-        if (m.role === "user") {
-          return '<div class="msg msg-user">' + escapeHtml(m.text) + '</div>';
-        }
-        return '<div class="msg msg-bot">' + escapeHtml(m.text) +
-          evidenceHtml(m.evidence || []) +
-          '<div class="msg-meta">意图：' + escapeHtml(m.intent || "-") +
-          (m.topicLabel ? ' ｜ 专题：' + escapeHtml(m.topicLabel) : '') +
-          (m.topicSection ? ' ｜ 板块：' + escapeHtml(m.topicSection) : '') +
-          ' ｜ 耗时：' + escapeHtml(String(m.cost ?? "-")) + 'ms</div></div>';
-      }).join("");
-      chatEl.scrollTop = chatEl.scrollHeight;
-    }
-
-    function renderAll() {
-      renderHistory();
-      renderChat();
-    }
-
-    async function ask() {
-      const query = qEl.value.trim();
-      if (!query) return;
-      const conv = getCurrentConversation();
-      if (!conv) return;
-
-      btnEl.disabled = true;
-      conv.messages.push({ role: "user", text: query });
-      conv.updatedAt = Date.now();
-      setConversationTitle(conv);
-      renderAll();
-      persistConversations();
-
-      intentEl.textContent = "意图：处理中";
-      costEl.textContent = "耗时：-";
-      qEl.value = "";
-      try {
-        const res = await fetch("/api/ask", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ query, history: buildHistoryPayload() })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "请求失败");
-        conv.messages.push({
-          role: "bot",
-          text: data.answer || "",
-          intent: data.intent || "-",
-          topicId: (data.topic && data.topic.topic_id) ? data.topic.topic_id : "",
-          topicLabel: (data.topic && data.topic.topic_label) ? data.topic.topic_label : "",
-          topicSection: (data.topic && data.topic.topic_section) ? data.topic.topic_section : "",
-          cost: data.elapsed_ms ?? "-",
-          evidence: Array.isArray(data.evidence) ? data.evidence : []
-        });
-        conv.updatedAt = Date.now();
-        setConversationTitle(conv);
-        pruneConversations();
-        renderAll();
-        persistConversations();
-        intentEl.textContent = "意图：" + (data.intent || "-");
-        costEl.textContent = "耗时：" + String(data.elapsed_ms ?? "-") + "ms";
-      } catch (err) {
-        const msg = (err && err.message) ? err.message : "请求失败";
-        conv.messages.push({ role: "bot", text: "请求失败：" + msg, intent: "-", cost: "-" });
-        conv.updatedAt = Date.now();
-        setConversationTitle(conv);
-        renderAll();
-        persistConversations();
-      } finally {
-        btnEl.disabled = false;
-        qEl.focus();
-      }
-    }
-
-    btnEl.addEventListener("click", ask);
-    qEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        ask();
-      }
-    });
-    newChatBtnEl.addEventListener("click", startNewConversation);
-
-    loadConversationsAndStartFresh();
-  </script>
+<div class="layout">
+<aside class="sidebar">
+<button id="newChatBtn" class="new-chat-btn">+ 新建对话</button>
+<div class="history-title">历史会话</div>
+<div id="historyList" class="history-list"></div>
+</aside>
+<section class="main">
+<header class="topbar"><div class="logo">MarxOS</div><div class="subtitle">马克思主义文献检索 · 概念解释 · 学术分析</div></header>
+<main id="chat" class="chat-wrap"><div class="welcome"><h2>MarxOS 学术助手</h2><p>精确问答：概念解释、引文出处、篇目定位<br>深度分析：理论分析、社会批判、学术论文<br>所有回答均附可核对的原文出处。</p></div></main>
+<section class="composer-shell"><div class="composer">
+<textarea id="q" placeholder="输入问题…（Enter 发送，Shift+Enter 换行）"></textarea>
+<div class="toolbar">
+<div style="display:flex;gap:8px;align-items:center">
+<div class="mode-bar">
+<button class="mode-btn active" data-mode="auto" id="modeAuto">智能</button>
+<button class="mode-btn" data-mode="precise" id="modePrecise">精确问答</button>
+<button class="mode-btn" data-mode="deep" id="modeDeep">深度分析</button>
+</div>
+<button id="askBtn" class="send-btn">发送</button>
+</div>
+<div class="meta"><span class="badge" id="intentBadge">就绪</span><span id="costLabel">-</span></div>
+</div>
+</div></section>
+</section>
+</div>
+<script>
+const qEl=document.getElementById("q"),btnEl=document.getElementById("askBtn"),chatEl=document.getElementById("chat");
+const intentBadge=document.getElementById("intentBadge"),costLabel=document.getElementById("costLabel");
+const historyListEl=document.getElementById("historyList"),newChatBtnEl=document.getElementById("newChatBtn");
+const modeAuto=document.getElementById("modeAuto"),modePrecise=document.getElementById("modePrecise"),modeDeep=document.getElementById("modeDeep");
+const STORE_KEY="marxos_v2",memoryTurns=6;
+let conversations=[],currentId="",currentMode="auto";
+function esc(s){return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;")}
+function nowLabel(ts){try{return new Date(ts).toLocaleString()}catch(_){return""}}
+function createConversation(){const n=Date.now();return{id:String(n)+"_"+Math.random().toString(36).slice(2,8),title:"新对话",createdAt:n,updatedAt:n,messages:[]}}
+function getConv(){return conversations.find(x=>x.id===currentId)}
+function setTitle(c){if(!c)return;const u=c.messages.find(m=>m.role==="user"&&m.text.trim());c.title=u?u.text.trim().slice(0,20):"新对话"}
+function persist(){try{const ne=conversations.filter(c=>c.messages&&c.messages.length);localStorage.setItem(STORE_KEY,JSON.stringify(ne))}catch(_){}}
+function prune(){conversations=conversations.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).slice(0,50)}
+function newChat(){conversations=conversations.filter(c=>c.messages&&c.messages.length);const f=createConversation();conversations.unshift(f);prune();currentId=f.id;persist();renderAll()}
+function load(){try{const raw=localStorage.getItem(STORE_KEY);if(raw){const p=JSON.parse(raw);if(Array.isArray(p))conversations=p.filter(x=>x&&Array.isArray(x.messages)&&x.messages.length)}}catch(_){}if(!conversations.length){conversations=[createConversation()];currentId=conversations[0].id}else{newChat();return}persist();renderAll()}
+function buildHistory(){const c=getConv();if(!c)return[];const h=[];for(const m of c.messages){if(m.role==="user")h.push({role:"user",text:m.text});if(m.role==="bot")h.push({role:"bot",text:m.text,evidence:m.evidence||[],topic:{topic_id:m.topicId||"",topic_label:m.topicLabel||"",topic_section:m.topicSection||""}})}return h.slice(-memoryTurns*2)}
+function verifyBadge(v){if(!v||!v.total)return"";const ok=v.verified||0,pa=v.partial||0,ha=v.hallucinated||0;let cls="badge-ok",label="";if(ha>0){cls="badge-err";label=ha+"条引用待确认"}else if(pa>ok){cls="badge-warn";label=pa+"条转述引用"}else{label=ok+"条引用已校验"}return'<span class="badge '+cls+'">'+label+'</span>'}
+function evidenceHtml(ev){if(!Array.isArray(ev)||!ev.length)return"";const items=ev.slice(0,6).map((e,i)=>{const cite=esc(e.citation||e.sentence_citation||""),src=esc(e.source||""),pg=esc(e.printed_page||e.citation_page||""),meta=src+(pg?" | 第"+pg+"页":""),ex=esc(String(e.excerpt||"").slice(0,200));return'<details class="evidence-item"><summary><span class="evidence-cite">['+(i+1)+'] '+cite+'</span><span class="evidence-mini">'+meta+'</span></summary>'+(ex?'<div class="evidence-excerpt">'+ex+'</div>':'')+'</details>'}).join("");return'<details class="evidence-box"><summary>查看证据卡片 ('+ev.length+')</summary>'+items+'</details>'}
+function renderHistory(){const vis=conversations.filter(c=>c.messages&&c.messages.length);if(!vis.length){historyListEl.innerHTML="";return}historyListEl.innerHTML=vis.map(c=>{const act=c.id===currentId?" active":"";return'<button class="history-item'+act+'" data-id="'+esc(c.id)+'"><div class="history-item-title">'+esc(c.title||"新对话")+'</div><div class="history-item-time">'+esc(nowLabel(c.updatedAt||c.createdAt))+'</div></button>'}).join("");for(const n of historyListEl.querySelectorAll(".history-item")){n.addEventListener("click",()=>{const id=n.getAttribute("data-id");if(id){currentId=id;renderAll()}})}}
+function renderChat(){const c=getConv(),ms=c?c.messages:[];if(!ms.length){chatEl.innerHTML='<div class="welcome"><h2>MarxOS 学术助手</h2><p>精确问答：概念解释、引文出处、篇目定位<br>深度分析：理论分析、社会批判、学术论文<br>所有回答均附可核对的原文出处。</p></div>';return}chatEl.innerHTML=ms.map(m=>{if(m.role==="user")return'<div class="msg msg-user">'+esc(m.text)+'</div>';let meta='<div class="msg-meta">';if(m.intent)meta+='<span class="badge">'+esc(m.intent)+'</span>';if(m.mode)meta+='<span class="badge">'+esc(m.mode)+'</span>';if(m.verify)meta+=verifyBadge(m.verify);if(m.crag)meta+='<span class="badge">CRAG:'+esc(String(m.crag))+'</span>';meta+='<span>'+esc(String(m.cost||"-"))+'ms</span></div>';return'<div class="msg msg-bot">'+esc(m.text)+evidenceHtml(m.evidence||[])+meta+'</div>'}).join("");chatEl.scrollTop=chatEl.scrollHeight}
+function renderAll(){renderHistory();renderChat()}
+function setMode(m){currentMode=m;modeAuto.classList.toggle("active",m==="auto");modePrecise.classList.toggle("active",m==="precise");modeDeep.classList.toggle("active",m==="deep")}
+modeAuto.addEventListener("click",()=>setMode("auto"));modePrecise.addEventListener("click",()=>setMode("precise"));modeDeep.addEventListener("click",()=>setMode("deep"));
+async function ask(){const query=qEl.value.trim();if(!query)return;const conv=getConv();if(!conv)return;btnEl.disabled=true;conv.messages.push({role:"user",text:query});conv.updatedAt=Date.now();setTitle(conv);renderAll();persist();intentBadge.textContent="处理中...";costLabel.textContent="";qEl.value="";try{const res=await fetch("/api/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,history:buildHistory(),mode:currentMode})});const data=await res.json();if(!res.ok)throw new Error(data.error||"请求失败");conv.messages.push({role:"bot",text:data.answer||"",intent:data.intent||"-",mode:data.mode||"",cost:data.elapsed_ms||"-",evidence:Array.isArray(data.evidence)?data.evidence:[],verify:data.citation_audit?.content_verification||null,crag:(data.citation_audit?.crag_report?.score)||null,topicId:(data.topic?.topic_id)||"",topicLabel:(data.topic?.topic_label)||"",topicSection:(data.topic?.topic_section)||""});conv.updatedAt=Date.now();setTitle(conv);prune();renderAll();persist();const vfy=data.citation_audit?.content_verification;const vOk=vfy?(vfy.verified||0)+(vfy.partial||0):0;const vTotal=vfy?.total||0;intentBadge.textContent=data.intent||"-";costLabel.textContent=(data.elapsed_ms||"-")+"ms"+(vTotal?" | 校验:"+vOk+"/"+vTotal:"")}catch(err){const msg=err?.message||"请求失败";conv.messages.push({role:"bot",text:"请求失败："+msg,intent:"-",cost:"-"});conv.updatedAt=Date.now();setTitle(conv);renderAll();persist()}finally{btnEl.disabled=false;qEl.focus()}}
+btnEl.addEventListener("click",ask);qEl.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();ask()}});newChatBtnEl.addEventListener("click",newChat);load();
+</script>
 </body>
-</html>
-"""
+</html>"""
 
 
 class MarxOSHandler(BaseHTTPRequestHandler):
@@ -549,16 +141,8 @@ class MarxOSHandler(BaseHTTPRequestHandler):
     @staticmethod
     def _build_ask_metrics(query, intent, history, answer, evidence, citation_audit, elapsed_ms, topic_info, crag_report):
         return web_support.build_ask_metrics(
-            query,
-            intent,
-            history,
-            answer,
-            evidence,
-            citation_audit,
-            elapsed_ms,
-            topic_info,
-            crag_report,
-            MAX_HISTORY_TURNS,
+            query, intent, history, answer, evidence, citation_audit,
+            elapsed_ms, topic_info, crag_report, MAX_HISTORY_TURNS,
             app.extract_answer_citation_lines,
         )
 
@@ -573,12 +157,8 @@ class MarxOSHandler(BaseHTTPRequestHandler):
     @classmethod
     def _build_contextual_query(cls, query, history):
         return web_support.build_contextual_query(
-            query,
-            history,
-            MAX_HISTORY_TURNS,
-            MAX_HISTORY_CHARS,
-            cls._build_history_summary,
-            cls._trim_text,
+            query, history, MAX_HISTORY_TURNS, MAX_HISTORY_CHARS,
+            cls._build_history_summary, cls._trim_text,
         )
 
     @staticmethod
@@ -628,10 +208,7 @@ class MarxOSHandler(BaseHTTPRequestHandler):
     @staticmethod
     def _find_pdf_page_by_printed_page(source, printed_page):
         return web_citations.find_pdf_page_by_printed_page(
-            source,
-            printed_page,
-            OCR_CACHE_DIR,
-            app.infer_printed_page_from_ocr_cache,
+            source, printed_page, OCR_CACHE_DIR, app.infer_printed_page_from_ocr_cache,
         )
 
     @staticmethod
@@ -641,41 +218,27 @@ class MarxOSHandler(BaseHTTPRequestHandler):
     @classmethod
     def _answer_citation_followup(cls, query, history):
         return web_citations.answer_citation_followup(
-            query,
-            history,
-            cls._is_contextual_followup,
-            cls._last_bot_item,
-            cls._last_bot_message,
-            OCR_CACHE_DIR,
-            app.repair_mojibake,
+            query, history, cls._is_contextual_followup, cls._last_bot_item,
+            cls._last_bot_message, OCR_CACHE_DIR, app.repair_mojibake,
             app.infer_printed_page_from_ocr_cache,
         )
 
     @classmethod
     def _answer_evidence_page_followup(cls, query, history):
         return web_citations.answer_evidence_page_followup(
-            query,
-            history,
-            cls._is_contextual_followup,
-            cls._last_bot_item,
+            query, history, cls._is_contextual_followup, cls._last_bot_item,
         )
 
     @classmethod
     def _answer_topic_rewrite_followup(cls, query, history):
         return web_followups.answer_topic_rewrite_followup(
-            query,
-            history,
-            cls._last_bot_item,
-            cls._requested_citation_indices,
+            query, history, cls._last_bot_item, cls._requested_citation_indices,
         )
 
     @classmethod
     def _answer_topic_item_explain_followup(cls, query, history):
         return web_followups.answer_topic_item_explain_followup(
-            query,
-            history,
-            cls._last_bot_item,
-            cls._requested_citation_indices,
+            query, history, cls._last_bot_item, cls._requested_citation_indices,
         )
 
     @staticmethod
@@ -690,7 +253,6 @@ class MarxOSHandler(BaseHTTPRequestHandler):
     def _rank_topic_evidence(cls, evidence):
         return web_followups.rank_topic_evidence(evidence, app.normalize_for_match)
 
-
     @staticmethod
     def _filter_ranked_evidence(ranked, markers_any=None, markers_all=None):
         return web_followups.filter_ranked_evidence(ranked, markers_any=markers_any, markers_all=markers_all)
@@ -698,23 +260,16 @@ class MarxOSHandler(BaseHTTPRequestHandler):
     @classmethod
     def _answer_topic_history_followup(cls, query, history):
         return web_followups.answer_topic_history_followup(
-            query,
-            history,
-            cls._last_bot_item,
-            cls._requested_citation_indices,
+            query, history, cls._last_bot_item, cls._requested_citation_indices,
             app.normalize_for_match,
         )
 
     @classmethod
     def _answer_history_followup(cls, query, history):
         return web_followups.answer_history_followup(
-            query,
-            history,
-            cls._answer_topic_rewrite_followup,
-            cls._answer_topic_item_explain_followup,
-            cls._answer_topic_history_followup,
-            cls._answer_evidence_page_followup,
-            cls._answer_citation_followup,
+            query, history, cls._answer_topic_rewrite_followup,
+            cls._answer_topic_item_explain_followup, cls._answer_topic_history_followup,
+            cls._answer_evidence_page_followup, cls._answer_citation_followup,
         )
 
     def _send_json(self, status_code, payload):
@@ -753,6 +308,7 @@ class MarxOSHandler(BaseHTTPRequestHandler):
 
         query = (data.get("query") or "").strip()
         history = data.get("history") or []
+        mode = data.get("mode", "auto")
         if not query:
             self._send_json(400, {"error": "问题不能为空"})
             return
@@ -767,12 +323,16 @@ class MarxOSHandler(BaseHTTPRequestHandler):
                 route_query = self._topic_scoped_query(query, history)
                 is_followup = self._is_contextual_followup(query)
                 contextual_query = self._build_contextual_query(route_query, history) if is_followup else route_query
-                intent = "rag_answer" if is_followup else app.classify_query(route_query)
-                # Keep routing and safety guards scoped to the current user turn.
-                # Passing the full transcript can let a previous negative case
-                # incorrectly block the next question.
-                answer = app.run_query(contextual_query, route_query=route_query)
-        except Exception as exc:  # noqa: BLE001
+
+                # Mode routing: force deep_analysis or precise based on user selection
+                if mode == "deep":
+                    force = "deep_analysis"
+                else:
+                    force = None  # auto: let run_query classify internally
+
+                answer = app.run_query(contextual_query, route_query=route_query, force_intent=force)
+                intent = app.LAST_CITATION_AUDIT.get("crag_report", {}).get("intent") or force or app.classify_query(route_query)
+        except Exception as exc:
             self._send_json(500, {"error": f"服务异常: {html.escape(str(exc))}"})
             return
 
@@ -782,35 +342,20 @@ class MarxOSHandler(BaseHTTPRequestHandler):
         topic_info = getattr(app, "LAST_TOPIC_INFO", {})
         crag_report = getattr(app, "LAST_CRAG_REPORT", {})
         metrics = self._build_ask_metrics(
-            query=query,
-            intent=intent,
-            history=history,
-            answer=answer,
-            evidence=evidence,
-            citation_audit=citation_audit,
-            elapsed_ms=elapsed_ms,
-            topic_info=topic_info,
-            crag_report=crag_report,
+            query=query, intent=intent, history=history, answer=answer,
+            evidence=evidence, citation_audit=citation_audit, elapsed_ms=elapsed_ms,
+            topic_info=topic_info, crag_report=crag_report,
         )
         self._append_metrics_log(metrics)
         try:
             print(json.dumps(metrics, ensure_ascii=False), file=sys.stderr)
         except UnicodeEncodeError:
-            # Some Windows consoles cannot emit the Chinese metrics payload.
-            # Never let logging break the HTTP response path.
             print(json.dumps(metrics, ensure_ascii=True), file=sys.stderr)
         self._send_json(
             200,
             web_support.build_ask_response(
-                intent,
-                answer,
-                evidence,
-                citation_audit,
-                topic_info,
-                crag_report,
-                elapsed_ms,
-                history,
-                MAX_HISTORY_TURNS,
+                intent, answer, evidence, citation_audit, topic_info,
+                crag_report, elapsed_ms, history, MAX_HISTORY_TURNS,
             ),
         )
 
