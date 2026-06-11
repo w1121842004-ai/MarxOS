@@ -120,7 +120,15 @@ class RunQueryRegressionTests(unittest.TestCase):
             def similarity_search(self, _query, k):
                 return docs
 
-        with patch("app.load_vectorstore", return_value=FakeDb()), patch("app.OpenAI") as openai:
+        def fake_retrieve_documents(_query, _db, k=5):
+            return docs[:k]
+
+        with (
+            patch("app.load_vectorstore", return_value=FakeDb()),
+            patch("app.retrieve_documents", side_effect=fake_retrieve_documents),
+            patch("app.paragraph_vectorstore_exists", return_value=False),
+            patch("app.OpenAI") as openai,
+        ):
             answer = app.run_query("请列出马克思关于农民合作社的观点")
 
         openai.assert_not_called()

@@ -64,7 +64,26 @@ class RuntimeState:
                     message=r".*HuggingFaceEmbeddings.*deprecated in LangChain 0\.2\.2.*",
                     category=DeprecationWarning,
                 )
-                self.embeddings_instance = HuggingFaceEmbeddings(model_name=self.embedding_model)
+                try:
+                    self.embeddings_instance = HuggingFaceEmbeddings(model_name=self.embedding_model)
+                except Exception as exc:
+                    # SentenceTransformers may issue a small HuggingFace Hub
+                    # metadata request even when the model is already cached.
+                    # In offline/sandboxed runs, retry against the local cache.
+                    if not any(
+                        marker in str(exc)
+                        for marker in [
+                            "huggingface.co",
+                            "Cannot send a request",
+                            "WinError 10013",
+                            "Max retries exceeded",
+                        ]
+                    ):
+                        raise
+                    self.embeddings_instance = HuggingFaceEmbeddings(
+                        model_name=self.embedding_model,
+                        model_kwargs={"local_files_only": True},
+                    )
         return self.embeddings_instance
 
     def load_vectorstore(self) -> FAISS:

@@ -214,6 +214,8 @@ def diversify_documents(docs, k, ctx, max_per_source=2, max_per_article=1, min_d
 
 def annotate_docs_with_constraints(docs, constraints, ctx):
     metadata_citation_page = _helper(ctx, "metadata_citation_page")
+    clean_text = _helper(ctx, "clean_text")
+    is_noisy_article_title = _helper(ctx, "is_noisy_article_title")
     title = constraints.get("title")
     entries = constraints.get("entries") or []
     if not title and not entries:
@@ -252,7 +254,13 @@ def annotate_docs_with_constraints(docs, constraints, ctx):
                 metadata["classic_title"] = entry_title
                 metadata["work_title"] = entry_title
                 metadata["locator_title"] = entry_title
-                if not (metadata.get("raw_article") or metadata.get("raw_section")):
+                current_article = clean_text(metadata.get("article") or metadata.get("section"), "")
+                should_replace_article = (
+                    not current_article
+                    or is_noisy_article_title(current_article)
+                    or current_article == clean_text(metadata.get("book"), "")
+                )
+                if should_replace_article and not (metadata.get("raw_article") or metadata.get("raw_section")):
                     metadata["article"] = entry_title
                     metadata["section"] = entry_title
             if matched_entry.get("classic_author"):
