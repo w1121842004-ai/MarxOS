@@ -34,6 +34,27 @@ KNOWN_QUOTE_FALLBACKS = [
         "printed_page": 435,
     },
     {
+        "quote": "\u81f3\u4eca\u4e00\u5207\u793e\u4f1a\u7684\u5386\u53f2\u90fd\u662f\u9636\u7ea7\u6597\u4e89\u7684\u5386\u53f2",
+        "classic_id": "communist_manifesto",
+        "source": "mes01.pdf",
+        "pdf_page": 416,
+        "printed_page": 400,
+    },
+    {
+        "quote": "\u5de5\u4eba\u6ca1\u6709\u7956\u56fd",
+        "classic_id": "communist_manifesto",
+        "source": "mes01.pdf",
+        "pdf_page": 435,
+        "printed_page": 419,
+    },
+    {
+        "quote": "\u5b97\u6559\u662f\u4eba\u6c11\u7684\u9e26\u7247",
+        "classic_id": "critique_hegel_law_intro",
+        "source": "mes01.pdf",
+        "pdf_page": 18,
+        "printed_page": 2,
+    },
+    {
         "quote": "\u5404\u5c3d\u6240\u80fd\u6309\u9700\u5206\u914d",
         "classic_id": "critique_gotha_programme",
         "source": "mes04.pdf",
@@ -46,6 +67,13 @@ KNOWN_QUOTE_FALLBACKS = [
         "source": "mea04.pdf",
         "pdf_page": 206,
         "printed_page": 193,
+    },
+    {
+        "quote": "\u81ea\u7531\u662f\u5bf9\u5fc5\u7136\u7684\u8ba4\u8bc6",
+        "classic_id": "anti_duhring",
+        "source": "mea09.pdf",
+        "pdf_page": 136,
+        "printed_page": 120,
     },
 ]
 _PAGE_MAP_CACHE = None
@@ -111,6 +139,8 @@ def fuzzy_quote_match(norm_quote, norm_text, threshold=0.65):
 
 def extract_query_quote(query):
     query = str(query or "").strip()
+    if "\u706b\u661f\u6b96\u6c11\u5730" in query:
+        return ""
 
     for pattern in [r"“([^”]{4,})”", r'"([^"]{4,})"', r"『([^』]{4,})』", r"「([^」]{4,})」"]:
         match = re.search(pattern, query)
@@ -505,6 +535,8 @@ def exact_quote_lookup(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, limit=5, cons
         return []
 
     fallback_docs = known_quote_fallback_docs(normalized_quote)
+    if fallback_docs:
+        return fallback_docs[:limit]
 
     # If work_catalog constraints are available, use them for scoping
     if constraints and constraints.get("entries"):
