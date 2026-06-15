@@ -267,6 +267,9 @@ def annotate_docs_with_constraints(docs, constraints, ctx):
                 metadata.setdefault("classic_author", matched_entry.get("classic_author"))
             if matched_entry.get("classic_work_type"):
                 metadata.setdefault("classic_work_type", matched_entry.get("classic_work_type"))
+            for key in ("is_letter", "letter_title", "no_page_citation", "citation_mode"):
+                if matched_entry.get(key) is not None:
+                    metadata[key] = matched_entry.get(key)
     return docs
 
 

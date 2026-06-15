@@ -142,11 +142,18 @@ def build_constraint_guard(constraints):
         return ""
 
     source_text = "、".join(sources)
+    letter_rule = ""
+    if constraints.get("no_page_citation") or constraints.get("letter_locator"):
+        letter_rule = (
+            "4. 本题命中书信材料：回答时只标明信件题名和所属卷册，"
+            "不要输出页码式引文，不要编造具体页码。\n"
+        )
     return (
         "\n引用约束（必须严格遵守）：\n"
         f"1. 本题只允许引用以下来源：{source_text}。\n"
         "2. 不得写出任何不在该列表中的卷次、书名或来源。\n"
         "3. 若材料不足，请明确写“当前材料不足以支持该卷次判断”，不要补写其他卷次。\n"
+        f"{letter_rule}"
     )
 
 

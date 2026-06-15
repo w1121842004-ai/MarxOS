@@ -400,7 +400,7 @@ def infer_page_from_sequence(
 def is_me_volume(filename):
     stem = filename.lower().replace(".pdf", "")
 
-    if not re.fullmatch(r"me\d{2}[ab]?", stem):
+    if not re.fullmatch(r"me\d{2}[abc]?", stem):
         return False
 
     volume = int(stem[2:4])

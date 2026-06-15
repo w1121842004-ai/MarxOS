@@ -52,6 +52,8 @@ LINE_END_PAGE_RE = re.compile(r"(?<!\d)\d{1,4}(?!\d)\s*$")
 
 def normalize_ocr_text(text):
     text = (text or "").replace("\u3000", " ")
+    for marker in PDF_BOILERPLATE_MARKERS:
+        text = text.split(marker)[0]
     text = text.replace("⋯", "…")
     text = re.sub(r"[ \t\r\f\v]+", " ", text)
 

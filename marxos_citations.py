@@ -27,6 +27,12 @@ def format_citation(metadata, include_article, normalize_metadata, normalize_boo
     metadata = normalize_metadata(metadata)
     author, title, volume, year = normalize_book_parts(metadata)
     article = clean_text(metadata.get("section") or metadata.get("article"), "")
+    if metadata.get("no_page_citation"):
+        letter_title = clean_text(metadata.get("letter_title") or article, "")
+        volume_text = volume if volume else ""
+        if letter_title and letter_title != title:
+            return f"《{title}》{volume_text}，《{letter_title}》"
+        return f"《{title}》{volume_text}"
     author_text = f"{author}，" if author else ""
     volume_text = volume if volume else ""
     article_text = ""
@@ -68,6 +74,10 @@ def evidence_from_doc(
         "pdf_page": metadata.get("pdf_page") or metadata.get("page"),
         "match_type": metadata.get("match_type"),
         "confidence": metadata.get("confidence"),
+        "is_letter": metadata.get("is_letter"),
+        "letter_title": metadata.get("letter_title"),
+        "no_page_citation": metadata.get("no_page_citation"),
+        "citation_mode": metadata.get("citation_mode"),
         "excerpt": compact_preview(content, limit=240),
     }
 

@@ -155,7 +155,35 @@ def extract_query_quote(query):
 
 def cache_path_for_page(ocr_cache_dir, source, pdf_page):
     stem = source.replace(".pdf", "")
-    return Path(ocr_cache_dir) / stem / f"page_{pdf_page}.json"
+    base = Path(ocr_cache_dir) / stem
+    json_path = base / f"page_{pdf_page}.json"
+    if json_path.exists():
+        return json_path
+    return base / f"page_{pdf_page}.txt"
+
+
+def load_cached_page(path):
+    if not path.exists():
+        return None
+    match = re.search(r"page_(\d+)\.(?:json|txt)$", path.name)
+    pdf_page = int(match.group(1)) if match else None
+    source = f"{path.parent.name}.pdf"
+    if path.suffix.lower() == ".json":
+        with path.open("r", encoding="utf-8") as f:
+            page = json.load(f)
+        page.setdefault("source", source)
+        if pdf_page is not None:
+            page.setdefault("page_num", pdf_page)
+        return page
+    with path.open("r", encoding="utf-8") as f:
+        text = f.read()
+    return {
+        "source": source,
+        "page_num": pdf_page,
+        "cleaned_text": text,
+        "raw_text": text,
+        "page_type": "",
+    }
 
 
 def iter_candidate_pages(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, scoped=True):
@@ -167,7 +195,9 @@ def iter_candidate_pages(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, scoped=True
                 yield entry, cache_path_for_page(ocr_cache_dir, entry["source"], pdf_page)
         return
 
-    for path in Path(ocr_cache_dir).glob("*/page_*.json"):
+    for path in Path(ocr_cache_dir).glob("*/page_*.*"):
+        if path.suffix.lower() not in {".json", ".txt"}:
+            continue
         yield None, path
 
 
@@ -210,7 +240,7 @@ def metadata_from_page(page, entry, path, preferred_entries=None):
     pdf_page = page.get("page_num")
 
     if pdf_page is None:
-        match = re.search(r"page_(\d+)\.json$", path.name)
+        match = re.search(r"page_(\d+)\.(?:json|txt)$", path.name)
         pdf_page = int(match.group(1)) if match else None
 
     if entry is None:
@@ -407,11 +437,9 @@ def collect_hits_with_constraints(query, normalized_quote, ocr_cache_dir, constr
             if pdf_page is None:
                 pdf_page = printed_page  # fallback: try as-is
             path = cache_path_for_page(ocr_cache_dir, source, pdf_page)
-            if not path.exists():
+            page = load_cached_page(path)
+            if page is None:
                 continue
-
-            with path.open("r", encoding="utf-8") as f:
-                page = json.load(f)
 
             if page.get("page_type") == "toc":
                 continue
@@ -463,11 +491,9 @@ def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
     seen = set()
 
     for entry, path in iter_candidate_pages(query, ocr_cache_dir, scoped=scoped):
-        if not path.exists():
+        page = load_cached_page(path)
+        if page is None:
             continue
-
-        with path.open("r", encoding="utf-8") as f:
-            page = json.load(f)
 
         if page.get("page_type") == "toc":
             continue
