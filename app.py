@@ -9,9 +9,11 @@ import sys
 from pathlib import Path
 import marxos_citations as citations
 import marxos_answers as answer_utils
+import marxos_ambiguous as ambiguous_utils
 import marxos_orchestration as orchestration
 import marxos_phoenix as phoenix
 import marxos_prompts as prompts
+import marxos_query_planner as query_planner
 import marxos_query_intent as query_intent
 import retrieval as retrieval_utils
 import marxos_trace as trace_utils
@@ -258,19 +260,23 @@ def printed_page_from_page_map(source, pdf_page):
 def load_ocr_page_text(source, pdf_page):
     if not source or pdf_page is None:
         return ""
-    cache_path = os.path.join(
+    cache_base = os.path.join(
         OCR_CACHE_DIR,
         source_stem({"source": source}),
-        f"page_{pdf_page}.json",
     )
-    if not os.path.exists(cache_path):
-        return ""
+    cache_path = os.path.join(cache_base, f"page_{pdf_page}.json")
     try:
-        with open(cache_path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
+        if os.path.exists(cache_path):
+            with open(cache_path, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+            return repair_mojibake(payload.get("raw_text") or payload.get("cleaned_text") or "")
+        txt_path = os.path.join(cache_base, f"page_{pdf_page}.txt")
+        if os.path.exists(txt_path):
+            with open(txt_path, "r", encoding="utf-8") as f:
+                return repair_mojibake(f.read())
     except (OSError, json.JSONDecodeError):
         return ""
-    return repair_mojibake(payload.get("raw_text") or payload.get("cleaned_text") or "")
+    return ""
 
 
 def extract_query_terms_for_page_match(query):
@@ -307,21 +313,24 @@ def infer_printed_page_from_ocr_cache(metadata):
     if mapped_page is not None:
         return mapped_page
 
-    cache_path = os.path.join(
+    cache_base = os.path.join(
         OCR_CACHE_DIR,
         source_stem({"source": source}),
-        f"page_{pdf_page}.json",
     )
-    if not os.path.exists(cache_path):
-        return None
-
     try:
-        with open(cache_path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
+        cache_path = os.path.join(cache_base, f"page_{pdf_page}.json")
+        if os.path.exists(cache_path):
+            with open(cache_path, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+            raw_text = repair_mojibake(payload.get("raw_text") or payload.get("cleaned_text") or "")
+        else:
+            txt_path = os.path.join(cache_base, f"page_{pdf_page}.txt")
+            if not os.path.exists(txt_path):
+                return None
+            with open(txt_path, "r", encoding="utf-8") as f:
+                raw_text = repair_mojibake(f.read())
     except (OSError, json.JSONDecodeError):
         return None
-
-    raw_text = repair_mojibake(payload.get("raw_text") or payload.get("cleaned_text") or "")
     lines = [normalize_digit_text(line).strip() for line in str(raw_text).splitlines()]
     lines = [line for line in lines if line]
     edge_lines = lines[:3] + lines[-3:]
@@ -468,6 +477,7 @@ def _retrieval_ctx():
         "CLASSIC_SAYING_QUOTE_SEEDS": CLASSIC_SAYING_QUOTE_SEEDS,
         "CLASSIC_SAYING_QUERY_SEEDS": CLASSIC_SAYING_QUERY_SEEDS,
         "normalize_topic_title": normalize_topic_title,
+        "normalize_digit_text": normalize_digit_text,
         "normalize_for_match": normalize_for_match,
         "clean_article_title": clean_article_title,
         "clean_text": clean_text,
@@ -2224,6 +2234,10 @@ def build_constraint_guard(constraints):
 def build_prompt(intent, query, context):
     return prompts.build_prompt(intent, query, context)
 
+
+def build_ambiguous_locator_answer(query, constraints, limit=10):
+    return ambiguous_utils.build_ambiguous_locator_answer(query, constraints, limit=limit)
+
 def build_context(docs, query_intent):
     # Chunk creation happens in the vectorstore build step. This function only
     # consumes chunks and keeps their metadata visible for citation and prompts.
@@ -2258,15 +2272,36 @@ def build_context(docs, query_intent):
         sentence_citation = format_citation(metadata, include_article=False)
         detailed_source = format_citation(metadata, include_article=True)
         source_page = source_page_label(metadata)
+        letter_notice = ""
+        metadata_fields_text = (
+            f"metadata_fields: book={book}, article={article}, section={section}, page={page}, source={source}\n"
+        )
+        page_fields_text = (
+            f"page_fields: printed_page={printed_page}, citation_page={citation_page}, pdf_page={pdf_page}{page_range_text}\n"
+        )
+        if metadata.get("no_page_citation"):
+            letter_title = clean_text(metadata.get("letter_title") or article, article)
+            source_page = "书信材料"
+            letter_notice = (
+                f"letter_mode=true, letter_title={letter_title}, "
+                "citation_policy=letter_title_only\n"
+            )
+            metadata_fields_text = (
+                f"metadata_fields: book={book}, article={article}, section={section}, source={source}\n"
+            )
+            page_fields_text = (
+                "locator_fields: suppressed_for_letter=true\n"
+            )
 
         context_parts.append(
             f"EVIDENCE-CARD E{i}\n"
             f"evidence_id={evidence_id}\n"
             f"\u6765\u6e90\uff1a\u300a{book}\u300b{article}{section_text}\uff0c{source_page}\uff0csource={source}\n"
+            f"{letter_notice}"
             f"{confidence_text}\n"
             f"{classic_meta_text}"
-            f"metadata_fields: book={book}, article={article}, section={section}, page={page}, source={source}\n"
-            f"page_fields: printed_page={printed_page}, citation_page={citation_page}, pdf_page={pdf_page}{page_range_text}\n"
+            f"{metadata_fields_text}"
+            f"{page_fields_text}"
             f"position_fields: line_start={line_start}, line_end={line_end}\n"
             f"\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\uff1a{sentence_citation}\n"
             f"\u6bb5\u843d\u5177\u4f53\u51fa\u5904\u683c\u5f0f\uff1a{detailed_source}\n"
@@ -2632,7 +2667,7 @@ def normalize_final_answer(answer):
 
     return "\n".join(normalized_lines)
 
-def run_query(query, route_query=None, force_intent=None):
+def run_query(query, route_query=None, force_intent=None, history=None):
     with phoenix.trace_manager.start_as_current_span("marxos.run_query") as root_span:
         try:
             set_last_evidence([])
@@ -2662,6 +2697,9 @@ def run_query(query, route_query=None, force_intent=None):
             query = request["query"]
             route_query = request["route_query"]
             query_intent = request["query_intent"]
+            plan = query_planner.plan_query(route_query, query_intent, history=history or [])
+            if plan.standalone_query and plan.standalone_query != route_query:
+                route_query = plan.standalone_query
             trace = trace_enabled()
             trace_only = trace_only_enabled()
             dual_retrieval = dual_retrieval_enabled()
@@ -2744,6 +2782,8 @@ def run_query(query, route_query=None, force_intent=None):
                     "app.query": phoenix.compact_text(query, limit=240),
                     "app.route_query": phoenix.compact_text(route_query, limit=240),
                     "app.query_intent": query_intent,
+                    "app.query_plan_mode": plan.mode,
+                    "app.query_plan_variants": len(plan.retrieval_queries),
                     "app.trace_enabled": trace,
                     "app.trace_only": trace_only,
                     "app.dual_retrieval": dual_retrieval,
@@ -2819,6 +2859,7 @@ def run_query(query, route_query=None, force_intent=None):
                     refine_docs_citation_pages_for_query,
                     evidence_from_docs,
                     is_topic_view_list_query,
+                    query_plan=plan.as_dict(),
                 )
                 docs = retrieval_state["docs"]
                 evidence = retrieval_state["evidence"]
@@ -2845,6 +2886,18 @@ def run_query(query, route_query=None, force_intent=None):
                         "crag.ok": bool(crag_report.get("ok", False)),
                     },
                 )
+
+            ambiguous_answer = build_ambiguous_locator_answer(route_query, constraints)
+            if ambiguous_answer:
+                set_last_evidence(evidence, {"ok": True, "issues": [], "evidence_count": len(evidence), "answer": ambiguous_answer})
+                phoenix.set_attributes(
+                    root_span,
+                    {
+                        "answer.path": "ambiguous_locator",
+                        "answer.length": len(ambiguous_answer),
+                    },
+                )
+                return ambiguous_answer
 
             with phoenix.trace_manager.start_as_current_span("marxos.local_view_answer") as span:
                 local_view_answer = orchestration.maybe_answer_local_view_query(
@@ -2933,6 +2986,7 @@ def run_query(query, route_query=None, force_intent=None):
                         refine_docs_citation_pages_for_query,
                         evidence_from_docs, is_topic_view_list_query,
                         force_corrective=True,
+                        query_plan=plan.as_dict(),
                     )
                     new_docs = recovery_state["docs"]
                     new_evidence = recovery_state["evidence"]

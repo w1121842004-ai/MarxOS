@@ -1,0 +1,3735 @@
+[
+  {
+    "active": true,
+    "title": "给一个骑士英雄画像",
+    "source": "me01b.pdf",
+    "book": "马克思恩格斯全集 第1卷B",
+    "start_page": 787,
+    "end_page": 787,
+    "level": 2,
+    "parent": "献给亲爱的父亲的诗作",
+    "primary": true,
+    "aliases": [
+      "给一个骑士英雄画像"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "附录卡尔·马克思的出生证书",
+    "source": "me01b.pdf",
+    "book": "马克思恩格斯全集 第1卷B",
+    "start_page": 931,
+    "end_page": 931,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录卡尔·马克思的出生证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "特里尔中学毕业证书",
+    "source": "me01b.pdf",
+    "book": "马克思恩格斯全集 第1卷B",
+    "start_page": 932,
+    "end_page": 934,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "特里尔中学毕业证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "波恩大学肄业证书",
+    "source": "me01b.pdf",
+    "book": "马克思恩格斯全集 第1卷B",
+    "start_page": 936,
+    "end_page": 938,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "波恩大学肄业证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "柏林大学毕业证书",
+    "source": "me01b.pdf",
+    "book": "马克思恩格斯全集 第1卷B",
+    "start_page": 939,
+    "end_page": 941,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "柏林大学毕业证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "卡尔·马克思的博士学位证书",
+    "source": "me01b.pdf",
+    "book": "马克思恩格斯全集 第1卷B",
+    "start_page": 944,
+    "end_page": 945,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡尔·马克思的博士学位证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "文学作品和神话中的人物索引",
+    "source": "me01b.pdf",
+    "book": "马克思恩格斯全集 第1卷B",
+    "start_page": 1089,
+    "end_page": 1096,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "文学作品和神话中的人物索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "报刊索引",
+    "source": "me01b.pdf",
+    "book": "马克思恩格斯全集 第1卷B",
+    "start_page": 1132,
+    "end_page": 1140,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "报刊索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "英国工人阶级状况”一书第一版的扉页",
+    "source": "me02.pdf",
+    "book": "马克思恩格斯全集 第2卷",
+    "start_page": 271,
+    "end_page": 272,
+    "level": 2,
+    "parent": "弗·恩格斯。英国工人阶级状况。根据亲身观察和可靠材料",
+    "primary": false,
+    "aliases": [
+      "英国工人阶级状况”一书第一版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 286,
+    "pdf_end_page": 287
+  },
+  {
+    "active": true,
+    "title": "曼彻斯特及其郊区平面图",
+    "source": "me02.pdf",
+    "book": "马克思恩格斯全集 第2卷",
+    "start_page": 514,
+    "end_page": 515,
+    "level": 2,
+    "parent": "弗·恩格斯。英国工人阶级状况。根据亲身观察和可靠材料",
+    "primary": true,
+    "aliases": [
+      "曼彻斯特及其郊区平面图"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 529,
+    "pdf_end_page": 530
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me02.pdf",
+    "book": "马克思恩格斯全集 第2卷",
+    "start_page": 707,
+    "end_page": 712,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 722,
+    "pdf_end_page": 727
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯“德意志意识形态”手稿的第一页。序言",
+    "source": "me03.pdf",
+    "book": "马克思恩格斯全集 第3卷",
+    "start_page": 17,
+    "end_page": 18,
+    "level": 3,
+    "parent": "第一卷对费尔巴哈、布·鲍威尔和施蒂纳所代表的现代德国哲学的批判",
+    "primary": false,
+    "aliases": [
+      "卡·马克思和弗·恩格斯“德意志意识形态”手稿的第一页。序言"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "卡·马克思“哲学的贫困”第一版的封面",
+    "source": "me04.pdf",
+    "book": "马克思恩格斯全集 第4卷",
+    "start_page": 73,
+    "end_page": 74,
+    "level": 2,
+    "parent": "卡·马克思。哲学的贫困。答蒲鲁东先生的“贫困的哲学",
+    "primary": false,
+    "aliases": [
+      "卡·马克思“哲学的贫困”第一版的封面"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "共产党宣言”第一版的扉页",
+    "source": "me04.pdf",
+    "book": "马克思恩格斯全集 第4卷",
+    "start_page": 463,
+    "end_page": 464,
+    "level": 2,
+    "parent": "卡·马克思和弗·恩格斯。共产党宣言",
+    "primary": false,
+    "aliases": [
+      "共产党宣言”第一版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 483,
+    "pdf_end_page": 484
+  },
+  {
+    "active": true,
+    "title": "共产党宣言”1848年版的封面（30页本",
+    "source": "me04.pdf",
+    "book": "马克思恩格斯全集 第4卷",
+    "start_page": 492,
+    "end_page": 493,
+    "level": 2,
+    "parent": "卡·马克思和弗·恩格斯。共产党宣言",
+    "primary": false,
+    "aliases": [
+      "共产党宣言”1848年版的封面（30页本"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 512,
+    "pdf_end_page": 513
+  },
+  {
+    "active": true,
+    "title": "附录马克思所做的关于1847年8月5日建立共产主义者同盟布鲁塞尔支部和区部的记录",
+    "source": "me04.pdf",
+    "book": "马克思恩格斯全集 第4卷",
+    "start_page": 571,
+    "end_page": 571,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录马克思所做的关于1847年8月5日建立共产主义者同盟布鲁塞尔支部和区部的记录"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 591,
+    "pdf_end_page": 591
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me04.pdf",
+    "book": "马克思恩格斯全集 第4卷",
+    "start_page": 635,
+    "end_page": 643,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 655,
+    "pdf_end_page": 663
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯的“从巴黎到伯尔尼”的手稿第一页",
+    "source": "me05.pdf",
+    "book": "马克思恩格斯全集 第5卷",
+    "start_page": 547,
+    "end_page": 548,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "弗·恩格斯的“从巴黎到伯尔尼”的手稿第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 572,
+    "pdf_end_page": 573
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯画的从奥克萨里到洛克尔的路线草图",
+    "source": "me05.pdf",
+    "book": "马克思恩格斯全集 第5卷",
+    "start_page": 564,
+    "end_page": 565,
+    "level": 2,
+    "parent": "弗·恩格斯的遗稿从巴黎到伯尔尼",
+    "primary": true,
+    "aliases": [
+      "弗·恩格斯画的从奥克萨里到洛克尔的路线草图"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 589,
+    "pdf_end_page": 590
+  },
+  {
+    "active": true,
+    "title": "附录告全体德国工人书",
+    "source": "me05.pdf",
+    "book": "马克思恩格斯全集 第5卷",
+    "start_page": 575,
+    "end_page": 576,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录告全体德国工人书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 600,
+    "pdf_end_page": 601
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me05.pdf",
+    "book": "马克思恩格斯全集 第5卷",
+    "start_page": 652,
+    "end_page": 666,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 677,
+    "pdf_end_page": 691
+  },
+  {
+    "active": true,
+    "title": "用星花（）标出的篇名都是苏共中央马克思列宁主义研究院加的。——编者注艾希曼的命令",
+    "source": "me06.pdf",
+    "book": "马克思恩格斯全集 第6卷",
+    "start_page": 37,
+    "end_page": 38,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "用星花（）标出的篇名都是苏共中央马克思列宁主义研究院加的。——编者注艾希曼的命令"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "载有卡·马克思和弗·恩格斯在科伦受审时发言全文的小册子“两个政治审判案”的扉页",
+    "source": "me06.pdf",
+    "book": "马克思恩格斯全集 第6卷",
+    "start_page": 263,
+    "end_page": 278,
+    "level": 2,
+    "parent": "新莱茵报”审判案",
+    "primary": false,
+    "aliases": [
+      "载有卡·马克思和弗·恩格斯在科伦受审时发言全文的小册子“两个政治审判案”的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 297,
+    "pdf_end_page": 312
+  },
+  {
+    "active": true,
+    "title": "—1849年的匈牙利地图",
+    "source": "me06.pdf",
+    "book": "马克思恩格斯全集 第6卷",
+    "start_page": 604,
+    "end_page": 605,
+    "level": 2,
+    "parent": "匈牙利",
+    "primary": true,
+    "aliases": [
+      "—1849年的匈牙利地图"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 638,
+    "pdf_end_page": 639
+  },
+  {
+    "active": true,
+    "title": "卡·马克思的手稿“工资”的第一页",
+    "source": "me06.pdf",
+    "book": "马克思恩格斯全集 第6卷",
+    "start_page": 633,
+    "end_page": 634,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "卡·马克思的手稿“工资”的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 667,
+    "pdf_end_page": 668
+  },
+  {
+    "active": true,
+    "title": "附录卡尔·马克思",
+    "source": "me06.pdf",
+    "book": "马克思恩格斯全集 第6卷",
+    "start_page": 675,
+    "end_page": 675,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录卡尔·马克思"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 709,
+    "pdf_end_page": 709
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯请求准许他居留伯尔尼的申请书",
+    "source": "me06.pdf",
+    "book": "马克思恩格斯全集 第6卷",
+    "start_page": 676,
+    "end_page": 677,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "弗·恩格斯请求准许他居留伯尔尼的申请书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 710,
+    "pdf_end_page": 711
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me06.pdf",
+    "book": "马克思恩格斯全集 第6卷",
+    "start_page": 771,
+    "end_page": 786,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 805,
+    "pdf_end_page": 820
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯的“1852年神圣同盟对法战争的可能性与展望”手稿的第一页",
+    "source": "me07.pdf",
+    "book": "马克思恩格斯全集 第7卷",
+    "start_page": 547,
+    "end_page": 577,
+    "level": 2,
+    "parent": "弗·恩格斯。1852年神圣同盟对法战争的可能性与展望",
+    "primary": false,
+    "aliases": [
+      "弗·恩格斯的“1852年神圣同盟对法战争的可能性与展望”手稿的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 572,
+    "pdf_end_page": 602
+  },
+  {
+    "active": true,
+    "title": "附录救济德国政治流亡者的呼吁书",
+    "source": "me07.pdf",
+    "book": "马克思恩格斯全集 第7卷",
+    "start_page": 595,
+    "end_page": 596,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录救济德国政治流亡者的呼吁书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 620,
+    "pdf_end_page": 621
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me07.pdf",
+    "book": "马克思恩格斯全集 第7卷",
+    "start_page": 690,
+    "end_page": 705,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 715,
+    "pdf_end_page": 730
+  },
+  {
+    "active": true,
+    "title": "报刊索引",
+    "source": "me07.pdf",
+    "book": "马克思恩格斯全集 第7卷",
+    "start_page": 738,
+    "end_page": 740,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "报刊索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 763,
+    "pdf_end_page": 765
+  },
+  {
+    "active": true,
+    "title": "载有弗·恩格斯的“去年十二月法国无产者相对消极的真正原因”一文的“寄语人民”杂志的扉页",
+    "source": "me08.pdf",
+    "book": "马克思恩格斯全集 第8卷",
+    "start_page": 253,
+    "end_page": 256,
+    "level": 3,
+    "parent": "三",
+    "primary": false,
+    "aliases": [
+      "载有弗·恩格斯的“去年十二月法国无产者相对消极的真正原因”一文的“寄语人民”杂志的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 282,
+    "pdf_end_page": 285
+  },
+  {
+    "active": true,
+    "title": "卡·马克思的“揭露科伦共产党人案件”一书的巴塞尔第一版的扉页",
+    "source": "me08.pdf",
+    "book": "马克思恩格斯全集 第8卷",
+    "start_page": 459,
+    "end_page": 460,
+    "level": 2,
+    "parent": "卡·马克思。揭露科伦共产党人案件",
+    "primary": false,
+    "aliases": [
+      "卡·马克思的“揭露科伦共产党人案件”一书的巴塞尔第一版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 488,
+    "pdf_end_page": 489
+  },
+  {
+    "active": true,
+    "title": "卡·马克思的“揭露科伦共产党人案件”一书的1853年波士顿版的扉页",
+    "source": "me08.pdf",
+    "book": "马克思恩格斯全集 第8卷",
+    "start_page": 523,
+    "end_page": 529,
+    "level": 3,
+    "parent": "六维利希—沙佩尔集团",
+    "primary": false,
+    "aliases": [
+      "卡·马克思的“揭露科伦共产党人案件”一书的1853年波士顿版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 552,
+    "pdf_end_page": 558
+  },
+  {
+    "active": true,
+    "title": "附录1850年9月15日的中央委员会会议",
+    "source": "me08.pdf",
+    "book": "马克思恩格斯全集 第8卷",
+    "start_page": 635,
+    "end_page": 641,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录1850年9月15日的中央委员会会议"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 655,
+    "pdf_end_page": 670
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me08.pdf",
+    "book": "马克思恩格斯全集 第8卷",
+    "start_page": 711,
+    "end_page": 728,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 740,
+    "pdf_end_page": 757
+  },
+  {
+    "active": true,
+    "title": "用星花（）标出的篇名都是苏共中央马克思列宁主义研究院加的。——编者注卡·马克思。粮价上涨。——霍乱。——罢工海员中的运动",
+    "source": "me09.pdf",
+    "book": "马克思恩格斯全集 第9卷",
+    "start_page": 324,
+    "end_page": 326,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "用星花（）标出的篇名都是苏共中央马克思列宁主义研究院加的。——编者注卡·马克思。粮价上涨。——霍乱。——罢工海员中的运动"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 355,
+    "pdf_end_page": 357
+  },
+  {
+    "active": true,
+    "title": "卡·马克思的抨击文“高尚意识的骑士”第一版的扉页",
+    "source": "me09.pdf",
+    "book": "马克思恩格斯全集 第9卷",
+    "start_page": 539,
+    "end_page": 571,
+    "level": 2,
+    "parent": "卡·马克思。高尚意识的骑士",
+    "primary": false,
+    "aliases": [
+      "卡·马克思的抨击文“高尚意识的骑士”第一版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 570,
+    "pdf_end_page": 602
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me09.pdf",
+    "book": "马克思恩格斯全集 第9卷",
+    "start_page": 699,
+    "end_page": 712,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 730,
+    "pdf_end_page": 743
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me09.pdf",
+    "book": "马克思恩格斯全集 第9卷",
+    "start_page": 754,
+    "end_page": 764,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 785,
+    "pdf_end_page": 795
+  },
+  {
+    "active": true,
+    "title": "卡·马克思。俄国的外交。——关于东方问题的蓝用星花（）标出的篇名都是苏共中央马克思列宁主义研究院加的。——编者注皮书。——门的内哥罗",
+    "source": "me10.pdf",
+    "book": "马克思恩格斯全集 第10卷",
+    "start_page": 69,
+    "end_page": 76,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思。俄国的外交。——关于东方问题的蓝用星花（）标出的篇名都是苏共中央马克思列宁主义研究院加的。——编者注皮书。——门的内哥罗"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "附录英国资产阶级",
+    "source": "me10.pdf",
+    "book": "马克思恩格斯全集 第10卷",
+    "start_page": 683,
+    "end_page": 688,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录英国资产阶级"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 713,
+    "pdf_end_page": 718
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me10.pdf",
+    "book": "马克思恩格斯全集 第10卷",
+    "start_page": 750,
+    "end_page": 765,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 780,
+    "pdf_end_page": 795
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me10.pdf",
+    "book": "马克思恩格斯全集 第10卷",
+    "start_page": 812,
+    "end_page": 824,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 842,
+    "pdf_end_page": 854
+  },
+  {
+    "active": true,
+    "title": "用星花（）标出的篇名都是苏共中央马克思列宁主义研究院加的。——编者注一",
+    "source": "me11.pdf",
+    "book": "马克思恩格斯全集 第11卷",
+    "start_page": 68,
+    "end_page": 71,
+    "level": 2,
+    "parent": "卡·马克思。帕麦斯顿勋爵",
+    "primary": true,
+    "aliases": [
+      "用星花（）标出的篇名都是苏共中央马克思列宁主义研究院加的。——编者注一"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me11.pdf",
+    "book": "马克思恩格斯全集 第11卷",
+    "start_page": 779,
+    "end_page": 796,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 816,
+    "pdf_end_page": 833
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me11.pdf",
+    "book": "马克思恩格斯全集 第11卷",
+    "start_page": 837,
+    "end_page": 846,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 874,
+    "pdf_end_page": 883
+  },
+  {
+    "active": true,
+    "title": "⒇用星花（）标出的篇名都是苏共中央马克思列宁主义研究院加的编者注卡·马克思英国—波斯战争",
+    "source": "me12.pdf",
+    "book": "马克思恩格斯全集 第12卷",
+    "start_page": 77,
+    "end_page": 79,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "⒇用星花（）标出的篇名都是苏共中央马克思列宁主义研究院加的编者注卡·马克思英国—波斯战争"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "卡·马克思“对波斯的战争”的草稿的第一页",
+    "source": "me12.pdf",
+    "book": "马克思恩格斯全集 第12卷",
+    "start_page": 129,
+    "end_page": 132,
+    "level": 2,
+    "parent": "卡·马克思。对波斯的战争",
+    "primary": false,
+    "aliases": [
+      "卡·马克思“对波斯的战争”的草稿的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 162,
+    "pdf_end_page": 165
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me12.pdf",
+    "book": "马克思恩格斯全集 第12卷",
+    "start_page": 843,
+    "end_page": 865,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 876,
+    "pdf_end_page": 898
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me12.pdf",
+    "book": "马克思恩格斯全集 第12卷",
+    "start_page": 910,
+    "end_page": 921,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 943,
+    "pdf_end_page": 954
+  },
+  {
+    "active": true,
+    "title": "马克思恩格斯全集用星花（）标出的篇名是苏共中央马克思列宁主义研究院加的。——编者注一",
+    "source": "me13.pdf",
+    "book": "马克思恩格斯全集 第13卷",
+    "start_page": 325,
+    "end_page": 329,
+    "level": 2,
+    "parent": "卡·马克思。印度财政状况的严重混乱",
+    "primary": true,
+    "aliases": [
+      "马克思恩格斯全集用星花（）标出的篇名是苏共中央马克思列宁主义研究院加的。——编者注一"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 358,
+    "pdf_end_page": 362
+  },
+  {
+    "active": true,
+    "title": "附录“人民报”编辑部的声明",
+    "source": "me13.pdf",
+    "book": "马克思恩格斯全集 第13卷",
+    "start_page": 683,
+    "end_page": 683,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录“人民报”编辑部的声明"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 716,
+    "pdf_end_page": 716
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me13.pdf",
+    "book": "马克思恩格斯全集 第13卷",
+    "start_page": 763,
+    "end_page": 779,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 796,
+    "pdf_end_page": 812
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me13.pdf",
+    "book": "马克思恩格斯全集 第13卷",
+    "start_page": 819,
+    "end_page": 833,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 852,
+    "pdf_end_page": 866
+  },
+  {
+    "active": true,
+    "title": "括号中是“美国新百科全书”刊载的条目的原文标题。－－编者注ＣＬＡＹＤＥＴＯＬＬＹ",
+    "source": "me14a.pdf",
+    "book": "马克思恩格斯全集 第14卷A",
+    "start_page": 92,
+    "end_page": 94,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "括号中是“美国新百科全书”刊载的条目的原文标题。－－编者注ＣＬＡＹＤＥＴＯＬＬＹ"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "福格特先生”一书第一版的扉页",
+    "source": "me14a.pdf",
+    "book": "马克思恩格斯全集 第14卷A",
+    "start_page": 399,
+    "end_page": 400,
+    "level": 2,
+    "parent": "卡·马克思。福格特先生",
+    "primary": false,
+    "aliases": [
+      "福格特先生”一书第一版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 434,
+    "pdf_end_page": 435
+  },
+  {
+    "active": true,
+    "title": "十二、附录",
+    "source": "me14a.pdf",
+    "book": "马克思恩格斯全集 第14卷A",
+    "start_page": 717,
+    "end_page": 754,
+    "level": 2,
+    "parent": "卡·马克思。福格特先生",
+    "primary": false,
+    "aliases": [
+      "十二、附录"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 752,
+    "pdf_end_page": 789
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me14b.pdf",
+    "book": "马克思恩格斯全集 第14卷B",
+    "start_page": 976,
+    "end_page": 995,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "用星花（）标出的篇名都是俄文版编者加的。——译者注马克思恩格斯全集弗·恩格斯。法国轻步兵",
+    "source": "me15.pdf",
+    "book": "马克思恩格斯全集 第15卷",
+    "start_page": 177,
+    "end_page": 191,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "用星花（）标出的篇名都是俄文版编者加的。——译者注马克思恩格斯全集弗·恩格斯。法国轻步兵"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 207,
+    "pdf_end_page": 221
+  },
+  {
+    "active": true,
+    "title": "志愿兵读物”一书的扉页",
+    "source": "me15.pdf",
+    "book": "马克思恩格斯全集 第15卷",
+    "start_page": 271,
+    "end_page": 272,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "志愿兵读物”一书的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 301,
+    "pdf_end_page": 302
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯“英国军队”一文手稿的第一页",
+    "source": "me15.pdf",
+    "book": "马克思恩格斯全集 第15卷",
+    "start_page": 645,
+    "end_page": 648,
+    "level": 3,
+    "parent": "一",
+    "primary": false,
+    "aliases": [
+      "弗·恩格斯“英国军队”一文手稿的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 675,
+    "pdf_end_page": 678
+  },
+  {
+    "active": true,
+    "title": "附录卡·马克思关于恢复普鲁士国籍的申请书",
+    "source": "me15.pdf",
+    "book": "马克思恩格斯全集 第15卷",
+    "start_page": 667,
+    "end_page": 667,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录卡·马克思关于恢复普鲁士国籍的申请书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 697,
+    "pdf_end_page": 697
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me15.pdf",
+    "book": "马克思恩格斯全集 第15卷",
+    "start_page": 749,
+    "end_page": 774,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 779,
+    "pdf_end_page": 804
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me15.pdf",
+    "book": "马克思恩格斯全集 第15卷",
+    "start_page": 817,
+    "end_page": 826,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 847,
+    "pdf_end_page": 856
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯的小册子“普鲁士军事问题和德国工人政党”第一版的扉页",
+    "source": "me16.pdf",
+    "book": "马克思恩格斯全集 第16卷",
+    "start_page": 43,
+    "end_page": 45,
+    "level": 2,
+    "parent": "弗·恩格斯。普鲁士军事问题和德国工人政党",
+    "primary": false,
+    "aliases": [
+      "弗·恩格斯的小册子“普鲁士军事问题和德国工人政党”第一版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "记录簿中贴有卡·马克思“关于对法国各支部的成员的迫害”手稿的一页",
+    "source": "me16.pdf",
+    "book": "马克思恩格斯全集 第16卷",
+    "start_page": 481,
+    "end_page": 482,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "记录簿中贴有卡·马克思“关于对法国各支部的成员的迫害”手稿的一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 495,
+    "pdf_end_page": 480
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯“爱尔兰史”手稿的第一页",
+    "source": "me16.pdf",
+    "book": "马克思恩格斯全集 第16卷",
+    "start_page": 527,
+    "end_page": 539,
+    "level": 3,
+    "parent": "自然条件",
+    "primary": false,
+    "aliases": [
+      "弗·恩格斯“爱尔兰史”手稿的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 541,
+    "pdf_end_page": 553
+  },
+  {
+    "active": true,
+    "title": "爱尔兰地图",
+    "source": "me16.pdf",
+    "book": "马克思恩格斯全集 第16卷",
+    "start_page": 540,
+    "end_page": 541,
+    "level": 3,
+    "parent": "自然条件",
+    "primary": true,
+    "aliases": [
+      "爱尔兰地图"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 554,
+    "pdf_end_page": 555
+  },
+  {
+    "active": true,
+    "title": "附录中央委员会告各工人团体书",
+    "source": "me16.pdf",
+    "book": "马克思恩格斯全集 第16卷",
+    "start_page": 579,
+    "end_page": 580,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录中央委员会告各工人团体书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 593,
+    "pdf_end_page": 594
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me16.pdf",
+    "book": "马克思恩格斯全集 第16卷",
+    "start_page": 831,
+    "end_page": 877,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 845,
+    "pdf_end_page": 891
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me16.pdf",
+    "book": "马克思恩格斯全集 第16卷",
+    "start_page": 923,
+    "end_page": 931,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 937,
+    "pdf_end_page": 945
+  },
+  {
+    "active": true,
+    "title": "卡·马克思①茹尔·法夫尔。——编者注下的决议：“我们以德国民主派的名义，特别是以参加社会民主党的工人名义宣布，目前这场战争完全是王朝战争……我们很高兴地握住法国工人们伸给我们的兄弟的手……我们谨记着国际工人协会的‘全世界无产者，联合起来！’",
+    "source": "me17.pdf",
+    "book": "马克思恩格斯全集 第17卷",
+    "start_page": 9,
+    "end_page": 10,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思①茹尔·法夫尔。——编者注下的决议：“我们以德国民主派的名义，特别是以参加社会民主党的工人名义宣布，目前这场战争完全是王朝战争……我们很高兴地握住法国工人们伸给我们的兄弟的手……我们谨记着国际工人协会的‘全世界无产者，联合起来！’"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "法兰西内战”英文第三版的扉页",
+    "source": "me17.pdf",
+    "book": "马克思恩格斯全集 第17卷",
+    "start_page": 333,
+    "end_page": 334,
+    "level": 2,
+    "parent": "卡·马克思。法兰西内战。国际工人协会总委员会宣言",
+    "primary": false,
+    "aliases": [
+      "法兰西内战”英文第三版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 346,
+    "pdf_end_page": 347
+  },
+  {
+    "active": true,
+    "title": "附录卡·马克思关于国防政府的发言记录",
+    "source": "me17.pdf",
+    "book": "马克思恩格斯全集 第17卷",
+    "start_page": 665,
+    "end_page": 666,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录卡·马克思关于国防政府的发言记录"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 678,
+    "pdf_end_page": 679
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me17.pdf",
+    "book": "马克思恩格斯全集 第17卷",
+    "start_page": 824,
+    "end_page": 858,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 837,
+    "pdf_end_page": 871
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me17.pdf",
+    "book": "马克思恩格斯全集 第17卷",
+    "start_page": 898,
+    "end_page": 907,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 911,
+    "pdf_end_page": 920
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯“论住宅问题”一书的扉页，上面有作者写的赠给劳拉·拉法格的字样",
+    "source": "me18.pdf",
+    "book": "马克思恩格斯全集 第18卷",
+    "start_page": 235,
+    "end_page": 236,
+    "level": 2,
+    "parent": "弗·恩格斯。论住宅问题",
+    "primary": false,
+    "aliases": [
+      "弗·恩格斯“论住宅问题”一书的扉页，上面有作者写的赠给劳拉·拉法格的字样"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 246,
+    "pdf_end_page": 247
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯的小册子“社会主义民主同盟和国际工人协会”的扉页",
+    "source": "me18.pdf",
+    "book": "马克思恩格斯全集 第18卷",
+    "start_page": 367,
+    "end_page": 368,
+    "level": 2,
+    "parent": "卡·马克思和弗·恩格斯。社会主义民主同盟和国际工人协会。根据国际海牙代表大会决定公布的报告和文件",
+    "primary": false,
+    "aliases": [
+      "卡·马克思和弗·恩格斯的小册子“社会主义民主同盟和国际工人协会”的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 378,
+    "pdf_end_page": 379
+  },
+  {
+    "active": true,
+    "title": "附录爱尔兰的警察恐怖。国际工人协会总委员会声明",
+    "source": "me18.pdf",
+    "book": "马克思恩格斯全集 第18卷",
+    "start_page": 711,
+    "end_page": 713,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录爱尔兰的警察恐怖。国际工人协会总委员会声明"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 722,
+    "pdf_end_page": 724
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me18.pdf",
+    "book": "马克思恩格斯全集 第18卷",
+    "start_page": 834,
+    "end_page": 867,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 845,
+    "pdf_end_page": 878
+  },
+  {
+    "active": true,
+    "title": "马克思恩格斯全集用星花（）标出的篇名都是俄文版编者加的。——译者注卡·马克思和弗·恩格斯。给奥·倍倍尔、威·李卜克内西、威·白拉克等人的通告信",
+    "source": "me19.pdf",
+    "book": "马克思恩格斯全集 第19卷",
+    "start_page": 172,
+    "end_page": 190,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "马克思恩格斯全集用星花（）标出的篇名都是俄文版编者加的。——译者注卡·马克思和弗·恩格斯。给奥·倍倍尔、威·李卜克内西、威·白拉克等人的通告信"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 181,
+    "pdf_end_page": 199
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯的通告信的第一页",
+    "source": "me19.pdf",
+    "book": "马克思恩格斯全集 第19卷",
+    "start_page": 173,
+    "end_page": 177,
+    "level": 2,
+    "parent": "马克思恩格斯全集用星花（）标出的篇名都是俄文版编者加的。——译者注卡·马克思和弗·恩格斯。给奥·倍倍尔、威·李卜克内西、威·白拉克等人的通告信",
+    "primary": false,
+    "aliases": [
+      "卡·马克思和弗·恩格斯的通告信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 182,
+    "pdf_end_page": 186
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯“社会主义从空想到科学的发展”一书的法文第一版的扉页",
+    "source": "me19.pdf",
+    "book": "马克思恩格斯全集 第19卷",
+    "start_page": 203,
+    "end_page": 204,
+    "level": 2,
+    "parent": "弗·恩格斯。社会主义从空想到科学的发展",
+    "primary": false,
+    "aliases": [
+      "弗·恩格斯“社会主义从空想到科学的发展”一书的法文第一版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 212,
+    "pdf_end_page": 213
+  },
+  {
+    "active": true,
+    "title": "注释：各日耳曼部落",
+    "source": "me19.pdf",
+    "book": "马克思恩格斯全集 第19卷",
+    "start_page": 523,
+    "end_page": 530,
+    "level": 2,
+    "parent": "弗·恩格斯。论日耳曼人的古代历史",
+    "primary": true,
+    "aliases": [
+      "注释：各日耳曼部落"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 532,
+    "pdf_end_page": 539
+  },
+  {
+    "active": true,
+    "title": "注释：法兰克方言",
+    "source": "me19.pdf",
+    "book": "马克思恩格斯全集 第19卷",
+    "start_page": 564,
+    "end_page": 602,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "注释：法兰克方言"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 573,
+    "pdf_end_page": 611
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯生平事业年表",
+    "source": "me19.pdf",
+    "book": "马克思恩格斯全集 第19卷",
+    "start_page": 664,
+    "end_page": 696,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 673,
+    "pdf_end_page": 705
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me19.pdf",
+    "book": "马克思恩格斯全集 第19卷",
+    "start_page": 728,
+    "end_page": 740,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 737,
+    "pdf_end_page": 749
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯《反杜林论》一书第三版的扉页",
+    "source": "me20.pdf",
+    "book": "马克思恩格斯全集 第20卷",
+    "start_page": 5,
+    "end_page": 6,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "弗·恩格斯《反杜林论》一书第三版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "卡·马克思《评杜林〈国民经济学批判史〉》手稿的第一页",
+    "source": "me20.pdf",
+    "book": "马克思恩格斯全集 第20卷",
+    "start_page": 247,
+    "end_page": 248,
+    "level": 2,
+    "parent": "第二编政治经济学",
+    "primary": false,
+    "aliases": [
+      "卡·马克思《评杜林〈国民经济学批判史〉》手稿的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 254,
+    "pdf_end_page": 255
+  },
+  {
+    "active": true,
+    "title": "自然辩证法》第一束材料的第一页",
+    "source": "me20.pdf",
+    "book": "马克思恩格斯全集 第20卷",
+    "start_page": 543,
+    "end_page": 552,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "自然辩证法》第一束材料的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 550,
+    "pdf_end_page": 559
+  },
+  {
+    "active": true,
+    "title": "自然辩证法》各束手稿内容索引",
+    "source": "me20.pdf",
+    "book": "马克思恩格斯全集 第20卷",
+    "start_page": 797,
+    "end_page": 804,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "自然辩证法》各束手稿内容索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 804,
+    "pdf_end_page": 811
+  },
+  {
+    "active": true,
+    "title": "自然辩证法》论文和片断成稿年表",
+    "source": "me20.pdf",
+    "book": "马克思恩格斯全集 第20卷",
+    "start_page": 805,
+    "end_page": 809,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "自然辩证法》论文和片断成稿年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 812,
+    "pdf_end_page": 816
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me20.pdf",
+    "book": "马克思恩格斯全集 第20卷",
+    "start_page": 835,
+    "end_page": 857,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 842,
+    "pdf_end_page": 864
+  },
+  {
+    "active": true,
+    "title": "家庭、私有制和国家的起源”第四版的扉页",
+    "source": "me21.pdf",
+    "book": "马克思恩格斯全集 第21卷",
+    "start_page": 181,
+    "end_page": 203,
+    "level": 3,
+    "parent": "九野蛮时代和文明时代",
+    "primary": false,
+    "aliases": [
+      "家庭、私有制和国家的起源”第四版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 188,
+    "pdf_end_page": 210
+  },
+  {
+    "active": true,
+    "title": "用星花（）标出的篇名都是俄文版编者加的。——译者注卡·马克思“雇佣劳动与资本”一书1884年单行本前言",
+    "source": "me21.pdf",
+    "book": "马克思恩格斯全集 第21卷",
+    "start_page": 204,
+    "end_page": 204,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "用星花（）标出的篇名都是俄文版编者加的。——译者注卡·马克思“雇佣劳动与资本”一书1884年单行本前言"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 211,
+    "pdf_end_page": 211
+  },
+  {
+    "active": true,
+    "title": "英国工人阶级状况”美国版附录",
+    "source": "me21.pdf",
+    "book": "马克思恩格斯全集 第21卷",
+    "start_page": 292,
+    "end_page": 298,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "英国工人阶级状况”美国版附录"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 299,
+    "pdf_end_page": 305
+  },
+  {
+    "active": true,
+    "title": "路德维希·费尔巴哈和德国古典哲学的终结”的扉页",
+    "source": "me21.pdf",
+    "book": "马克思恩格斯全集 第21卷",
+    "start_page": 303,
+    "end_page": 304,
+    "level": 2,
+    "parent": "路德维希·费尔巴哈和德国古典哲学的终结",
+    "primary": false,
+    "aliases": [
+      "路德维希·费尔巴哈和德国古典哲学的终结”的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 310,
+    "pdf_end_page": 311
+  },
+  {
+    "active": true,
+    "title": "共产党宣言”1888年英文版的扉页",
+    "source": "me21.pdf",
+    "book": "马克思恩格斯全集 第21卷",
+    "start_page": 405,
+    "end_page": 410,
+    "level": 2,
+    "parent": "共产党宣言”1888年英文版序言",
+    "primary": false,
+    "aliases": [
+      "共产党宣言”1888年英文版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 412,
+    "pdf_end_page": 417
+  },
+  {
+    "active": true,
+    "title": "暴力在历史中的作用”手稿的一页",
+    "source": "me21.pdf",
+    "book": "马克思恩格斯全集 第21卷",
+    "start_page": 475,
+    "end_page": 527,
+    "level": 2,
+    "parent": "暴力在历史中的作用",
+    "primary": false,
+    "aliases": [
+      "暴力在历史中的作用”手稿的一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 482,
+    "pdf_end_page": 534
+  },
+  {
+    "active": true,
+    "title": "附录格·亚·洛帕廷给玛·尼·奥沙尼娜的信的片断",
+    "source": "me21.pdf",
+    "book": "马克思恩格斯全集 第21卷",
+    "start_page": 539,
+    "end_page": 541,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录格·亚·洛帕廷给玛·尼·奥沙尼娜的信的片断"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 546,
+    "pdf_end_page": 548
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯生平事业年表",
+    "source": "me21.pdf",
+    "book": "马克思恩格斯全集 第21卷",
+    "start_page": 727,
+    "end_page": 766,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 734,
+    "pdf_end_page": 773
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me21.pdf",
+    "book": "马克思恩格斯全集 第21卷",
+    "start_page": 812,
+    "end_page": 819,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 819,
+    "pdf_end_page": 826
+  },
+  {
+    "active": true,
+    "title": "家庭、私有制和国家的起源”一书族名索引",
+    "source": "me21.pdf",
+    "book": "马克思恩格斯全集 第21卷",
+    "start_page": 820,
+    "end_page": 826,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "家庭、私有制和国家的起源”一书族名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 827,
+    "pdf_end_page": 833
+  },
+  {
+    "active": true,
+    "title": "共产党宣言”1890年德文版的扉页",
+    "source": "me22.pdf",
+    "book": "马克思恩格斯全集 第22卷",
+    "start_page": 65,
+    "end_page": 68,
+    "level": 2,
+    "parent": "共产党宣言”1890年德文版序言",
+    "primary": false,
+    "aliases": [
+      "共产党宣言”1890年德文版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "用星花（）标出的篇名都是俄文版编者加的。——译者注卡·马克思“哥达纲领批判”序言",
+    "source": "me22.pdf",
+    "book": "马克思恩格斯全集 第22卷",
+    "start_page": 105,
+    "end_page": 106,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "用星花（）标出的篇名都是俄文版编者加的。——译者注卡·马克思“哥达纲领批判”序言"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 116,
+    "pdf_end_page": 117
+  },
+  {
+    "active": true,
+    "title": "第14号布伦坦诺答复的附录的摘录",
+    "source": "me22.pdf",
+    "book": "马克思恩格斯全集 第22卷",
+    "start_page": 206,
+    "end_page": 210,
+    "level": 4,
+    "parent": "四恩格斯和布伦坦诺",
+    "primary": false,
+    "aliases": [
+      "第14号布伦坦诺答复的附录的摘录"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 217,
+    "pdf_end_page": 221
+  },
+  {
+    "active": true,
+    "title": "共产党宣言”1892年波兰文第二版的第一页和第二页",
+    "source": "me22.pdf",
+    "book": "马克思恩格斯全集 第22卷",
+    "start_page": 328,
+    "end_page": 329,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "共产党宣言”1892年波兰文第二版的第一页和第二页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 339,
+    "pdf_end_page": 340
+  },
+  {
+    "active": true,
+    "title": "社会主义从空想到科学的发展”1892年英文版的扉页",
+    "source": "me22.pdf",
+    "book": "马克思恩格斯全集 第22卷",
+    "start_page": 335,
+    "end_page": 361,
+    "level": 2,
+    "parent": "社会主义从空想到科学的发展”英文版导言",
+    "primary": false,
+    "aliases": [
+      "社会主义从空想到科学的发展”1892年英文版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 346,
+    "pdf_end_page": 372
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯开列的他本人的著作的书单的第一页和第二页",
+    "source": "me22.pdf",
+    "book": "马克思恩格斯全集 第22卷",
+    "start_page": 401,
+    "end_page": 402,
+    "level": 2,
+    "parent": "马克思，亨利希·卡尔",
+    "primary": false,
+    "aliases": [
+      "弗·恩格斯开列的他本人的著作的书单的第一页和第二页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 412,
+    "pdf_end_page": 413
+  },
+  {
+    "active": true,
+    "title": "共产党宣言”1893年意大利文版的扉页",
+    "source": "me22.pdf",
+    "book": "马克思恩格斯全集 第22卷",
+    "start_page": 427,
+    "end_page": 428,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "共产党宣言”1893年意大利文版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 438,
+    "pdf_end_page": 439
+  },
+  {
+    "active": true,
+    "title": "劳动解放社”出版的小册子“弗里德里希·恩格斯论俄国”（载有弗·恩格斯给“论俄国的社会问题”一文写的跋）的扉页",
+    "source": "me22.pdf",
+    "book": "马克思恩格斯全集 第22卷",
+    "start_page": 495,
+    "end_page": 510,
+    "level": 2,
+    "parent": "论俄国的社会问题”跋",
+    "primary": false,
+    "aliases": [
+      "劳动解放社”出版的小册子“弗里德里希·恩格斯论俄国”（载有弗·恩格斯给“论俄国的社会问题”一文写的跋）的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 506,
+    "pdf_end_page": 521
+  },
+  {
+    "active": true,
+    "title": "附录1892年4月1日弗·恩格斯对法国“闪电报”记者的谈话",
+    "source": "me22.pdf",
+    "book": "马克思恩格斯全集 第22卷",
+    "start_page": 617,
+    "end_page": 623,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录1892年4月1日弗·恩格斯对法国“闪电报”记者的谈话"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 628,
+    "pdf_end_page": 634
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯生平事业年表",
+    "source": "me22.pdf",
+    "book": "马克思恩格斯全集 第22卷",
+    "start_page": 773,
+    "end_page": 822,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "弗·恩格斯生平事业年表"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 784,
+    "pdf_end_page": 833
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me22.pdf",
+    "book": "马克思恩格斯全集 第22卷",
+    "start_page": 856,
+    "end_page": 861,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 867,
+    "pdf_end_page": 872
+  },
+  {
+    "active": true,
+    "title": "资本论》第一卷德文第一版的扉页",
+    "source": "me23.pdf",
+    "book": "马克思恩格斯全集 第23卷",
+    "start_page": 9,
+    "end_page": 13,
+    "level": 2,
+    "parent": "卡尔·马克思第一版序言",
+    "primary": false,
+    "aliases": [
+      "资本论》第一卷德文第一版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "资本论》第一卷俄文第一版的扉页",
+    "source": "me23.pdf",
+    "book": "马克思恩格斯全集 第23卷",
+    "start_page": 21,
+    "end_page": 25,
+    "level": 2,
+    "parent": "卡尔·马克思第二版跋",
+    "primary": false,
+    "aliases": [
+      "资本论》第一卷俄文第一版的扉页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me23.pdf",
+    "book": "马克思恩格斯全集 第23卷",
+    "start_page": 911,
+    "end_page": 960,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 922,
+    "pdf_end_page": 971
+  },
+  {
+    "active": true,
+    "title": "马克思《资本论》第二卷手稿的一页",
+    "source": "me24.pdf",
+    "book": "马克思恩格斯全集 第24卷",
+    "start_page": 57,
+    "end_page": 59,
+    "level": 2,
+    "parent": "第二卷资本的流通过程第一篇资本形态变化及其循环第一章货币资本的循环",
+    "primary": false,
+    "aliases": [
+      "马克思《资本论》第二卷手稿的一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "恩格斯编辑和重抄的《资本论》第二卷手稿的一页",
+    "source": "me24.pdf",
+    "book": "马克思恩格斯全集 第24卷",
+    "start_page": 61,
+    "end_page": 74,
+    "level": 2,
+    "parent": "第二卷资本的流通过程第一篇资本形态变化及其循环第一章货币资本的循环",
+    "primary": false,
+    "aliases": [
+      "恩格斯编辑和重抄的《资本论》第二卷手稿的一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me24.pdf",
+    "book": "马克思恩格斯全集 第24卷",
+    "start_page": 610,
+    "end_page": 618,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 618,
+    "pdf_end_page": 626
+  },
+  {
+    "active": true,
+    "title": "马克思《资本论》第三卷手稿的第一页",
+    "source": "me25a.pdf",
+    "book": "马克思恩格斯全集 第25卷A",
+    "start_page": 31,
+    "end_page": 34,
+    "level": 2,
+    "parent": "第三卷资本主义生产的总过程（上）第一篇剩余价值转化为利润和剩余价值率转化为利润率第一章成本价格和利润",
+    "primary": false,
+    "aliases": [
+      "马克思《资本论》第三卷手稿的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "秘书抄写的《资本论》第三卷第一页，上面有恩格斯所作的补充和校正",
+    "source": "me25a.pdf",
+    "book": "马克思恩格斯全集 第25卷A",
+    "start_page": 35,
+    "end_page": 48,
+    "level": 2,
+    "parent": "第三卷资本主义生产的总过程（上）第一篇剩余价值转化为利润和剩余价值率转化为利润率第一章成本价格和利润",
+    "primary": false,
+    "aliases": [
+      "秘书抄写的《资本论》第三卷第一页，上面有恩格斯所作的补充和校正"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me25b.pdf",
+    "book": "马克思恩格斯全集 第25卷B",
+    "start_page": 1080,
+    "end_page": 1102,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "卡·马克思《剩余价值理论》手稿的一页，上面有弗·恩格斯的修改（在本页末",
+    "source": "me26a.pdf",
+    "book": "马克思恩格斯全集 第26卷A",
+    "start_page": 17,
+    "end_page": 22,
+    "level": 3,
+    "parent": "［第二章］重农学派",
+    "primary": false,
+    "aliases": [
+      "卡·马克思《剩余价值理论》手稿的一页，上面有弗·恩格斯的修改（在本页末"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "卡·马克思《剩余价值理论》手稿的一页，上面有魁奈《经济表》的图解",
+    "source": "me26a.pdf",
+    "book": "马克思恩格斯全集 第26卷A",
+    "start_page": 325,
+    "end_page": 331,
+    "level": 3,
+    "parent": "［第六章］魁奈的经济表（插入部分",
+    "primary": false,
+    "aliases": [
+      "卡·马克思《剩余价值理论》手稿的一页，上面有魁奈《经济表》的图解"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 336,
+    "pdf_end_page": 342
+  },
+  {
+    "active": true,
+    "title": "附录［（1）霍布斯论劳动，论价值，论科学的经济作用］",
+    "source": "me26a.pdf",
+    "book": "马克思恩格斯全集 第26卷A",
+    "start_page": 377,
+    "end_page": 377,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录［（1）霍布斯论劳动，论价值，论科学的经济作用］"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 388,
+    "pdf_end_page": 388
+  },
+  {
+    "active": true,
+    "title": "本书中引用和提到的著作索引",
+    "source": "me26a.pdf",
+    "book": "马克思恩格斯全集 第26卷A",
+    "start_page": 485,
+    "end_page": 496,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本书中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 496,
+    "pdf_end_page": 507
+  },
+  {
+    "active": true,
+    "title": "附录［（1）关于农业中供求经常相符的论点的最初提法。洛贝尔图斯和十八世纪经济学家中的实践家］",
+    "source": "me26b.pdf",
+    "book": "马克思恩格斯全集 第26卷B",
+    "start_page": 669,
+    "end_page": 670,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录［（1）关于农业中供求经常相符的论点的最初提法。洛贝尔图斯和十八世纪经济学家中的实践家］"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 680,
+    "pdf_end_page": 681
+  },
+  {
+    "active": true,
+    "title": "本书中引用和提到的著作索引",
+    "source": "me26b.pdf",
+    "book": "马克思恩格斯全集 第26卷B",
+    "start_page": 708,
+    "end_page": 715,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本书中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 719,
+    "pdf_end_page": 726
+  },
+  {
+    "active": true,
+    "title": "恩格斯1847年11月23—24日给马克思的信的第一页",
+    "source": "me27.pdf",
+    "book": "马克思恩格斯全集 第27卷",
+    "start_page": 121,
+    "end_page": 124,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "恩格斯1847年11月23—24日给马克思的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "马克思1851年1月7日给恩格斯的信的第一页",
+    "source": "me27.pdf",
+    "book": "马克思恩格斯全集 第27卷",
+    "start_page": 177,
+    "end_page": 180,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "马克思1851年1月7日给恩格斯的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 194
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me27.pdf",
+    "book": "马克思恩格斯全集 第27卷",
+    "start_page": 770,
+    "end_page": 793,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 787,
+    "pdf_end_page": 810
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me28b.pdf",
+    "book": "马克思恩格斯全集 第28卷B",
+    "start_page": 840,
+    "end_page": 875,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "马克思1856年6月21日给妻子燕妮·马克思的信的第一页",
+    "source": "me29.pdf",
+    "book": "马克思恩格斯全集 第29卷",
+    "start_page": 513,
+    "end_page": 516,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "马克思1856年6月21日给妻子燕妮·马克思的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 652
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me29.pdf",
+    "book": "马克思恩格斯全集 第29卷",
+    "start_page": 795,
+    "end_page": 836,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 813,
+    "pdf_end_page": 854
+  },
+  {
+    "active": true,
+    "title": "马克思恩格斯全集恩格斯1863年5月20日给马克思的信的第一页",
+    "source": "me30b.pdf",
+    "book": "马克思恩格斯全集 第30卷B",
+    "start_page": 343,
+    "end_page": 360,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "马克思恩格斯全集恩格斯1863年5月20日给马克思的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me30b.pdf",
+    "book": "马克思恩格斯全集 第30卷B",
+    "start_page": 840,
+    "end_page": 870,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "恩格斯1867年4月4日给马克思的信的第一页",
+    "source": "me31b.pdf",
+    "book": "马克思恩格斯全集 第31卷B",
+    "start_page": 287,
+    "end_page": 389,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "恩格斯1867年4月4日给马克思的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me31b.pdf",
+    "book": "马克思恩格斯全集 第31卷B",
+    "start_page": 760,
+    "end_page": 788,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me32.pdf",
+    "book": "马克思恩格斯全集 第32卷",
+    "start_page": 871,
+    "end_page": 913,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 892,
+    "pdf_end_page": 934
+  },
+  {
+    "active": true,
+    "title": "恩格斯1873年5月30日给马克思的信的第一页",
+    "source": "me33.pdf",
+    "book": "马克思恩格斯全集 第33卷",
+    "start_page": 83,
+    "end_page": 85,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "恩格斯1873年5月30日给马克思的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "一份国际工人协会共同章程的扉页，上面有马克思的题字",
+    "source": "me33.pdf",
+    "book": "马克思恩格斯全集 第33卷",
+    "start_page": 423,
+    "end_page": 426,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "一份国际工人协会共同章程的扉页，上面有马克思的题字"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me33.pdf",
+    "book": "马克思恩格斯全集 第33卷",
+    "start_page": 868,
+    "end_page": 904,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 888,
+    "pdf_end_page": 924
+  },
+  {
+    "active": true,
+    "title": "马克思1875年5月5日给白拉克的信的第一页",
+    "source": "me34.pdf",
+    "book": "马克思恩格斯全集 第34卷",
+    "start_page": 131,
+    "end_page": 132,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "马克思1875年5月5日给白拉克的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "恩格斯1875年11月12—17日给拉甫罗夫的信的第一页",
+    "source": "me34.pdf",
+    "book": "马克思恩格斯全集 第34卷",
+    "start_page": 159,
+    "end_page": 160,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "恩格斯1875年11月12—17日给拉甫罗夫的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "马克思1877年11月10日给布洛斯的信的第一页",
+    "source": "me34.pdf",
+    "book": "马克思恩格斯全集 第34卷",
+    "start_page": 287,
+    "end_page": 289,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "马克思1877年11月10日给布洛斯的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_end_page": 306
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me34.pdf",
+    "book": "马克思恩格斯全集 第34卷",
+    "start_page": 609,
+    "end_page": 634,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 626,
+    "pdf_end_page": 651
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me35.pdf",
+    "book": "马克思恩格斯全集 第35卷",
+    "start_page": 580,
+    "end_page": 602,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 594,
+    "pdf_end_page": 616
+  },
+  {
+    "active": true,
+    "title": "恩格斯1885年4月23日给查苏利奇的信的第一页",
+    "source": "me36.pdf",
+    "book": "马克思恩格斯全集 第36卷",
+    "start_page": 303,
+    "end_page": 304,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "恩格斯1885年4月23日给查苏利奇的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "资本论》第二卷德文第一版的扉页，上面有恩格斯给拉甫罗夫的题字",
+    "source": "me36.pdf",
+    "book": "马克思恩格斯全集 第36卷",
+    "start_page": 333,
+    "end_page": 335,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "资本论》第二卷德文第一版的扉页，上面有恩格斯给拉甫罗夫的题字"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me36.pdf",
+    "book": "马克思恩格斯全集 第36卷",
+    "start_page": 870,
+    "end_page": 905,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 890,
+    "pdf_end_page": 925
+  },
+  {
+    "active": true,
+    "title": "恩格斯1889年5月27日给拉法格的信的第一页",
+    "source": "me37.pdf",
+    "book": "马克思恩格斯全集 第37卷",
+    "start_page": 219,
+    "end_page": 223,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "恩格斯1889年5月27日给拉法格的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "共产党宣言》德文第四版扉页，上面有恩格斯给劳拉·拉法格的题字",
+    "source": "me37.pdf",
+    "book": "马克思恩格斯全集 第37卷",
+    "start_page": 439,
+    "end_page": 441,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "共产党宣言》德文第四版扉页，上面有恩格斯给劳拉·拉法格的题字"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "邀请弗·恩格斯参加匈牙利社会民主党代表大会的请柬",
+    "source": "me37.pdf",
+    "book": "马克思恩格斯全集 第37卷",
+    "start_page": 505,
+    "end_page": 506,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "邀请弗·恩格斯参加匈牙利社会民主党代表大会的请柬"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me37.pdf",
+    "book": "马克思恩格斯全集 第37卷",
+    "start_page": 647,
+    "end_page": 674,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 662,
+    "pdf_end_page": 689
+  },
+  {
+    "active": true,
+    "title": "恩格斯1891年5月1—2日给奥·倍倍尔的信的第一页",
+    "source": "me38.pdf",
+    "book": "马克思恩格斯全集 第38卷",
+    "start_page": 85,
+    "end_page": 91,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "恩格斯1891年5月1—2日给奥·倍倍尔的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "恩格斯1891年10月31日给保·拉法格的信的第一页",
+    "source": "me38.pdf",
+    "book": "马克思恩格斯全集 第38卷",
+    "start_page": 199,
+    "end_page": 200,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "恩格斯1891年10月31日给保·拉法格的信的第一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "邀请弗·恩格斯参加奥地利党代表大会的请柬（1892年",
+    "source": "me38.pdf",
+    "book": "马克思恩格斯全集 第38卷",
+    "start_page": 344,
+    "end_page": 345,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "邀请弗·恩格斯参加奥地利党代表大会的请柬（1892年"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me38.pdf",
+    "book": "马克思恩格斯全集 第38卷",
+    "start_page": 699,
+    "end_page": 724,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 714,
+    "pdf_end_page": 739
+  },
+  {
+    "active": true,
+    "title": "资本论》第三卷的扉页，上面有恩格斯给普列汉诺夫的题字",
+    "source": "me39b.pdf",
+    "book": "马克思恩格斯全集 第39卷B",
+    "start_page": 323,
+    "end_page": 401,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "资本论》第三卷的扉页，上面有恩格斯给普列汉诺夫的题字"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "马克思的《1848年至1850年的法兰西阶级斗争》一书的扉页，上面有恩格斯给普列汉诺夫的题字",
+    "source": "me39b.pdf",
+    "book": "马克思恩格斯全集 第39卷B",
+    "start_page": 437,
+    "end_page": 472,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "马克思的《1848年至1850年的法兰西阶级斗争》一书的扉页，上面有恩格斯给普列汉诺夫的题字"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "恩格斯1895年7月23日给劳拉·拉法格的信（恩格斯的最后一封亲笔信）（第一页和第二页",
+    "source": "me39b.pdf",
+    "book": "马克思恩格斯全集 第39卷B",
+    "start_page": 473,
+    "end_page": 474,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "恩格斯1895年7月23日给劳拉·拉法格的信（恩格斯的最后一封亲笔信）（第一页和第二页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "附录1．弗里德里希·恩格斯的遗嘱及其补充",
+    "source": "me39b.pdf",
+    "book": "马克思恩格斯全集 第39卷B",
+    "start_page": 483,
+    "end_page": 483,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录1．弗里德里希·恩格斯的遗嘱及其补充"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me39b.pdf",
+    "book": "马克思恩格斯全集 第39卷B",
+    "start_page": 616,
+    "end_page": 651,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "耶拿大学授予马克思的哲学博士学位证书（1841年4月15日",
+    "source": "me40.pdf",
+    "book": "马克思恩格斯全集 第40卷",
+    "start_page": 228,
+    "end_page": 229,
+    "level": 2,
+    "parent": "德谟克利特的自然哲学和伊壁鸠鲁的自然哲学的差别",
+    "primary": true,
+    "aliases": [
+      "耶拿大学授予马克思的哲学博士学位证书（1841年4月15日"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 242,
+    "pdf_end_page": 243
+  },
+  {
+    "active": true,
+    "title": "附录的片断：批评普卢塔克对伊壁鸠鲁神学的论战",
+    "source": "me40.pdf",
+    "book": "马克思恩格斯全集 第40卷",
+    "start_page": 244,
+    "end_page": 246,
+    "level": 2,
+    "parent": "德谟克利特的自然哲学和伊壁鸠鲁的自然哲学的差别",
+    "primary": false,
+    "aliases": [
+      "附录的片断：批评普卢塔克对伊壁鸠鲁神学的论战"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 258,
+    "pdf_end_page": 260
+  },
+  {
+    "active": true,
+    "title": "马克思的诗册《爱之书》第一部的封面",
+    "source": "me40.pdf",
+    "book": "马克思恩格斯全集 第40卷",
+    "start_page": 397,
+    "end_page": 438,
+    "level": 2,
+    "parent": "青年马克思的文学和诗歌习作（1833—1837年）爱之书。第一部",
+    "primary": false,
+    "aliases": [
+      "马克思的诗册《爱之书》第一部的封面"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 411,
+    "pdf_end_page": 452
+  },
+  {
+    "active": true,
+    "title": "附录卡尔·马克思出生证书",
+    "source": "me40.pdf",
+    "book": "马克思恩格斯全集 第40卷",
+    "start_page": 817,
+    "end_page": 817,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录卡尔·马克思出生证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 831,
+    "pdf_end_page": 831
+  },
+  {
+    "active": true,
+    "title": "特利尔中学学生毕业证书",
+    "source": "me40.pdf",
+    "book": "马克思恩格斯全集 第40卷",
+    "start_page": 827,
+    "end_page": 828,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "特利尔中学学生毕业证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 841,
+    "pdf_end_page": 842
+  },
+  {
+    "active": true,
+    "title": "波恩大学肄业证书",
+    "source": "me40.pdf",
+    "book": "马克思恩格斯全集 第40卷",
+    "start_page": 844,
+    "end_page": 845,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "波恩大学肄业证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 858,
+    "pdf_end_page": 859
+  },
+  {
+    "active": true,
+    "title": "柏林大学毕业证书",
+    "source": "me40.pdf",
+    "book": "马克思恩格斯全集 第40卷",
+    "start_page": 896,
+    "end_page": 897,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "柏林大学毕业证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 910,
+    "pdf_end_page": 911
+  },
+  {
+    "active": true,
+    "title": "小册子《横遭灾祸但又奇迹般地得救的圣经，或信仰的胜利》的封面",
+    "source": "me41.pdf",
+    "book": "马克思恩格斯全集 第41卷",
+    "start_page": 333,
+    "end_page": 348,
+    "level": 2,
+    "parent": "横遭灾祸但又奇迹般地得救的圣经，或信仰的胜利",
+    "primary": false,
+    "aliases": [
+      "小册子《横遭灾祸但又奇迹般地得救的圣经，或信仰的胜利》的封面"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 351,
+    "pdf_end_page": 366
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯诗剧《科拉·迪·里恩齐》手稿的一页",
+    "source": "me41.pdf",
+    "book": "马克思恩格斯全集 第41卷",
+    "start_page": 656,
+    "end_page": 657,
+    "level": 2,
+    "parent": "科拉·迪·里恩齐",
+    "primary": false,
+    "aliases": [
+      "弗·恩格斯诗剧《科拉·迪·里恩齐》手稿的一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 674,
+    "pdf_end_page": 675
+  },
+  {
+    "active": true,
+    "title": "马克思恩格斯全集附录弗里德里希·恩格斯出生证明书",
+    "source": "me41.pdf",
+    "book": "马克思恩格斯全集 第41卷",
+    "start_page": 687,
+    "end_page": 687,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "马克思恩格斯全集附录弗里德里希·恩格斯出生证明书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 705,
+    "pdf_end_page": 705
+  },
+  {
+    "active": true,
+    "title": "中学高年级学生弗里德里希·恩格斯的肄业证书",
+    "source": "me41.pdf",
+    "book": "马克思恩格斯全集 第41卷",
+    "start_page": 692,
+    "end_page": 693,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "中学高年级学生弗里德里希·恩格斯的肄业证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 710,
+    "pdf_end_page": 711
+  },
+  {
+    "active": true,
+    "title": "一年制志愿兵弗里德里希·恩格斯的品行证书",
+    "source": "me41.pdf",
+    "book": "马克思恩格斯全集 第41卷",
+    "start_page": 694,
+    "end_page": 696,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "一年制志愿兵弗里德里希·恩格斯的品行证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 712,
+    "pdf_end_page": 714
+  },
+  {
+    "active": true,
+    "title": "用星花（）标出的篇名都是俄文版编者加的。——译者注地租",
+    "source": "me42.pdf",
+    "book": "马克思恩格斯全集 第42卷",
+    "start_page": 75,
+    "end_page": 88,
+    "level": 2,
+    "parent": "年经济学哲学手稿",
+    "primary": true,
+    "aliases": [
+      "用星花（）标出的篇名都是俄文版编者加的。——译者注地租"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "载有弗·恩格斯《现代兴起的今日尚存的共产主义移民区记述》一文的《1845年德国公民手册》年鉴的封面",
+    "source": "me42.pdf",
+    "book": "马克思恩格斯全集 第42卷",
+    "start_page": 219,
+    "end_page": 220,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "载有弗·恩格斯《现代兴起的今日尚存的共产主义移民区记述》一文的《1845年德国公民手册》年鉴的封面"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 235,
+    "pdf_end_page": 236
+  },
+  {
+    "active": true,
+    "title": "载有弗·恩格斯《对英国工人阶级状况的补充评述》一文的《威斯特伐利亚汽船》杂志的封面",
+    "source": "me42.pdf",
+    "book": "马克思恩格斯全集 第42卷",
+    "start_page": 275,
+    "end_page": 276,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "载有弗·恩格斯《对英国工人阶级状况的补充评述》一文的《威斯特伐利亚汽船》杂志的封面"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 291,
+    "pdf_end_page": 292
+  },
+  {
+    "active": true,
+    "title": "载有卡·马克思和弗·恩格斯《对布·鲍威尔反批评的回答》一文和卡·马克思的著作《珀歇论自杀》的《社会明镜》杂志的封面",
+    "source": "me42.pdf",
+    "book": "马克思恩格斯全集 第42卷",
+    "start_page": 301,
+    "end_page": 317,
+    "level": 2,
+    "parent": "卡·马克思。珀歇论自杀",
+    "primary": false,
+    "aliases": [
+      "载有卡·马克思和弗·恩格斯《对布·鲍威尔反批评的回答》一文和卡·马克思的著作《珀歇论自杀》的《社会明镜》杂志的封面"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 317,
+    "pdf_end_page": 333
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me42.pdf",
+    "book": "马克思恩格斯全集 第42卷",
+    "start_page": 553,
+    "end_page": 563,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 569,
+    "pdf_end_page": 579
+  },
+  {
+    "active": true,
+    "title": "用星花（）标出的篇名都是俄文版编者加的。——译者注马克思恩格斯全集柏林国民议会的决议",
+    "source": "me43.pdf",
+    "book": "马克思恩格斯全集 第43卷",
+    "start_page": 42,
+    "end_page": 43,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "用星花（）标出的篇名都是俄文版编者加的。——译者注马克思恩格斯全集柏林国民议会的决议"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "附录比利时国王莱奥波德一世驱逐马克思出比利时的命令",
+    "source": "me43.pdf",
+    "book": "马克思恩格斯全集 第43卷",
+    "start_page": 479,
+    "end_page": 480,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录比利时国王莱奥波德一世驱逐马克思出比利时的命令"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 500,
+    "pdf_end_page": 501
+  },
+  {
+    "active": true,
+    "title": "佐林根民主联合会给马克思、弗莱里格拉特、恩格斯、沙佩尔和沃尔弗的邀请信",
+    "source": "me43.pdf",
+    "book": "马克思恩格斯全集 第43卷",
+    "start_page": 516,
+    "end_page": 516,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "佐林根民主联合会给马克思、弗莱里格拉特、恩格斯、沙佩尔和沃尔弗的邀请信"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 537,
+    "pdf_end_page": 537
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me43.pdf",
+    "book": "马克思恩格斯全集 第43卷",
+    "start_page": 629,
+    "end_page": 645,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 650,
+    "pdf_end_page": 666
+  },
+  {
+    "active": true,
+    "title": "地名索引",
+    "source": "me43.pdf",
+    "book": "马克思恩格斯全集 第43卷",
+    "start_page": 654,
+    "end_page": 668,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "地名索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 675,
+    "pdf_end_page": 689
+  },
+  {
+    "active": true,
+    "title": "海·贝克尔关于出版卡·马克思《选集》两卷本（1850）的启事的第一页（出版计划完全没有实现",
+    "source": "me44.pdf",
+    "book": "马克思恩格斯全集 第44卷",
+    "start_page": 39,
+    "end_page": 40,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "海·贝克尔关于出版卡·马克思《选集》两卷本（1850）的启事的第一页（出版计划完全没有实现"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "①用星花（）标出的篇名都是俄文版编者加的。——译者注弗·恩格斯。革命的两年。1848年和1849年",
+    "source": "me44.pdf",
+    "book": "马克思恩格斯全集 第44卷",
+    "start_page": 42,
+    "end_page": 63,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "①用星花（）标出的篇名都是俄文版编者加的。——译者注弗·恩格斯。革命的两年。1848年和1849年"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "弗·恩格斯《巴拉克拉瓦》的一页手稿和会战平面图",
+    "source": "me44.pdf",
+    "book": "马克思恩格斯全集 第44卷",
+    "start_page": 235,
+    "end_page": 240,
+    "level": 2,
+    "parent": "弗·恩格斯。巴拉克拉瓦",
+    "primary": true,
+    "aliases": [
+      "弗·恩格斯《巴拉克拉瓦》的一页手稿和会战平面图"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 254,
+    "pdf_end_page": 259
+  },
+  {
+    "active": true,
+    "title": "附录发给恩格斯的瑞士出境许可证",
+    "source": "me44.pdf",
+    "book": "马克思恩格斯全集 第44卷",
+    "start_page": 633,
+    "end_page": 634,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录发给恩格斯的瑞士出境许可证"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 652,
+    "pdf_end_page": 653
+  },
+  {
+    "active": true,
+    "title": "纽约总委员会发给弗·恩格斯的全权证书",
+    "source": "me44.pdf",
+    "book": "马克思恩格斯全集 第44卷",
+    "start_page": 716,
+    "end_page": 716,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "纽约总委员会发给弗·恩格斯的全权证书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 735,
+    "pdf_end_page": 735
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me44.pdf",
+    "book": "马克思恩格斯全集 第44卷",
+    "start_page": 926,
+    "end_page": 949,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 945,
+    "pdf_end_page": 968
+  },
+  {
+    "active": true,
+    "title": "卡·马克思爱尔兰历史手稿的一页",
+    "source": "me45.pdf",
+    "book": "马克思恩格斯全集 第45卷",
+    "start_page": 82,
+    "end_page": 83,
+    "level": 2,
+    "parent": "卡·马克思。从美国革命到1801年合并的爱尔兰。摘录和札记",
+    "primary": false,
+    "aliases": [
+      "卡·马克思爱尔兰历史手稿的一页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "用星花标出的篇名都是俄文版编者加的。——译者注弗·恩格斯。西班牙的共和制",
+    "source": "me45.pdf",
+    "book": "马克思恩格斯全集 第45卷",
+    "start_page": 165,
+    "end_page": 169,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "用星花标出的篇名都是俄文版编者加的。——译者注弗·恩格斯。西班牙的共和制"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 180,
+    "pdf_end_page": 184
+  },
+  {
+    "active": true,
+    "title": "马·柯瓦列夫斯基原书的扉页，上有作者的赠书题词：“赠给卡尔·马克思以表友谊和尊敬",
+    "source": "me45.pdf",
+    "book": "马克思恩格斯全集 第45卷",
+    "start_page": 210,
+    "end_page": 211,
+    "level": 2,
+    "parent": "卡·马克思。马·柯瓦列夫斯基《公社土地占有制，其解体的原因、进程和结果》（第一册，1879年莫斯科版）一书摘要",
+    "primary": false,
+    "aliases": [
+      "马·柯瓦列夫斯基原书的扉页，上有作者的赠书题词：“赠给卡尔·马克思以表友谊和尊敬"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 225,
+    "pdf_end_page": 226
+  },
+  {
+    "active": true,
+    "title": "附录卡·马克思加入英国国籍的声明",
+    "source": "me45.pdf",
+    "book": "马克思恩格斯全集 第45卷",
+    "start_page": 705,
+    "end_page": 706,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "附录卡·马克思加入英国国籍的声明"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 720,
+    "pdf_end_page": 721
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me45.pdf",
+    "book": "马克思恩格斯全集 第45卷",
+    "start_page": 856,
+    "end_page": 895,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 871,
+    "pdf_end_page": 910
+  },
+  {
+    "active": true,
+    "title": "政治经济学批判》手稿第本封面",
+    "source": "me46a.pdf",
+    "book": "马克思恩格斯全集 第46卷A",
+    "start_page": 55,
+    "end_page": 67,
+    "level": 2,
+    "parent": "政治经济学批判（1857—1858年草稿）［手稿前半部分］．货币章",
+    "primary": false,
+    "aliases": [
+      "政治经济学批判》手稿第本封面"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me46a.pdf",
+    "book": "马克思恩格斯全集 第46卷A",
+    "start_page": 564,
+    "end_page": 572,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 578,
+    "pdf_end_page": 586
+  },
+  {
+    "active": true,
+    "title": "七个笔记本的索引（第一部分",
+    "source": "me46b.pdf",
+    "book": "马克思恩格斯全集 第46卷B",
+    "start_page": 413,
+    "end_page": 426,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "七个笔记本的索引（第一部分"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 423,
+    "pdf_end_page": 436
+  },
+  {
+    "active": true,
+    "title": "［索引第一稿］",
+    "source": "me46b.pdf",
+    "book": "马克思恩格斯全集 第46卷B",
+    "start_page": 415,
+    "end_page": 417,
+    "level": 2,
+    "parent": "七个笔记本的索引（第一部分",
+    "primary": true,
+    "aliases": [
+      "［索引第一稿］"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 425,
+    "pdf_end_page": 427
+  },
+  {
+    "active": true,
+    "title": "［索引第二稿］",
+    "source": "me46b.pdf",
+    "book": "马克思恩格斯全集 第46卷B",
+    "start_page": 419,
+    "end_page": 426,
+    "level": 2,
+    "parent": "七个笔记本的索引（第一部分",
+    "primary": true,
+    "aliases": [
+      "［索引第二稿］"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 429,
+    "pdf_end_page": 436
+  },
+  {
+    "active": true,
+    "title": "马克思恩格斯全集注释",
+    "source": "me46b.pdf",
+    "book": "马克思恩格斯全集 第46卷B",
+    "start_page": 553,
+    "end_page": 570,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "马克思恩格斯全集注释"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 563,
+    "pdf_end_page": 580
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me46b.pdf",
+    "book": "马克思恩格斯全集 第46卷B",
+    "start_page": 584,
+    "end_page": 599,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 594,
+    "pdf_end_page": 609
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me47.pdf",
+    "book": "马克思恩格斯全集 第47卷",
+    "start_page": 669,
+    "end_page": 687,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 679,
+    "pdf_end_page": 697
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me48.pdf",
+    "book": "马克思恩格斯全集 第48卷",
+    "start_page": 632,
+    "end_page": 654,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 644,
+    "pdf_end_page": 666
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me49.pdf",
+    "book": "马克思恩格斯全集 第49卷",
+    "start_page": 549,
+    "end_page": 561,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 561,
+    "pdf_end_page": 573
+  },
+  {
+    "active": true,
+    "title": "用星花（）标出的篇名都是俄文版编者加的。——译者注（3）流通费用",
+    "source": "me50.pdf",
+    "book": "马克思恩格斯全集 第50卷",
+    "start_page": 60,
+    "end_page": 65,
+    "level": 2,
+    "parent": "第一章资本的循环过程",
+    "primary": true,
+    "aliases": [
+      "用星花（）标出的篇名都是俄文版编者加的。——译者注（3）流通费用"
+    ],
+    "locator_type": "non_body",
+    "non_body": true
+  },
+  {
+    "active": true,
+    "title": "卡·马克思和弗·恩格斯为寄送《资本论》法文版第1卷第1分册而拟的报刊、组织和个人的名单",
+    "source": "me50.pdf",
+    "book": "马克思恩格斯全集 第50卷",
+    "start_page": 362,
+    "end_page": 366,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "卡·马克思和弗·恩格斯为寄送《资本论》法文版第1卷第1分册而拟的报刊、组织和个人的名单"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 382,
+    "pdf_end_page": 386
+  },
+  {
+    "active": true,
+    "title": "为寄送《资本论》法文版第1卷第1分册而拟的报刊、组织和个人的名单第2页",
+    "source": "me50.pdf",
+    "book": "马克思恩格斯全集 第50卷",
+    "start_page": 367,
+    "end_page": 368,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "为寄送《资本论》法文版第1卷第1分册而拟的报刊、组织和个人的名单第2页"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 387,
+    "pdf_end_page": 388
+  },
+  {
+    "active": true,
+    "title": "马克思恩格斯全集附录科伦市民关于继续出版《莱茵报》的请愿书",
+    "source": "me50.pdf",
+    "book": "马克思恩格斯全集 第50卷",
+    "start_page": 509,
+    "end_page": 510,
+    "level": 1,
+    "parent": "",
+    "primary": false,
+    "aliases": [
+      "马克思恩格斯全集附录科伦市民关于继续出版《莱茵报》的请愿书"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 529,
+    "pdf_end_page": 530
+  },
+  {
+    "active": true,
+    "title": "本卷中引用和提到的著作索引",
+    "source": "me50.pdf",
+    "book": "马克思恩格斯全集 第50卷",
+    "start_page": 613,
+    "end_page": 642,
+    "level": 1,
+    "parent": "",
+    "primary": true,
+    "aliases": [
+      "本卷中引用和提到的著作索引"
+    ],
+    "locator_type": "non_body",
+    "non_body": true,
+    "pdf_start_page": 633,
+    "pdf_end_page": 662
+  }
+]

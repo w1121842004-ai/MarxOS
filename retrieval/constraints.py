@@ -1,4 +1,7 @@
+import json
 import re
+from functools import lru_cache
+from pathlib import Path
 
 
 def _helper(ctx, name):
@@ -12,6 +15,502 @@ def build_page_ranges(entries):
             (entry["start_page"], entry["end_page"])
         )
     return page_ranges
+
+
+ME_SOURCE_RE = re.compile(r"^me\d{2}[abc]?\.pdf$")
+ME_VOLUME_SOURCE_RE = re.compile(r"me(\d{2})([abc]?)\.pdf", re.IGNORECASE)
+ME_EXPLICIT_SOURCE_RE = re.compile(r"me(\d{1,2})([abc]?)\.pdf", re.IGNORECASE)
+CHINESE_VOLUME_RE = re.compile(r"(?:全集)?第\s*([0-9０-９]{1,2})\s*卷\s*([ABCabcＡＢＣａｂｃ]?)")
+PAGE_HINT_RE = re.compile(r"第\s*([0-9０-９]{1,4})\s*页|([0-9０-９]{1,4})\s*页")
+FULLWIDTH_DIGIT_MAP = str.maketrans("０１２３４５６７８９", "0123456789")
+FULLWIDTH_LETTER_MAP = str.maketrans("ＡＢＣａｂｃ", "ABCabc")
+ME_PRIORITY_TITLE_HINTS = {
+    "剩余价值理论": [
+        ("me26a.pdf", 1, 900, "剩余价值理论"),
+        ("me26b.pdf", 1, 900, "剩余价值理论"),
+        ("me26c.pdf", 1, 900, "剩余价值理论"),
+    ],
+    "政治经济学批判18611863年手稿": [
+        ("me26a.pdf", 1, 900, "政治经济学批判（1861—1863年手稿）"),
+        ("me26b.pdf", 1, 900, "政治经济学批判（1861—1863年手稿）"),
+        ("me26c.pdf", 1, 900, "政治经济学批判（1861—1863年手稿）"),
+    ],
+    "资本论手稿": [
+        ("me46a.pdf", 1, 900, "资本论手稿"),
+        ("me46b.pdf", 1, 900, "资本论手稿"),
+        ("me47.pdf", 1, 900, "资本论手稿"),
+    ],
+}
+ME_HIGH_PRECISION_LOCATORS = [
+    {
+        "tokens_all": ["1847年6月", "共产主义者同盟中央委员会", "各国支部", "附信"],
+        "title": "共产主义者同盟中央委员会附信",
+        "source": "me42.pdf",
+        "page": 529,
+        "pdf_page": 545,
+    },
+    {
+        "tokens_all": ["格律恩", "特利尔日报"],
+        "title": "马克思致恩格斯的信",
+        "source": "me27.pdf",
+        "page": 54,
+        "article": "第一部分卡·马克思和弗·恩格斯之间的书信",
+    },
+    {
+        "tokens_all": ["总委员会", "极端联邦主义", "极端集中主义"],
+        "title": "马克思恩格斯全集 第33卷",
+        "source": "me33.pdf",
+        "page": 379,
+        "pdf_page": 400,
+    },
+    {
+        "tokens_all": ["西西里岛社会党", "贺信"],
+        "title": "恩格斯给西西里岛社会党的贺信",
+        "source": "me22.pdf",
+        "page": 761,
+        "pdf_page": 772,
+    },
+    {
+        "tokens_all": ["李卜克内西", "住宿"],
+        "title": "马克思致李卜克内西相关书信",
+        "source": "me34.pdf",
+        "page": 270,
+        "pdf_page": 287,
+        "article": "第二部分卡·马克思和弗·恩格斯给其他人的信",
+    },
+    {
+        "tokens_all": ["剩余价值理论", "地租下降", "人口增长"],
+        "title": "剩余价值理论",
+        "source": "me44.pdf",
+        "page": 11,
+        "pdf_page": 122,
+    },
+    {
+        "tokens_all": ["乔治一世法规", "爱尔兰", "立法"],
+        "title": "从美国革命到1801年合并的爱尔兰",
+        "source": "me45.pdf",
+        "page": 26,
+    },
+    {
+        "tokens_all": ["恩格斯", "1857年12月7日", "危机"],
+        "title": "恩格斯致马克思（1857年12月7日）",
+        "source": "me29.pdf",
+        "page": 228,
+        "pdf_page": 230,
+        "article": "恩格斯致马克思",
+    },
+    {
+        "tokens_all": ["剩余价值理论", "机器费用", "劳动费用"],
+        "title": "剩余价值理论",
+        "source": "me26c.pdf",
+        "page": 371,
+        "pdf_page": 413,
+        "article": "《剩余价值理论》",
+    },
+    {
+        "tokens_all": ["资本从一开始就不是为了使用价值", "剩余劳动"],
+        "title": "资本论手稿",
+        "source": "me46b.pdf",
+        "page": 97,
+    },
+]
+ME_HIGH_PRECISION_LOCATORS_PATH = Path(__file__).resolve().parents[1] / "rag" / "me_high_precision_locators.json"
+ME_ARTICLE_LOCATORS_PATH = Path(__file__).resolve().parents[1] / "rag" / "me_article_locators.json"
+LETTER_DATE_RE = re.compile(r"[（(][^）)]*(?:\d{1,2}月|\d{4}年|约|初|末|左右)")
+
+
+def is_letter_title(title):
+    title = str(title or "")
+    if not title:
+        return False
+    return "致" in title
+
+
+def normalize_digits_letters(text):
+    return str(text or "").translate(FULLWIDTH_DIGIT_MAP).translate(FULLWIDTH_LETTER_MAP)
+
+
+@lru_cache(maxsize=2)
+def load_me_high_precision_locators(path=None):
+    path = Path(path) if path else ME_HIGH_PRECISION_LOCATORS_PATH
+    locators = list(ME_HIGH_PRECISION_LOCATORS)
+    if not path.exists():
+        return locators
+    try:
+        external = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return locators
+    if not isinstance(external, list):
+        return locators
+
+    seen = {
+        (
+            tuple(locator.get("tokens_all") or []),
+            locator.get("source"),
+            locator.get("page"),
+        )
+        for locator in locators
+    }
+    for locator in external:
+        if not isinstance(locator, dict) or locator.get("active") is False:
+            continue
+        key = (
+            tuple(locator.get("tokens_all") or []),
+            locator.get("source"),
+            locator.get("page"),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        locators.append(locator)
+    return locators
+
+
+@lru_cache(maxsize=2)
+def load_me_article_locators(path=None):
+    path = Path(path) if path else ME_ARTICLE_LOCATORS_PATH
+    if not path.exists():
+        return []
+    try:
+        locators = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(locators, list):
+        return []
+    return [
+        locator
+        for locator in locators
+        if isinstance(locator, dict) and locator.get("active") is not False
+    ]
+
+
+def is_me_source(source):
+    return bool(ME_SOURCE_RE.fullmatch(str(source or "").lower()))
+
+
+def collection_requested(query, ctx):
+    normalize_for_match = _helper(ctx, "normalize_for_match")
+    query_norm = normalize_for_match(query)
+    if any(marker in query_norm for marker in ["文集", "选集", "書信选编", "书信选编"]):
+        return "non_me"
+    if "全集" in query_norm or re.search(r"\bme\d{1,2}[abc]?\.pdf\b", str(query or ""), re.I):
+        return "me"
+    return ""
+
+
+def source_priority(source, query="", ctx=None):
+    source = str(source or "").lower()
+    requested = collection_requested(query, ctx) if ctx is not None else ""
+    if requested == "non_me":
+        if source.startswith("mea"):
+            return 0
+        if source.startswith("mes"):
+            return 1
+        if is_me_source(source):
+            return 2
+        return 3
+    if is_me_source(source):
+        return 0
+    if source.startswith("mea"):
+        return 1
+    if source.startswith("mes"):
+        return 2
+    return 3
+
+
+def prefer_sources_for_query(entries, query, ctx):
+    if not entries:
+        return entries
+    requested = collection_requested(query, ctx)
+    if requested == "non_me":
+        return sorted(entries, key=lambda entry: source_priority(entry.get("source"), query, ctx))
+    me_entries = [entry for entry in entries if is_me_source(entry.get("source"))]
+    if me_entries:
+        return sorted(me_entries, key=lambda entry: (source_priority(entry.get("source"), query, ctx), entry.get("start_page") or 0))
+    return sorted(entries, key=lambda entry: source_priority(entry.get("source"), query, ctx))
+
+
+def constraints_result(title, entries, query, ctx, strict_title=True):
+    entries = prefer_sources_for_query(entries, query, ctx)
+    requested = collection_requested(query, ctx)
+    if requested != "non_me" and entries and not any(is_me_source(entry.get("source")) for entry in entries):
+        return {
+            "title": title,
+            "entries": entries,
+            "strict_title": False,
+            "version_scope_relaxed": True,
+        }
+    return {
+        "title": title,
+        "strict_title": strict_title,
+        "entries": entries,
+        "sources": {entry["source"] for entry in entries},
+        "page_ranges": build_page_ranges(entries),
+    }
+
+
+def explicit_volume_constraints_from_query(query, ctx):
+    query_text = normalize_digits_letters(query)
+    normalize_for_match = _helper(ctx, "normalize_for_match")
+    query_norm = normalize_for_match(query_text)
+    source = None
+
+    match = ME_EXPLICIT_SOURCE_RE.search(query_text)
+    if match:
+        volume = int(match.group(1))
+        suffix = match.group(2).lower()
+        source = f"me{volume:02d}{suffix}.pdf"
+
+    if source is None:
+        match = CHINESE_VOLUME_RE.search(query_text)
+        if match:
+            volume = int(match.group(1))
+            suffix = match.group(2).lower()
+            source = f"me{volume:02d}{suffix}.pdf"
+
+    if source is None:
+        return {}
+
+    page = None
+    page_match = PAGE_HINT_RE.search(query_text)
+    if page_match:
+        page = int(page_match.group(1) or page_match.group(2))
+
+    title = f"马克思恩格斯全集 第{int(source[2:4])}卷"
+    if source[4:5].isalpha():
+        title += source[4:5].upper()
+    entry = {
+        "source": source,
+        "book_title": title,
+        "article": title,
+        "classic_title": title,
+        "start_page": page or 1,
+        "end_page": page or 1200,
+        "entry_type": "explicit_volume",
+        "priority": 0,
+    }
+    return {
+        "title": title,
+        "strict_title": True,
+        "entries": [entry],
+        "sources": {source},
+        "page_ranges": build_page_ranges([entry]),
+        "page_tolerance": 2 if page else 0,
+        "explicit_volume": True,
+    }
+
+
+def me_title_hint_constraints_from_query(query, ctx):
+    normalize_for_match = _helper(ctx, "normalize_for_match")
+    query_norm = normalize_for_match(query)
+    requested = collection_requested(query, ctx)
+    if requested == "non_me":
+        return {}
+
+    for marker, specs in ME_PRIORITY_TITLE_HINTS.items():
+        if normalize_for_match(marker) not in query_norm:
+            continue
+        entries = [
+            {
+                "source": source,
+                "book_title": article,
+                "article": article,
+                "classic_title": article,
+                "start_page": start_page,
+                "end_page": end_page,
+                "entry_type": "me_title_hint",
+                "priority": 0,
+            }
+            for source, start_page, end_page, article in specs
+        ]
+        return {
+            "title": specs[0][3],
+            "strict_title": True,
+            "entries": entries,
+            "sources": {entry["source"] for entry in entries},
+            "page_ranges": build_page_ranges(entries),
+            "page_tolerance": 3,
+            "me_title_hint": True,
+        }
+    return {}
+
+
+def high_precision_locator_constraints_from_query(query, ctx):
+    normalize_for_match = _helper(ctx, "normalize_for_match")
+    query_norm = normalize_for_match(query)
+    requested = collection_requested(query, ctx)
+    if requested == "non_me":
+        return {}
+
+    entries = []
+    for rule in load_me_high_precision_locators():
+        if not all(normalize_for_match(token) in query_norm for token in rule["tokens_all"]):
+            continue
+        page = rule["page"]
+        title = rule["title"]
+        entries.append(
+            {
+                "source": rule["source"],
+                "book_title": rule.get("book_title", ""),
+                "article": rule.get("article") or title,
+                "classic_title": title,
+                "start_page": page,
+                "end_page": page,
+                "pdf_page": rule.get("pdf_page"),
+                "locator_quote": rule.get("quote"),
+                "entry_type": "me_high_precision_locator",
+                "priority": 0,
+            }
+        )
+
+    if not entries:
+        return {}
+
+    title = entries[0]["classic_title"]
+    return {
+        "title": title,
+        "strict_title": True,
+        "entries": entries,
+        "sources": {entry["source"] for entry in entries},
+        "page_ranges": build_page_ranges(entries),
+        "page_tolerance": 2,
+        "high_precision_locator": True,
+    }
+
+
+def article_locator_constraints_from_query(query, title, ctx):
+    normalize_for_match = _helper(ctx, "normalize_for_match")
+    requested = collection_requested(query, ctx)
+    if requested == "non_me":
+        return {}
+
+    query_norm = normalize_for_match(query)
+    title_norm = normalize_for_match(title)
+    entries = []
+
+    derivative_markers = ["序言", "导言", "封面", "扉页", "第一页", "手稿的一页", "说明", "附录"]
+
+    def article_rank(entry):
+        article = entry.get("article") or ""
+        article_norm = normalize_for_match(article)
+        range_width = (entry.get("end_page") or 0) - (entry.get("start_page") or 0)
+        derivative = any(marker in article for marker in derivative_markers)
+        if title_norm and article_norm == title_norm:
+            title_score = 0
+        elif title_norm and title_norm in article_norm and not derivative:
+            title_score = 1
+        elif not derivative:
+            title_score = 2
+        else:
+            title_score = 3
+        return (
+            source_priority(entry.get("source"), query, ctx),
+            title_score,
+            entry.get("priority", 99),
+            -range_width,
+            entry.get("start_page") or 9999,
+        )
+
+    for locator in load_me_article_locators():
+        source = locator.get("source")
+        article_title = locator.get("title") or ""
+        article_norm = normalize_for_match(article_title)
+        if not source or not article_norm:
+            continue
+
+        matched = False
+        if len(article_norm) >= 4 and article_norm in query_norm:
+            matched = True
+        elif title_norm and len(title_norm) >= 4:
+            matched = article_norm == title_norm or title_norm in article_norm or article_norm in title_norm
+        elif len(article_norm) >= 8 and article_norm in query_norm:
+            matched = True
+
+        if not matched:
+            continue
+
+        start_page = locator.get("start_page")
+        end_page = locator.get("end_page")
+        if start_page is None or end_page is None:
+            continue
+        entry = {
+            "source": source,
+            "book_title": locator.get("book") or source,
+            "article": article_title,
+            "classic_title": article_title,
+            "start_page": start_page,
+            "end_page": end_page,
+            "pdf_page": locator.get("pdf_start_page"),
+            "pdf_end_page": locator.get("pdf_end_page"),
+            "entry_type": "me_article_locator",
+            "priority": 0 if locator.get("primary") else 1,
+            "locator_type": locator.get("locator_type") or "article",
+            "non_body": locator.get("non_body"),
+        }
+        if is_letter_title(article_title):
+            entry["entry_type"] = "me_letter_locator"
+            entry["is_letter"] = True
+            entry["letter_title"] = article_title
+            entry["no_page_citation"] = True
+            entry["citation_mode"] = "letter_title"
+        entries.append(entry)
+
+    if not entries:
+        return {}
+
+    entries = prefer_sources_for_query(entries, query, ctx)
+    used_query_exact_entries = False
+    query_exact_entries = [
+        entry for entry in entries
+        if len(normalize_for_match(entry.get("article"))) >= 4
+        and normalize_for_match(entry.get("article")) in query_norm
+    ]
+    if query_exact_entries:
+        max_title_len = max(
+            len(normalize_for_match(entry.get("article")))
+            for entry in query_exact_entries
+        )
+        entries = [
+            entry for entry in query_exact_entries
+            if len(normalize_for_match(entry.get("article"))) == max_title_len
+        ]
+        used_query_exact_entries = True
+    # Prefer exact title matches and primary article entries over derivative pages.
+    exact_entries = [
+        entry for entry in entries
+        if normalize_for_match(entry.get("article")) == (title_norm or query_norm)
+    ]
+    if exact_entries:
+        entries = exact_entries
+    primary_entries = [entry for entry in entries if entry.get("priority", 99) == 0]
+    if primary_entries and not used_query_exact_entries:
+        entries = primary_entries
+    entries = sorted(
+        entries,
+        key=article_rank,
+    )[:8]
+
+    result_title = title or entries[0].get("article")
+    letter_locator = bool(entries) and all(entry.get("is_letter") for entry in entries)
+    entry_title_norms = {normalize_for_match(entry.get("article")) for entry in entries if entry.get("article")}
+    entry_locations = {
+        (entry.get("source"), entry.get("start_page"), entry.get("end_page"))
+        for entry in entries
+    }
+    ambiguous_locator = len(entries) > 1 and len(entry_locations) > 1 and len(entry_title_norms) <= 2
+    return {
+        "title": result_title,
+        "strict_title": True,
+        "entries": entries,
+        "sources": {entry["source"] for entry in entries},
+        "page_ranges": build_page_ranges(entries),
+        "page_tolerance": 2,
+        "article_locator": True,
+        "ambiguous_locator": ambiguous_locator,
+        "letter_locator": letter_locator,
+        "no_page_citation": letter_locator,
+        "citation_mode": "letter_title" if letter_locator else "",
+    }
 
 
 def dedupe_locator_entries(entries):
@@ -217,6 +716,22 @@ def constraints_from_query(query, ctx):
     normalize_for_match = _helper(ctx, "normalize_for_match")
     query_norm = normalize_for_match(query)
 
+    high_precision_constraints = high_precision_locator_constraints_from_query(query, ctx)
+    if high_precision_constraints:
+        return high_precision_constraints
+
+    article_locator_constraints = article_locator_constraints_from_query(query, title, ctx)
+    if article_locator_constraints:
+        return article_locator_constraints
+
+    explicit_constraints = explicit_volume_constraints_from_query(query, ctx)
+    if explicit_constraints:
+        return explicit_constraints
+
+    me_hint_constraints = me_title_hint_constraints_from_query(query, ctx)
+    if me_hint_constraints:
+        return me_hint_constraints
+
     # ── Step 1: Work Catalog lookup (94-work structured metadata) ─
     query_work_hints = [
         (["\u552f\u7269\u53f2\u89c2", "\u7cfb\u7edf\u63d0\u51fa"], ["\u5fb7\u610f\u5fd7\u610f\u8bc6\u5f62\u6001"]),
@@ -281,15 +796,9 @@ def constraints_from_query(query, ctx):
             first_title = hinted_titles[0]
             if isinstance(first_title, (list, tuple)):
                 first_title = first_title[1] if len(first_title) > 1 else first_title[0]
-            return {
-                "title": display_title or first_title,
-                "strict_title": True,
-                "entries": hinted_entries,
-                "sources": {entry["source"] for entry in hinted_entries},
-                "page_ranges": build_page_ranges(hinted_entries),
-            }
+            return constraints_result(display_title or first_title, hinted_entries, query, ctx)
 
-    catalog_entries = work_catalog_entries_for_query(query)
+    catalog_entries = prefer_sources_for_query(work_catalog_entries_for_query(query), query, ctx)
     catalog_title = ""
     if catalog_entries:
         catalog_title = catalog_entries[0].get("classic_title") or catalog_entries[0].get("article") or ""
@@ -318,36 +827,18 @@ def constraints_from_query(query, ctx):
         return concept_constraints
     if catalog_entries:
         title = catalog_title
-        return {
-            "title": title,
-            "strict_title": True,
-            "entries": catalog_entries,
-            "sources": {entry["source"] for entry in catalog_entries},
-            "page_ranges": build_page_ranges(catalog_entries),
-        }
+        return constraints_result(title, catalog_entries, query, ctx)
 
-    locator_entries = locator_entries_for_query(query)
+    locator_entries = prefer_sources_for_query(locator_entries_for_query(query), query, ctx)
     if locator_entries:
         title = locator_entries[0].get("classic_title") or locator_entries[0].get("article")
-        return {
-            "title": title,
-            "strict_title": True,
-            "entries": locator_entries,
-            "sources": {entry["source"] for entry in locator_entries},
-            "page_ranges": build_page_ranges(locator_entries),
-        }
+        return constraints_result(title, locator_entries, query, ctx)
 
     core_entries = classic_entries_for_query(title) if title else []
     if core_entries:
-        entries = enrich_core_classic_entries(core_entries)
+        entries = prefer_sources_for_query(enrich_core_classic_entries(core_entries), query, ctx)
         title = title or entries[0].get("classic_title")
-        return {
-            "title": title,
-            "strict_title": True,
-            "entries": entries,
-            "sources": {entry["source"] for entry in entries},
-            "page_ranges": build_page_ranges(entries),
-        }
+        return constraints_result(title, entries, query, ctx)
 
     concept_constraints = concept_constraints_from_query(query, ctx)
     if concept_constraints:
@@ -369,17 +860,11 @@ def constraints_from_query(query, ctx):
             return locator_result
         return {}
 
-    entries = find_toc_entries(title)
+    entries = prefer_sources_for_query(find_toc_entries(title), query, ctx)
     if not entries:
         return {"title": title}
 
-    return {
-        "title": title,
-        "entries": entries,
-        "sources": {entry["source"] for entry in entries},
-        "page_ranges": build_page_ranges(entries),
-        "strict_title": True,
-    }
+    return constraints_result(title, entries, query, ctx)
 
 
 def topic_seed_queries(query, constraints, ctx):

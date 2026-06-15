@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from langchain_core.documents import Document
 
+import marxos_query_planner as query_planner
+
+from langchain_core.documents import Document
+
 
 def _doc_page_anchor(doc):
     metadata = doc.metadata or {}
@@ -213,7 +217,57 @@ def collect_retrieval_materials(
     evidence_from_docs,
     is_topic_view_list_query,
     force_corrective=False,
+    query_plan=None,
 ):
+    def doc_key(doc):
+        metadata = doc.metadata or {}
+        return (
+            metadata.get("source"),
+            metadata.get("page"),
+            metadata.get("printed_page"),
+            metadata.get("citation_page"),
+            metadata.get("article") or metadata.get("section"),
+            str(doc.page_content or "")[:120],
+        )
+
+    def rrf_merge_doc_lists(doc_lists, limit):
+        ranked = {}
+        order = {}
+        for list_index, docs_for_query in enumerate(doc_lists):
+            for rank, doc in enumerate(docs_for_query, start=1):
+                key = doc_key(doc)
+                if key not in ranked:
+                    ranked[key] = {
+                        "score": 0.0,
+                        "doc": Document(page_content=doc.page_content, metadata=dict(doc.metadata or {})),
+                    }
+                    order[key] = len(order)
+                ranked[key]["score"] += 1 / (60 + rank)
+                metadata = ranked[key]["doc"].metadata
+                metadata["planner_rrf_score"] = round(ranked[key]["score"], 6)
+                metadata.setdefault("planner_first_list", list_index)
+                metadata.setdefault("planner_first_rank", rank)
+        merged = sorted(
+            ranked.values(),
+            key=lambda item: (item["score"], -order[doc_key(item["doc"])]),
+            reverse=True,
+        )
+        return [item["doc"] for item in merged[:limit]]
+
+    def retrieve_with_plan(db, k):
+        if not query_plan or query_intent in {"quote_lookup", "bibliographic_lookup"}:
+            return _tag_docs(retrieve_documents(query, db, k=k), "initial_chunk")
+
+        retrieval_queries = query_plan.get("retrieval_queries") or [query]
+        if len(retrieval_queries) <= 1:
+            return _tag_docs(retrieve_documents(retrieval_queries[0], db, k=k), "initial_chunk")
+
+        per_query_k = max(k, min(k * 2, 16))
+        doc_lists = []
+        for variant in retrieval_queries:
+            doc_lists.append(retrieve_documents(variant, db, k=per_query_k))
+        return _tag_docs(rrf_merge_doc_lists(doc_lists, limit=max(k * 2, 12)), "planner_rrf_chunk")[:k]
+
     def build_state(selected_docs, selected_paragraph_docs, report, path):
         selected_docs = refine_docs_citation_pages_for_query(selected_docs, route_query)
         selected_evidence = evidence_from_docs(selected_docs)
@@ -231,7 +285,7 @@ def collect_retrieval_materials(
 
     db = load_vectorstore()
     retrieve_k = 12 if query_intent == "rag_answer" else 5
-    docs = _tag_docs(retrieve_documents(query, db, k=retrieve_k), "initial_chunk")
+    docs = retrieve_with_plan(db, retrieve_k)
     paragraph_docs_for_answer = []
     topic_list_query = query_intent == "rag_answer" and is_topic_view_list_query(route_query, constraints)
     paragraph_store_ready = paragraph_vectorstore_exists()
@@ -240,7 +294,7 @@ def collect_retrieval_materials(
         paragraph_db_for_answer = load_paragraph_vectorstore()
         paragraph_docs_for_answer = filter_paragraph_docs_by_text_overlap(
             query,
-            retrieve_documents(query, paragraph_db_for_answer, k=max(retrieve_k * 3, 12)),
+            retrieve_documents(query_plan.get("standalone_query", query) if query_plan else query, paragraph_db_for_answer, k=max(retrieve_k * 3, 12)),
             limit=retrieve_k,
         )
         paragraph_docs_for_answer = _tag_docs(paragraph_docs_for_answer, "initial_paragraph")

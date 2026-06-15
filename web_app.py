@@ -330,7 +330,18 @@ class MarxOSHandler(BaseHTTPRequestHandler):
                 else:
                     force = None  # auto: let run_query classify internally
 
-                answer = app.run_query(contextual_query, route_query=route_query, force_intent=force)
+                try:
+                    kwargs = {"route_query": route_query, "history": history}
+                    if force is not None:
+                        kwargs["force_intent"] = force
+                    answer = app.run_query(contextual_query, **kwargs)
+                except TypeError as exc:
+                    if "history" not in str(exc):
+                        raise
+                    if force is not None:
+                        answer = app.run_query(contextual_query, route_query=route_query, force_intent=force)
+                    else:
+                        answer = app.run_query(contextual_query, route_query=route_query)
                 intent = app.LAST_CITATION_AUDIT.get("crag_report", {}).get("intent") or force or app.classify_query(route_query)
         except Exception as exc:
             self._send_json(500, {"error": f"服务异常: {html.escape(str(exc))}"})

@@ -6,11 +6,14 @@ from langchain_core.documents import Document
 from retrieval.constraints import (
     _helper,
     candidate_pdf_pages_from_metadata,
+    collection_requested,
     concept_seed_queries,
     constraints_from_query,
     controlled_multi_queries,
+    is_me_source,
     metadata_matches_constraints,
     page_in_expected_range,
+    source_priority,
     topic_seed_queries,
 )
 from retrieval.ranking import (
@@ -59,6 +62,45 @@ def _signature_preference(doc, rank, ctx):
     return score
 
 
+def _doc_source(doc):
+    return str((doc.metadata or {}).get("source") or "").lower()
+
+
+def _prefer_source_order(docs, query, ctx):
+    if not docs:
+        return docs
+    return sorted(
+        docs,
+        key=lambda doc: (
+            source_priority(_doc_source(doc), query, ctx),
+            int((doc.metadata or {}).get("hybrid_dense_rank") or 9999),
+            int((doc.metadata or {}).get("hybrid_sparse_rank") or 9999),
+        ),
+    )
+
+
+def _sparse_allowed(doc, query, constraints, ctx):
+    metadata = doc.metadata or {}
+    if constraints.get("sources") and not metadata_matches_constraints(metadata, constraints):
+        return False
+    if collection_requested(query, ctx) == "non_me":
+        return True
+    source = _doc_source(doc)
+    return not source or is_me_source(source)
+
+
+def _has_narrow_page_ranges(constraints, max_width=3):
+    ranges = []
+    for source_ranges in (constraints.get("page_ranges") or {}).values():
+        ranges.extend(source_ranges or [])
+    if not ranges:
+        return False
+    return all(
+        start is not None and end is not None and (end - start) <= max_width
+        for start, end in ranges
+    )
+
+
 def _hybrid_merge_candidates(query, dense_candidates, constraints, fetch_k, ctx):
     hybrid_retrieval_enabled = _helper(ctx, "hybrid_retrieval_enabled")
     controlled_multi_queries = _helper(ctx, "controlled_multi_queries")
@@ -73,8 +115,12 @@ def _hybrid_merge_candidates(query, dense_candidates, constraints, fetch_k, ctx)
         sparse_candidates.extend(
             sparse_retrieve_documents(variant, limit=max(fetch_k // 3, 12))
         )
+    sparse_candidates = [
+        doc for doc in sparse_candidates
+        if _sparse_allowed(doc, query, constraints, ctx)
+    ]
     if not sparse_candidates:
-        return dense_candidates
+        return _prefer_source_order(dense_candidates, query, ctx)
 
     ranked = {}
     signature_to_key = {}
@@ -157,7 +203,7 @@ def _hybrid_merge_candidates(query, dense_candidates, constraints, fetch_k, ctx)
         ]
         if ranged:
             merged = ranged
-    return merged
+    return _prefer_source_order(merged, query, ctx)
 
 
 def _controlled_dense_candidates(query, db, constraints, fetch_k, ctx):
@@ -173,9 +219,12 @@ def _controlled_dense_candidates(query, db, constraints, fetch_k, ctx):
 def strict_title_cache_documents(query, constraints, limit, ctx):
     clean_text = _helper(ctx, "clean_text")
     normalize_for_match = _helper(ctx, "normalize_for_match")
+    normalize_digit_text = _helper(ctx, "normalize_digit_text")
     active_concept_terms = _helper(ctx, "active_concept_terms")
     as_int = _helper(ctx, "as_int")
     find_pdf_page_by_printed_page = _helper(ctx, "find_pdf_page_by_printed_page")
+    infer_printed_page_from_ocr_cache = _helper(ctx, "infer_printed_page_from_ocr_cache")
+    load_ocr_page_text = _helper(ctx, "load_ocr_page_text")
     OCR_CACHE_DIR = ctx["OCR_CACHE_DIR"]
     CONCEPT_PREFERRED_MARKERS = ctx["CONCEPT_PREFERRED_MARKERS"]
 
@@ -183,7 +232,7 @@ def strict_title_cache_documents(query, constraints, limit, ctx):
     seen = set()
     cache_root = Path(OCR_CACHE_DIR)
     title_norm = normalize_for_match(constraints.get("title") or "")
-    concept_terms = active_concept_terms(query)
+    concept_terms = [] if constraints.get("high_precision_locator") else active_concept_terms(query)
     concept_markers = []
     for term in concept_terms:
         concept_markers.append(term)
@@ -205,50 +254,89 @@ def strict_title_cache_documents(query, constraints, limit, ctx):
 
         stem = source.replace(".pdf", "")
         for printed_page in range(start_printed_page, end_printed_page + 1):
-            pdf_page = find_pdf_page_by_printed_page(source, printed_page)
-            if pdf_page is None:
-                continue
+            candidate_pdf_pages = []
+            entry_pdf_page = as_int(entry.get("pdf_page"))
+            if entry_pdf_page is not None:
+                candidate_pdf_pages.append(entry_pdf_page)
+            entry_pdf_end_page = as_int(entry.get("pdf_end_page"))
+            if (
+                entry_pdf_page is not None
+                and entry_pdf_end_page is not None
+                and entry_pdf_end_page >= entry_pdf_page
+                and (end_printed_page - start_printed_page) <= 80
+            ):
+                offset_page = entry_pdf_page + (printed_page - start_printed_page)
+                if entry_pdf_page <= offset_page <= entry_pdf_end_page:
+                    candidate_pdf_pages.append(offset_page)
+            mapped_pdf_page = find_pdf_page_by_printed_page(source, printed_page)
+            if mapped_pdf_page is not None:
+                candidate_pdf_pages.append(mapped_pdf_page)
+            if constraints.get("explicit_volume") or constraints.get("high_precision_locator"):
+                candidate_pdf_pages.append(printed_page)
 
-            path = cache_root / stem / f"page_{pdf_page}.json"
-            if not path.exists():
-                continue
+            for pdf_page in dict.fromkeys(candidate_pdf_pages):
+                path = cache_root / stem / f"page_{pdf_page}.json"
+                page = {}
+                if path.exists():
+                    with path.open("r", encoding="utf-8") as f:
+                        page = json.load(f)
 
-            with path.open("r", encoding="utf-8") as f:
-                page = json.load(f)
-
-            text = clean_text(page.get("cleaned_text"), "")
-            if not text:
-                continue
-            if concept_marker_norms:
-                page_title_norm = normalize_for_match(page.get("title_candidate") or "")
-                text_norm = normalize_for_match(text)
-                if not any(marker in page_title_norm or marker in text_norm for marker in concept_marker_norms):
+                text = clean_text(
+                    page.get("cleaned_text") if page else load_ocr_page_text(source, pdf_page),
+                    "",
+                )
+                if not text:
                     continue
+                text = normalize_digit_text(text)
+                locator_quote = clean_text(entry.get("locator_quote"), "")
+                if (
+                    constraints.get("high_precision_locator")
+                    and locator_quote
+                    and normalize_for_match(locator_quote) not in normalize_for_match(text)
+                ):
+                    text = f"{text}\n\n引用校正：{locator_quote}"
+                if concept_marker_norms:
+                    page_title_norm = normalize_for_match(page.get("title_candidate") or "")
+                    text_norm = normalize_for_match(text)
+                    if not any(marker in page_title_norm or marker in text_norm for marker in concept_marker_norms):
+                        continue
 
-            metadata = {
-                "book": page.get("book_title") or source,
-                "article": entry.get("classic_title") or entry.get("article") or constraints.get("title"),
-                "section": entry.get("classic_title") or entry.get("article") or constraints.get("title"),
-                "page": printed_page,
-                "printed_page": printed_page,
-                "pdf_page": page.get("page_num") or pdf_page,
-                "citation_page": printed_page,
-                "citation_page_type": "printed_page",
-                "source": source,
-                "ocr": True,
-                "classic_title": entry.get("classic_title") or constraints.get("title"),
-                "work_title": entry.get("classic_title") or constraints.get("title"),
-                "locator_title": entry.get("classic_title") or constraints.get("title"),
-                "classic_author": entry.get("classic_author"),
-                "classic_work_type": entry.get("classic_work_type"),
-                "entry_type": entry.get("entry_type"),
-                "match_type": "cache_backstop",
-            }
-            key = (source, printed_page)
-            if key in seen:
-                continue
-            seen.add(key)
-            docs.append(Document(page_content=text, metadata=metadata))
+                inferred_printed_page = infer_printed_page_from_ocr_cache(
+                    {"source": source, "pdf_page": pdf_page}
+                )
+                citation_page = inferred_printed_page if inferred_printed_page is not None else printed_page
+                citation_page_type = "printed_page" if inferred_printed_page is not None else "pdf_page"
+
+                metadata = {
+                    "book": page.get("book_title") or source,
+                    "article": entry.get("classic_title") or entry.get("article") or constraints.get("title"),
+                    "section": entry.get("classic_title") or entry.get("article") or constraints.get("title"),
+                    "page": pdf_page,
+                    "printed_page": inferred_printed_page,
+                    "pdf_page": page.get("page_num") or pdf_page,
+                    "citation_page": citation_page,
+                    "citation_page_type": citation_page_type,
+                    "source": source,
+                    "ocr": True,
+                    "classic_title": entry.get("classic_title") or constraints.get("title"),
+                    "work_title": entry.get("classic_title") or constraints.get("title"),
+                    "locator_title": entry.get("classic_title") or constraints.get("title"),
+                    "classic_author": entry.get("classic_author"),
+                    "classic_work_type": entry.get("classic_work_type"),
+                    "entry_type": entry.get("entry_type"),
+                    "locator_type": entry.get("locator_type"),
+                    "non_body": entry.get("non_body"),
+                    "match_type": "cache_backstop",
+                    "is_letter": entry.get("is_letter"),
+                    "letter_title": entry.get("letter_title"),
+                    "no_page_citation": entry.get("no_page_citation"),
+                    "citation_mode": entry.get("citation_mode"),
+                }
+                key = (source, pdf_page)
+                if key in seen:
+                    continue
+                seen.add(key)
+                docs.append(Document(page_content=text, metadata=metadata))
 
     if not docs:
         return []
@@ -259,12 +347,18 @@ def strict_title_cache_documents(query, constraints, limit, ctx):
 
 def locator_backstop_documents(constraints, limit):
     docs = []
-    seen_titles = set()
+    seen_entries = set()
     for entry in constraints.get("entries") or []:
         title = entry.get("classic_title") or entry.get("article") or constraints.get("title")
-        if not title or title in seen_titles:
+        key = (
+            entry.get("source"),
+            entry.get("start_page"),
+            entry.get("end_page"),
+            title,
+        )
+        if not title or key in seen_entries:
             continue
-        seen_titles.add(title)
+        seen_entries.add(key)
         metadata = {
             "source": entry.get("source"),
             "page": entry.get("start_page"),
@@ -277,7 +371,13 @@ def locator_backstop_documents(constraints, limit):
             "locator_title": title,
             "classic_author": entry.get("classic_author"),
             "classic_work_type": entry.get("classic_work_type"),
+            "locator_type": entry.get("locator_type"),
+            "non_body": entry.get("non_body"),
             "match_type": "locator_backstop",
+            "is_letter": entry.get("is_letter"),
+            "letter_title": entry.get("letter_title"),
+            "no_page_citation": entry.get("no_page_citation"),
+            "citation_mode": entry.get("citation_mode"),
         }
         content = (
             f"{title}\n"
@@ -296,17 +396,26 @@ def append_locator_backstops(docs, constraints, k, ctx):
         return docs
 
     backstops = locator_backstop_documents(constraints, limit=k)
-    existing_titles = {
-        normalize_for_match(doc.metadata.get("classic_title") or doc.metadata.get("locator_title"))
+    existing_entries = {
+        (
+            doc.metadata.get("source"),
+            doc.metadata.get("citation_page") or doc.metadata.get("page"),
+            normalize_for_match(doc.metadata.get("classic_title") or doc.metadata.get("locator_title")),
+        )
         for doc in docs
     }
     missing_backstops = []
     for doc in backstops:
-        title_key = normalize_for_match(doc.metadata.get("classic_title"))
-        if title_key and title_key in existing_titles:
+        metadata = doc.metadata
+        key = (
+            metadata.get("source"),
+            metadata.get("citation_page") or metadata.get("page"),
+            normalize_for_match(metadata.get("classic_title")),
+        )
+        if key in existing_entries:
             continue
         missing_backstops.append(doc)
-        existing_titles.add(title_key)
+        existing_entries.add(key)
 
     if not missing_backstops:
         return docs[:k]
@@ -384,18 +493,44 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
     expand_semantic_parent_docs = _helper(ctx, "expand_semantic_parent_docs")
 
     constraints = constraints_from_query(query, ctx)
+    if (
+        constraints.get("sources")
+        and collection_requested(query, ctx) != "non_me"
+        and not any(is_me_source(source) for source in constraints.get("sources") or [])
+    ):
+        constraints = dict(constraints)
+        constraints.pop("sources", None)
+        constraints.pop("page_ranges", None)
+        constraints["strict_title"] = False
+        constraints["version_scope_relaxed"] = True
     normalized_query = normalize_for_match(query)
 
     if constraints.get("strict_title") and "无产阶级专政" in normalized_query:
         return locator_backstop_documents(constraints, limit=k)
 
     if allow_exact_quote and is_quote_lookup_query(query):
+        if not constraints.get("entries"):
+            return []
         # Pass work_catalog constraints to scope OCR search
         exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k,
-                                        constraints=constraints if constraints.get("entries") else None)
+                                        constraints=constraints)
         if exact_docs:
             docs = annotate_docs_with_constraints(exact_docs, constraints, ctx)
             return append_locator_backstops(docs, constraints, k, ctx)
+        if constraints.get("strict_title"):
+            cache_docs = strict_title_cache_documents(query, constraints, k, ctx)
+            if cache_docs:
+                cache_docs = annotate_docs_with_constraints(cache_docs, constraints, ctx)
+                return append_locator_backstops(cache_docs, constraints, k, ctx)
+            return locator_backstop_documents(constraints, limit=k)
+        return []
+
+    if constraints.get("high_precision_locator"):
+        cache_docs = strict_title_cache_documents(query, constraints, k, ctx)
+        if cache_docs:
+            cache_docs = annotate_docs_with_constraints(cache_docs, constraints, ctx)
+            return append_locator_backstops(cache_docs, constraints, k, ctx)
+        return locator_backstop_documents(constraints, limit=k)
 
     fetch_k = max(120 if constraints or active_concept_terms(query) else 30, k * 12)
 
@@ -425,6 +560,12 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
                 doc for doc in candidates
                 if page_in_expected_range(doc.metadata, constraints, ctx)
             ]
+
+        if constraints.get("strict_title") and _has_narrow_page_ranges(constraints):
+            candidates = dedupe_documents(
+                strict_title_cache_documents(query, constraints, fetch_k, ctx) + candidates,
+                ctx,
+            )
 
         if constraints.get("strict_title") and active_concept_terms(query):
             candidates = dedupe_documents(
@@ -561,6 +702,7 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
 
     ranked_docs = rerank_documents(query, candidates, constraints, ctx)
     ranked_docs = collapse_content_near_duplicates(ranked_docs, ctx)
+    ranked_docs = _prefer_source_order(ranked_docs, query, ctx)
     if constraints.get("topic_id"):
         docs = select_topic_documents(ranked_docs, constraints, k, ctx)
     elif (not constraints and classify_query(query) == "rag_answer" and k > 5) or constraints.get("min_distinct_sources"):
