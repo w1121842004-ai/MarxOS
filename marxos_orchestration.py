@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import sys
+import time
+
 from langchain_core.documents import Document
 
 import marxos_query_planner as query_planner
@@ -218,7 +222,32 @@ def collect_retrieval_materials(
     is_topic_view_list_query,
     force_corrective=False,
     query_plan=None,
+    performance=None,
 ):
+    performance = performance or {}
+    retrieval_started = time.perf_counter()
+
+    def log_retrieval_phase(phase, started, **extra):
+        payload = {
+            "event": "marxos_retrieval_timing",
+            "phase": phase,
+            "elapsed_ms": int((time.perf_counter() - started) * 1000),
+            "total_ms": int((time.perf_counter() - retrieval_started) * 1000),
+        }
+        payload.update(extra)
+        try:
+            print(json.dumps(payload, ensure_ascii=False), file=sys.stderr, flush=True)
+        except UnicodeEncodeError:
+            print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+
+    def retrieve_documents_for_mode(query_text, db, k):
+        try:
+            return retrieve_documents(query_text, db, k=k, performance=performance)
+        except TypeError as exc:
+            if "performance" not in str(exc):
+                raise
+            return retrieve_documents(query_text, db, k=k)
+
     def doc_key(doc):
         metadata = doc.metadata or {}
         return (
@@ -256,21 +285,35 @@ def collect_retrieval_materials(
 
     def retrieve_with_plan(db, k):
         if not query_plan or query_intent in {"quote_lookup", "bibliographic_lookup"}:
-            return _tag_docs(retrieve_documents(query, db, k=k), "initial_chunk")
+            return _tag_docs(retrieve_documents_for_mode(query, db, k), "initial_chunk")
 
         retrieval_queries = query_plan.get("retrieval_queries") or [query]
-        if len(retrieval_queries) <= 1:
-            return _tag_docs(retrieve_documents(retrieval_queries[0], db, k=k), "initial_chunk")
+        if not performance.get("planner_multi_query", True) or len(retrieval_queries) <= 1:
+            return _tag_docs(retrieve_documents_for_mode(retrieval_queries[0], db, k), "initial_chunk")
 
         per_query_k = max(k, min(k * 2, 16))
         doc_lists = []
         for variant in retrieval_queries:
-            doc_lists.append(retrieve_documents(variant, db, k=per_query_k))
+            doc_lists.append(retrieve_documents_for_mode(variant, db, per_query_k))
         return _tag_docs(rrf_merge_doc_lists(doc_lists, limit=max(k * 2, 12)), "planner_rrf_chunk")[:k]
 
     def build_state(selected_docs, selected_paragraph_docs, report, path):
-        selected_docs = refine_docs_citation_pages_for_query(selected_docs, route_query)
+        phase_started = time.perf_counter()
+        if performance.get("citation_page_refinement", True):
+            selected_docs = refine_docs_citation_pages_for_query(selected_docs, route_query)
+        log_retrieval_phase(
+            f"{path}_refine_citation_pages",
+            phase_started,
+            enabled=bool(performance.get("citation_page_refinement", True)),
+            doc_count=len(selected_docs or []),
+        )
+        phase_started = time.perf_counter()
         selected_evidence = evidence_from_docs(selected_docs)
+        log_retrieval_phase(
+            f"{path}_evidence_from_docs",
+            phase_started,
+            evidence_count=len(selected_evidence or []),
+        )
         return {
             "docs": selected_docs,
             "evidence": selected_evidence,
@@ -280,25 +323,66 @@ def collect_retrieval_materials(
 
     set_last_topic_info(topic_info_from_constraints(constraints))
     if trace or trace_only:
-        print_trace_line("search_path: FAISS vector similarity search -> rule rerank -> DeepSeek")
+        print_trace_line("search_path: vector similarity search -> rule rerank -> DeepSeek")
         print_constraints_trace(constraints)
 
+    phase_started = time.perf_counter()
     db = load_vectorstore()
-    retrieve_k = 12 if query_intent == "rag_answer" else 5
+    log_retrieval_phase("load_vectorstore", phase_started)
+    retrieve_k = int(
+        performance.get(
+            "rag_retrieve_k" if query_intent == "rag_answer" else "retrieve_k",
+            12 if query_intent == "rag_answer" else 5,
+        )
+    )
+    phase_started = time.perf_counter()
     docs = retrieve_with_plan(db, retrieve_k)
+    log_retrieval_phase(
+        "initial_chunk_retrieve",
+        phase_started,
+        doc_count=len(docs or []),
+        retrieve_k=retrieve_k,
+        multi_query=bool(performance.get("planner_multi_query", True)),
+    )
     paragraph_docs_for_answer = []
     topic_list_query = query_intent == "rag_answer" and is_topic_view_list_query(route_query, constraints)
+    phase_started = time.perf_counter()
     paragraph_store_ready = paragraph_vectorstore_exists()
+    log_retrieval_phase("paragraph_store_check", phase_started, ready=bool(paragraph_store_ready))
 
-    if paragraph_store_ready and not topic_list_query:
+    if performance.get("paragraph_retrieval", True) and paragraph_store_ready and not topic_list_query:
+        phase_started = time.perf_counter()
         paragraph_db_for_answer = load_paragraph_vectorstore()
         paragraph_docs_for_answer = filter_paragraph_docs_by_text_overlap(
             query,
-            retrieve_documents(query_plan.get("standalone_query", query) if query_plan else query, paragraph_db_for_answer, k=max(retrieve_k * 3, 12)),
+            retrieve_documents_for_mode(
+                query_plan.get("standalone_query", query) if query_plan else query,
+                paragraph_db_for_answer,
+                max(retrieve_k * 3, 12),
+            ),
             limit=retrieve_k,
         )
         paragraph_docs_for_answer = _tag_docs(paragraph_docs_for_answer, "initial_paragraph")
         docs = merge_prefer_paragraph_docs(paragraph_docs_for_answer, docs, retrieve_k)
+        log_retrieval_phase(
+            "initial_paragraph_retrieve",
+            phase_started,
+            paragraph_count=len(paragraph_docs_for_answer or []),
+            doc_count=len(docs or []),
+        )
+
+    phase_started = time.perf_counter()
+    phase_started = time.perf_counter()
+    initial_evidence_for_assess_docs = docs
+    if performance.get("citation_page_refinement", True):
+        initial_evidence_for_assess_docs = refine_docs_citation_pages_for_query(docs, route_query)
+    initial_evidence_for_assess = evidence_from_docs(initial_evidence_for_assess_docs)
+    log_retrieval_phase(
+        "initial_assess_materials",
+        phase_started,
+        refinement_enabled=bool(performance.get("citation_page_refinement", True)),
+        evidence_count=len(initial_evidence_for_assess or []),
+    )
 
     initial_state = build_state(
         docs,
@@ -306,37 +390,58 @@ def collect_retrieval_materials(
         assess_retrieval_quality(
             query_intent,
             docs,
-            evidence_from_docs(refine_docs_citation_pages_for_query(docs, route_query)),
+            initial_evidence_for_assess,
             constraints,
         ),
         "initial",
+    )
+    log_retrieval_phase(
+        "initial_assess",
+        phase_started,
+        score=int(initial_state["crag_report"].get("score") or 0),
+        ok=bool(initial_state["crag_report"].get("ok", False)),
     )
 
     best_state = initial_state
     report = initial_state["crag_report"]
 
-    should_correct = force_corrective or (
-        not report.get("ok")
-        and query_intent not in {"bibliographic_lookup", "quote_lookup"}
-    ) or (
-        query_intent == "quote_lookup" and not report.get("ok")
+    should_correct = performance.get("corrective_retrieval", True) and (
+        force_corrective or (
+            not report.get("ok")
+            and query_intent not in {"bibliographic_lookup", "quote_lookup"}
+        ) or (
+            query_intent == "quote_lookup" and not report.get("ok")
+        )
     )
 
     if should_correct:
+        phase_started = time.perf_counter()
         corrective_chunk_docs = _tag_docs(
-            retrieve_documents(route_query, db, k=max(retrieve_k * 2, 8)),
+            retrieve_documents_for_mode(route_query, db, max(retrieve_k * 2, 8)),
             "corrective_route_chunk",
+        )
+        log_retrieval_phase(
+            "corrective_chunk_retrieve",
+            phase_started,
+            doc_count=len(corrective_chunk_docs or []),
         )
         corrective_paragraph_docs = []
         if paragraph_store_ready and not topic_list_query:
+            phase_started = time.perf_counter()
             paragraph_db_for_answer = paragraph_db_for_answer if paragraph_docs_for_answer else load_paragraph_vectorstore()
             corrective_paragraph_docs = filter_paragraph_docs_by_text_overlap(
                 route_query,
-                retrieve_documents(route_query, paragraph_db_for_answer, k=max(retrieve_k * 4, 16)),
+                retrieve_documents_for_mode(route_query, paragraph_db_for_answer, max(retrieve_k * 4, 16)),
                 limit=max(retrieve_k, 8),
             )
             corrective_paragraph_docs = _tag_docs(corrective_paragraph_docs, "corrective_paragraph")
+            log_retrieval_phase(
+                "corrective_paragraph_retrieve",
+                phase_started,
+                paragraph_count=len(corrective_paragraph_docs or []),
+            )
 
+        phase_started = time.perf_counter()
         merged_docs = _merge_ranked_docs(
             corrective_paragraph_docs,
             corrective_chunk_docs,
@@ -348,16 +453,35 @@ def collect_retrieval_materials(
         else:
             merged_docs = merged_docs[: max(retrieve_k * 2, 10)]
 
+        phase_started = time.perf_counter()
+        corrective_evidence_for_assess_docs = merged_docs
+        if performance.get("citation_page_refinement", True):
+            corrective_evidence_for_assess_docs = refine_docs_citation_pages_for_query(merged_docs, route_query)
+        corrective_evidence_for_assess = evidence_from_docs(corrective_evidence_for_assess_docs)
+        log_retrieval_phase(
+            "corrective_assess_materials",
+            phase_started,
+            refinement_enabled=bool(performance.get("citation_page_refinement", True)),
+            evidence_count=len(corrective_evidence_for_assess or []),
+        )
+
         corrective_state = build_state(
             merged_docs,
             corrective_paragraph_docs or paragraph_docs_for_answer,
             assess_retrieval_quality(
                 query_intent,
                 merged_docs,
-                evidence_from_docs(refine_docs_citation_pages_for_query(merged_docs, route_query)),
+                corrective_evidence_for_assess,
                 constraints,
             ),
             "forced_corrective" if force_corrective else "corrective",
+        )
+        log_retrieval_phase(
+            "corrective_assess",
+            phase_started,
+            score=int(corrective_state["crag_report"].get("score") or 0),
+            ok=bool(corrective_state["crag_report"].get("ok", False)),
+            doc_count=len(merged_docs or []),
         )
         if corrective_state["crag_report"]["score"] >= best_state["crag_report"]["score"]:
             best_state = corrective_state

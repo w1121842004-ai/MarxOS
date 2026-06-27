@@ -1,6 +1,7 @@
 openai==2.36.0
 python-dotenv==1.2.2
 jsonschema==4.25.1
+jieba==0.42.1
 
 langchain==0.1.20
 langchain-community==0.0.38
@@ -8,6 +9,9 @@ langchain-core==0.1.52
 langchain-text-splitters==0.0.2
 faiss-cpu==1.7.4
 sentence-transformers==2.7.0
+FlagEmbedding==1.4.0
+pymilvus==3.0.0
+milvus-lite==3.0
 
 paddleocr==2.7.3
 paddlepaddle==2.6.2
@@ -16,7 +20,7 @@ PyMuPDF==1.27.2.3
 opencv-python==4.6.0.66
 opencv-python-headless==4.6.0.66
 scikit-image==0.21.0
-numpy==1.23.5
+numpy==1.26.4
 
 requests==2.33.1
 beautifulsoup4==4.14.3

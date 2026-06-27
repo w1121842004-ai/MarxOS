@@ -1,3 +1,24 @@
+"""
+⚠️ DEPRECATED: v1 vectorstore build script — use v2 pipeline instead.
+
+This module's ``main()`` builds a FAISS index by chunking OCR pages directly,
+producing chunks WITHOUT ``parent_paragraph_id`` metadata.  Those chunks cannot
+be expanded to paragraph windows by ``expand_semantic_parent_docs()``.
+
+**Use the v2 pipeline instead:**
+
+.. code-block:: bash
+
+    python scripts/build_paragraph_cache.py       # Step 1
+    python scripts/build_semantic_child_vectorstore.py  # Step 2
+    python scripts/build_paragraph_vectorstore.py       # Step 3
+
+The utility functions in this module (``document_from_cache``,
+``page_num_from_cache_file``, ``BOOK_MAPPING``, ``is_me_volume``,
+``infer_page_metadata*``, ``load_cleaned_cache_page``, ``iter_cache_files``)
+remain in active use by other modules and are NOT deprecated.
+"""
+
 import os
 import re
 import shutil
@@ -6,7 +27,7 @@ import json
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from marxos_embeddings import HuggingFaceEmbeddings
+from marxos_embeddings import HuggingFaceEmbeddings, embedding_encode_kwargs
 try:
     from clean_ocr_text import clean_ocr_page
 except ModuleNotFoundError:
@@ -23,7 +44,7 @@ TEMP_VECTORSTORE_DIR = f"{VECTORSTORE_DIR}_tmp"
 ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json")
 PARAGRAPH_CACHE_PATH = os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache_core.jsonl")
 
-EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+EMBEDDING_MODEL = os.getenv("MARXOS_EMBEDDING_MODEL", "BAAI/bge-m3")
 
 CHUNK_SIZE = int(os.getenv("SEMANTIC_CHILD_CHUNK_SIZE", "180"))
 CHUNK_OVERLAP = int(os.getenv("SEMANTIC_CHILD_CHUNK_OVERLAP", "40"))
@@ -550,6 +571,18 @@ def document_from_cache(cache_path, title_context, page_sequence_context=None):
 
 
 def main():
+    import warnings
+    warnings.warn(
+        "build_vectorstore_from_cache.py (v1) is deprecated. "
+        "Use the v2 pipeline instead:\n"
+        "  python scripts/build_paragraph_cache.py\n"
+        "  python scripts/build_semantic_child_vectorstore.py\n"
+        "  python scripts/build_paragraph_vectorstore.py\n"
+        "v1 chunks lack parent_paragraph_id and cannot be expanded "
+        "to paragraph windows.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     all_docs = []
     title_context = {}
     page_sequence_context = {}
@@ -612,6 +645,7 @@ def main():
 
     embeddings = HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL,
+        encode_kwargs=embedding_encode_kwargs(EMBEDDING_MODEL),
     )
 
     print("embedding 模型加载完成，开始构建 FAISS...", flush=True)

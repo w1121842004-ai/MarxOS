@@ -72,7 +72,7 @@ def main() -> int:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     result = {
         "version": 1,
-        "ocr_cache_dir": str(OCR_CACHE_DIR),
+        "ocr_cache_dir": OCR_CACHE_DIR.as_posix(),
         "sources": {},
     }
 

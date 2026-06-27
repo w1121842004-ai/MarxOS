@@ -13,7 +13,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from langchain_community.vectorstores import FAISS
-from marxos_embeddings import HuggingFaceEmbeddings
+from marxos_embeddings import HuggingFaceEmbeddings, embedding_encode_kwargs
 
 from rag.paragraph_cache import paragraph_record_to_document, read_paragraph_cache  # noqa: E402
 
@@ -22,7 +22,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
-EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+EMBEDDING_MODEL = os.getenv("MARXOS_EMBEDDING_MODEL", "BAAI/bge-m3")
 PARAGRAPH_CACHE_PATH = Path(os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache_core.jsonl"))
 PARAGRAPH_VECTORSTORE_DIR = Path(os.getenv("PARAGRAPH_VECTORSTORE_DIR", "vectorstore/marx_reader_paragraph"))
 TEMP_VECTORSTORE_DIR = Path(f"{PARAGRAPH_VECTORSTORE_DIR}_tmp")
@@ -52,7 +52,10 @@ def main() -> None:
     print(f"batch size: {BATCH_SIZE}", flush=True)
     print("loading embedding model...", flush=True)
 
-    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    embeddings = HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL,
+        encode_kwargs=embedding_encode_kwargs(EMBEDDING_MODEL),
+    )
 
     if TEMP_VECTORSTORE_DIR.exists():
         shutil.rmtree(TEMP_VECTORSTORE_DIR)

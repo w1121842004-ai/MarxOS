@@ -156,14 +156,16 @@ def topic_scoped_query(query, history, is_contextual_followup_fn):
     return f"{topic_label}：{query}"
 
 
-def build_ask_response(intent, answer, evidence, citation_audit, topic_info, crag_report, elapsed_ms, history, max_history_turns):
+def build_ask_response(intent, answer, evidence, citation_audit, topic_info, crag_report, elapsed_ms, history, max_history_turns, mode="", timing=None):
     return {
         "intent": intent,
+        "mode": mode,
         "answer": answer,
         "evidence": evidence,
         "citation_audit": citation_audit,
         "topic": topic_info,
         "crag": crag_report or {},
+        "timing": timing or {},
         "elapsed_ms": elapsed_ms,
         "memory_turns": min(len(history), max_history_turns),
     }

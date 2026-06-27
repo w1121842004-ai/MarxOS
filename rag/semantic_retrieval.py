@@ -3,9 +3,11 @@ from __future__ import annotations
 import os
 import math
 import re
+from array import array
 from collections import Counter, defaultdict
 from functools import lru_cache
 from pathlib import Path
+import pickle
 
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -16,14 +18,26 @@ from rag.paragraph_cache import paragraph_record_to_document, read_paragraph_cac
 DEFAULT_PARAGRAPH_CACHE_PATH = Path(
     os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache_core.jsonl")
 )
+DEFAULT_LIGHT_SPARSE_INDEX_PATH = Path(
+    os.getenv("SEMANTIC_LIGHT_SPARSE_INDEX_PATH", "data/sparse_paragraph_index_light.pkl")
+)
 DEFAULT_CHILD_CHUNK_SIZE = int(os.getenv("SEMANTIC_CHILD_CHUNK_SIZE", "180"))
 DEFAULT_CHILD_CHUNK_OVERLAP = int(os.getenv("SEMANTIC_CHILD_CHUNK_OVERLAP", "40"))
 DEFAULT_PARENT_WINDOW = int(os.getenv("SEMANTIC_PARENT_WINDOW", "1"))
 SPARSE_TOP_K = int(os.getenv("SEMANTIC_SPARSE_TOP_K", "24"))
+SPARSE_RERANK_POOL = int(os.getenv("SEMANTIC_SPARSE_RERANK_POOL", "2000"))
+SPARSE_CONTENT_RERANK_POOL = int(os.getenv("SEMANTIC_SPARSE_CONTENT_RERANK_POOL", "300"))
+LIGHT_SPARSE_MIN_DF = int(os.getenv("SEMANTIC_LIGHT_SPARSE_MIN_DF", "5"))
+LIGHT_SPARSE_MAX_DF_RATIO = float(os.getenv("SEMANTIC_LIGHT_SPARSE_MAX_DF_RATIO", "0.6"))
 SPARSE_STOP_PHRASES = (
     "请解释",
     "请说明",
     "请问",
+    "请概括",
+    "概括",
+    "总结",
+    "归纳",
+    "梳理",
     "为什么说",
     "为什么",
     "到底",
@@ -44,12 +58,47 @@ SPARSE_STOP_PHRASES = (
     "简单",
     "直接",
     "问题",
+    "观点",
+    "看法",
+    "主张",
     "在马克思那里",
 )
 
 
+def looks_like_index_or_toc_text(text: str, metadata: dict | None = None) -> bool:
+    text = str(text or "")
+    metadata = metadata or {}
+    article = str(metadata.get("article") or metadata.get("section") or "")
+    if metadata.get("page_type") in {"toc", "title_page"}:
+        return True
+    if any(marker in article for marker in ["目录", "目次", "人名索引", "名目索引", "文献索引", "报刊索引", "地名索引"]):
+        return True
+    dash_entry_count = text.count("——") + text.count("---")
+    if "并见" in text and dash_entry_count >= 1:
+        return True
+    if dash_entry_count >= 3 and len(text) < 600:
+        return True
+    punctuation_count = sum(1 for char in text if char in ".。!！?？,，;；:：…·•-—_[]()（）")
+    return bool(text and punctuation_count / max(len(text), 1) > 0.42)
+
+
 def _paragraph_cache_path(path: str | Path | None = None) -> Path:
     return Path(path) if path else DEFAULT_PARAGRAPH_CACHE_PATH
+
+
+def _light_sparse_index_path(path: str | Path | None = None) -> Path:
+    configured = Path(os.getenv("SEMANTIC_LIGHT_SPARSE_INDEX_PATH", str(DEFAULT_LIGHT_SPARSE_INDEX_PATH)))
+    if path is None:
+        return configured
+    cache_path = _paragraph_cache_path(path)
+    try:
+        if cache_path.resolve() == DEFAULT_PARAGRAPH_CACHE_PATH.resolve():
+            return configured
+    except OSError:
+        if str(cache_path) == str(DEFAULT_PARAGRAPH_CACHE_PATH):
+            return configured
+    safe_name = re.sub(r"[^0-9A-Za-z_.-]+", "_", str(cache_path))
+    return configured.with_name(f"{configured.stem}_{safe_name}{configured.suffix}")
 
 
 @lru_cache(maxsize=2)
@@ -64,6 +113,38 @@ def load_paragraph_records(path: str | Path | None = None) -> tuple[dict, dict]:
             continue
         by_source.setdefault(source, []).append(record)
     return by_id, by_source
+
+
+def _sparse_record_for_index(record: dict) -> dict:
+    return {
+        key: record.get(key)
+        for key in (
+            "source",
+            "book",
+            "article",
+            "section",
+            "paragraph_text",
+            "paragraph_char_count",
+            "paragraph_index_on_page",
+            "char_start",
+            "char_end",
+            "line_start",
+            "line_end",
+            "pdf_page_start",
+            "pdf_page_end",
+            "printed_page_start",
+            "printed_page_end",
+            "citation_page_start",
+            "citation_page_end",
+            "citation_page_type",
+            "page_span",
+            "page_type",
+            "paragraph_index",
+            "paragraph_id",
+            "cross_page",
+        )
+        if record.get(key) is not None
+    }
 
 
 def normalize_sparse_text(text: str) -> str:
@@ -132,8 +213,130 @@ def sparse_query_phrases(text: str) -> list[str]:
     return unique[:12]
 
 
+def _pack_postings(
+    postings: dict[str, dict[int, int]],
+    doc_count: int,
+    min_df: int = LIGHT_SPARSE_MIN_DF,
+    max_df_ratio: float = LIGHT_SPARSE_MAX_DF_RATIO,
+) -> dict[str, tuple[array, array]]:
+    packed = {}
+    max_df = int(doc_count * max_df_ratio) if max_df_ratio > 0 else 0
+    for token, freqs in postings.items():
+        if not freqs:
+            continue
+        doc_freq = len(freqs)
+        if min_df > 1 and doc_freq < min_df:
+            continue
+        if max_df and doc_freq > max_df:
+            continue
+        doc_ids = array("I")
+        term_freqs = array("H")
+        for doc_id, freq in freqs.items():
+            doc_ids.append(int(doc_id))
+            term_freqs.append(min(int(freq), 65535))
+        packed[token] = (doc_ids, term_freqs)
+    return packed
+
+
+def _iter_postings(postings):
+    if not postings:
+        return ()
+    if isinstance(postings, tuple) and len(postings) == 2:
+        return zip(postings[0], postings[1])
+    return postings
+
+
+def build_light_sparse_paragraph_index(path: str | Path | None = None) -> dict:
+    records = read_paragraph_cache(_paragraph_cache_path(path))
+    docs = []
+    postings = defaultdict(dict)
+    doc_lengths = []
+
+    for record in records:
+        doc_id = len(docs)
+        sparse_text = " ".join(
+            str(part or "")
+            for part in (
+                record.get("book"),
+                record.get("article"),
+                record.get("section"),
+                record.get("paragraph_text"),
+            )
+        )
+        tokens = sparse_query_tokens(sparse_text)
+        if not tokens:
+            continue
+
+        term_freqs = Counter(tokens)
+        doc_len = sum(term_freqs.values())
+        indexed_record = _sparse_record_for_index(record)
+        indexed_record["doc_len"] = doc_len
+        indexed_record["title_text"] = normalize_sparse_text(
+            f"{record.get('article') or ''} {record.get('section') or ''}"
+        )
+        indexed_record["book_text"] = normalize_sparse_text(record.get("book") or "")
+        docs.append(indexed_record)
+        doc_lengths.append(doc_len)
+        for token, freq in term_freqs.items():
+            postings[token][doc_id] = freq
+
+    avgdl = (sum(doc_lengths) / len(doc_lengths)) if doc_lengths else 1.0
+    return {
+        "schema_version": 1,
+        "kind": "light_sparse_paragraph_index",
+        "docs": docs,
+        "postings": _pack_postings(postings, len(docs)),
+        "doc_count": len(docs),
+        "avgdl": avgdl or 1.0,
+        "min_df": LIGHT_SPARSE_MIN_DF,
+        "max_df_ratio": LIGHT_SPARSE_MAX_DF_RATIO,
+    }
+
+
+def write_light_sparse_paragraph_index(
+    output_path: str | Path | None = None,
+    paragraph_cache_path: str | Path | None = None,
+) -> dict:
+    output_path = Path(output_path) if output_path else _light_sparse_index_path(paragraph_cache_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    index = build_light_sparse_paragraph_index(paragraph_cache_path)
+    tmp_path = output_path.with_suffix(output_path.suffix + ".tmp")
+    with tmp_path.open("wb") as f:
+        pickle.dump(index, f, protocol=pickle.HIGHEST_PROTOCOL)
+    tmp_path.replace(output_path)
+    return {
+        "path": str(output_path),
+        "doc_count": index.get("doc_count", 0),
+        "posting_terms": len(index.get("postings") or {}),
+        "size_bytes": output_path.stat().st_size,
+    }
+
+
+def load_light_sparse_paragraph_index(path: str | Path | None = None) -> dict | None:
+    cache_path = _paragraph_cache_path(path)
+    index_path = _light_sparse_index_path(path)
+    if os.getenv("SEMANTIC_USE_LIGHT_SPARSE_INDEX", "1").lower() not in {"1", "true", "yes", "on"}:
+        return None
+    if not index_path.exists() or not cache_path.exists():
+        return None
+    try:
+        if index_path.stat().st_mtime < cache_path.stat().st_mtime:
+            return None
+        with index_path.open("rb") as f:
+            index = pickle.load(f)
+    except (OSError, pickle.PickleError, EOFError, AttributeError, ValueError):
+        return None
+    if not isinstance(index, dict) or index.get("kind") != "light_sparse_paragraph_index":
+        return None
+    return index
+
+
 @lru_cache(maxsize=2)
 def load_sparse_paragraph_index(path: str | Path | None = None) -> dict:
+    light_index = load_light_sparse_paragraph_index(path)
+    if light_index is not None:
+        return light_index
+
     _, by_source = load_paragraph_records(path)
     docs = []
     postings = defaultdict(list)
@@ -300,6 +503,9 @@ def paragraph_window_document(
             "child_char_start",
             "child_char_end",
             "paragraph_query_overlap_score",
+            "retrieval_backend",
+            "milvus_id",
+            "vector_score",
         ):
             if key in (match_doc.metadata or {}):
                 doc.metadata[key] = match_doc.metadata.get(key)
@@ -318,9 +524,21 @@ def expand_semantic_parent_docs(
     for doc in docs or []:
         metadata = dict(doc.metadata or {})
         parent_id = metadata.get("parent_paragraph_id")
-        if metadata.get("retrieval_unit") == "paragraph_child" and parent_id:
+        if metadata.get("retrieval_unit") in {"paragraph_child", "semantic_child", "milvus_passage"} and parent_id:
             parent_doc = paragraph_window_document(parent_id, window=window, path=path, match_doc=doc)
             if parent_doc is not None:
+                if (
+                    metadata.get("retrieval_unit") == "milvus_passage"
+                    and looks_like_index_or_toc_text(parent_doc.page_content, parent_doc.metadata)
+                    and not looks_like_index_or_toc_text(doc.page_content, metadata)
+                ):
+                    parent_doc = None
+
+            if parent_doc is not None:
+                if metadata.get("retrieval_unit") == "milvus_passage":
+                    parent_doc.metadata["retrieval_unit"] = "milvus_paragraph_window"
+                elif metadata.get("retrieval_unit") == "semantic_child":
+                    parent_doc.metadata["retrieval_unit"] = "semantic_parent"
                 key = (
                     parent_doc.metadata.get("source"),
                     parent_doc.metadata.get("parent_paragraph_id"),
@@ -367,20 +585,27 @@ def sparse_retrieve_documents(
         postings = index["postings"].get(token) or []
         if not postings:
             continue
-        doc_freq = len(postings)
+        doc_freq = len(postings[0]) if isinstance(postings, tuple) else len(postings)
         idf = math.log(1 + ((doc_count - doc_freq + 0.5) / (doc_freq + 0.5)))
-        for doc_id, term_freq in postings:
+        for doc_id, term_freq in _iter_postings(postings):
             entry = index["docs"][doc_id]
             doc_len = entry["doc_len"]
             denom = term_freq + k1 * (1 - b + b * (doc_len / avgdl))
             scores[doc_id] += idf * ((term_freq * (k1 + 1)) / max(denom, 1e-9))
 
+    rough_ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    if SPARSE_RERANK_POOL > 0:
+        rough_ranked = rough_ranked[:max(limit, SPARSE_RERANK_POOL)]
+
     ranked = []
     normalized_query = normalize_sparse_text(query)
-    for doc_id, score in scores.items():
+    for rank_index, (doc_id, score) in enumerate(rough_ranked, start=1):
         entry = index["docs"][doc_id]
         title_text = entry["title_text"]
-        content_text = entry["content_text"]
+        inspect_content = SPARSE_CONTENT_RERANK_POOL <= 0 or rank_index <= SPARSE_CONTENT_RERANK_POOL
+        content_text = entry.get("content_text")
+        if content_text is None and inspect_content:
+            content_text = normalize_sparse_text(entry.get("paragraph_text") or "")
         book_text = entry["book_text"]
         title_token_hits = 0
         content_token_hits = 0
@@ -391,7 +616,7 @@ def sparse_retrieve_documents(
             if token and token in title_text:
                 title_token_hits += 1
                 score += 2.2
-            elif token and token in content_text:
+            elif inspect_content and token and token in content_text:
                 content_token_hits += 1
                 score += 0.6
         if normalized_query and normalized_query in title_text:
@@ -405,13 +630,13 @@ def sparse_retrieve_documents(
             elif phrase in book_text:
                 book_phrase_hits += 1
                 score += min(6.0, 1.2 * len(phrase))
-            elif phrase in content_text:
+            elif inspect_content and len(phrase) <= 12 and phrase in content_text:
                 content_phrase_hits += 1
                 score += min(8.0, 1.5 * len(phrase))
         ranked.append(
             (
                 score,
-                entry["document"],
+                entry.get("document") or entry,
                 {
                     "sparse_title_token_hits": title_token_hits,
                     "sparse_content_token_hits": content_token_hits,
@@ -426,7 +651,10 @@ def sparse_retrieve_documents(
 
     docs = []
     for score, doc, hit_info in ranked[:limit]:
-        clone = Document(page_content=doc.page_content, metadata=dict(doc.metadata or {}))
+        if isinstance(doc, Document):
+            clone = Document(page_content=doc.page_content, metadata=dict(doc.metadata or {}))
+        else:
+            clone = paragraph_record_to_document(doc)
         clone.metadata["match_type"] = "sparse_candidate"
         clone.metadata["sparse_score"] = round(score, 4)
         clone.metadata.update(hit_info)

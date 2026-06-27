@@ -10,3 +10,4 @@ faiss-cpu==1.7.4
 sentence-transformers==2.7.0
 
 numpy==1.23.5
+jieba==0.42.1

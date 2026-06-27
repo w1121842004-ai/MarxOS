@@ -5,6 +5,7 @@ import re
 import sys
 import threading
 import time
+import argparse
 from dataclasses import asdict, dataclass
 from http.client import HTTPConnection
 from pathlib import Path
@@ -121,9 +122,12 @@ def build_history_payload(history: list[dict]) -> list[dict]:
     return history[-12:]
 
 
-def ask(port: int, query: str, history: list[dict]) -> tuple[int, dict]:
+def ask(port: int, query: str, history: list[dict], mode: str = "auto") -> tuple[int, dict]:
     conn = HTTPConnection("127.0.0.1", port, timeout=180)
-    body = json.dumps({"query": query, "history": build_history_payload(history)}, ensure_ascii=False).encode("utf-8")
+    body = json.dumps(
+        {"query": query, "history": build_history_payload(history), "mode": mode},
+        ensure_ascii=False,
+    ).encode("utf-8")
     conn.request("POST", "/api/ask", body=body, headers={"Content-Type": "application/json"})
     res = conn.getresponse()
     payload = json.loads(res.read().decode("utf-8"))
@@ -170,6 +174,7 @@ def analyze_turn(spec: TurnSpec, status: int, payload: dict) -> dict:
         "query": spec.query,
         "status": status,
         "intent": payload.get("intent", ""),
+        "mode": payload.get("mode", ""),
         "elapsed_ms": payload.get("elapsed_ms", 0),
         "answer_len": len(answer),
         "citation_count": len(citation_lines(answer)),
@@ -182,7 +187,7 @@ def analyze_turn(spec: TurnSpec, status: int, payload: dict) -> dict:
     }
 
 
-def write_reports(results: list[dict], started_at: float, ended_at: float) -> None:
+def write_reports(results: list[dict], started_at: float, ended_at: float, report_json: Path, report_md: Path) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     summary = {
         "turns": len(results),
@@ -194,20 +199,22 @@ def write_reports(results: list[dict], started_at: float, ended_at: float) -> No
         "avg_evidence_count": round(sum(item.get("evidence_count", 0) for item in results) / max(len(results), 1), 2),
         "multi_work_turns_met": sum(
             1
-            for item, spec in zip(results, TURNS)
+            for item in results
+            for spec in [item.get("_spec")]
             if (not spec.require_multi_work) or len(item.get("distinct_works") or []) >= 2
         ),
         "started_at": int(started_at),
         "ended_at": int(ended_at),
         "duration_sec": int(ended_at - started_at),
     }
-    REPORT_JSON.write_text(
-        json.dumps({"summary": summary, "results": results}, ensure_ascii=False, indent=2),
+    serializable_results = [{k: v for k, v in item.items() if k != "_spec"} for item in results]
+    report_json.write_text(
+        json.dumps({"summary": summary, "results": serializable_results}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
     lines = [
-        "# MarxOS Web Expert Eval (50 turns)",
+        f"# MarxOS Web Expert Eval ({len(results)} turns)",
         "",
         f"- turns: {summary['turns']}",
         f"- ok_turns: {summary['ok_turns']}",
@@ -225,6 +232,7 @@ def write_reports(results: list[dict], started_at: float, ended_at: float) -> No
         lines.append(f"### {idx}. {item['label']}")
         lines.append(f"- query: {item['query']}")
         lines.append(f"- intent: {item['intent'] or '-'}")
+        lines.append(f"- mode: {item.get('mode') or '-'}")
         lines.append(f"- elapsed_ms: {item['elapsed_ms']}")
         lines.append(f"- citation_count: {item['citation_count']}")
         lines.append(f"- evidence_count: {item['evidence_count']}")
@@ -232,18 +240,64 @@ def write_reports(results: list[dict], started_at: float, ended_at: float) -> No
         lines.append(f"- flags: {', '.join(item['flags']) if item['flags'] else 'none'}")
         lines.append(f"- answer_preview: {item['answer_preview']}")
         lines.append("")
-    REPORT_MD.write_text("\n".join(lines), encoding="utf-8")
+    report_md.write_text("\n".join(lines), encoding="utf-8")
+
+
+def expanded_turns(turns: int) -> list[TurnSpec]:
+    if turns <= len(TURNS):
+        return TURNS[:turns]
+    expanded: list[TurnSpec] = []
+    round_index = 0
+    while len(expanded) < turns:
+        round_index += 1
+        for spec in TURNS:
+            if len(expanded) >= turns:
+                break
+            if round_index == 1:
+                expanded.append(spec)
+            else:
+                expanded.append(
+                    TurnSpec(
+                        query=f"{spec.query}\n\n请换一个角度补充回答，并避免简单重复前文。这是第 {round_index} 轮扩展测试。",
+                        label=f"{spec.label}_r{round_index}",
+                        require_multi_work=spec.require_multi_work,
+                        require_citations=spec.require_citations,
+                        min_answer_len=spec.min_answer_len,
+                        min_evidence_count=spec.min_evidence_count,
+                    )
+                )
+    return expanded
+
+
+def expanded_modes(modes_arg: str, turns: int) -> list[str]:
+    modes = [item.strip() for item in (modes_arg or "auto").split(",") if item.strip()]
+    if not modes:
+        modes = ["auto"]
+    return [modes[index % len(modes)] for index in range(turns)]
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Run MarxOS web expert multi-turn eval.")
+    parser.add_argument("--turns", type=int, default=50)
+    parser.add_argument("--modes", default="auto", help="Comma-separated web modes, repeated if shorter than turns.")
+    parser.add_argument("--report-prefix", default="")
+    args = parser.parse_args()
+    turns = expanded_turns(args.turns)
+    modes = expanded_modes(args.modes, len(turns))
+    report_prefix = args.report_prefix or f"web_expert_eval_{args.turns}"
+    report_json = LOG_DIR / f"{report_prefix}.json"
+    report_md = LOG_DIR / f"{report_prefix}.md"
+
     history: list[dict] = []
     results: list[dict] = []
     started_at = time.time()
     server, port, thread = start_server()
     try:
-        for spec in TURNS:
-            status, payload = ask(port, spec.query, history)
+        for spec, mode in zip(turns, modes):
+            status, payload = ask(port, spec.query, history, mode=mode)
             result = analyze_turn(spec, status, payload)
+            result["requested_mode"] = mode
+            result["_spec"] = spec
             results.append(result)
 
             history.append({"role": "user", "text": spec.query})
@@ -260,10 +314,10 @@ def main() -> int:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
-        write_reports(results, started_at, ended_at)
+        write_reports(results, started_at, ended_at, report_json, report_md)
 
     flagged = sum(1 for item in results if item["flags"])
-    print(json.dumps({"report_json": str(REPORT_JSON), "report_md": str(REPORT_MD), "turns": len(results), "flagged_turns": flagged}, ensure_ascii=False))
+    print(json.dumps({"report_json": str(report_json), "report_md": str(report_md), "turns": len(results), "flagged_turns": flagged}, ensure_ascii=False))
     return 0 if flagged == 0 else 1
 
 

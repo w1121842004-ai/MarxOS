@@ -122,7 +122,7 @@ def retrieve(db, question: str, top_k: int):
     return app.retrieve_documents(question, db, k=top_k)
 
 
-def evaluate_case(case: dict, docs: list) -> dict:
+def evaluate_case(case: dict, docs: list, retrieval_only: bool = False) -> dict:
     question_id = case.get("id")
     expected = expected_items(case.get("expected_work"))
     hard_negative = expected_items(case.get("hard_negative"))
@@ -133,6 +133,17 @@ def evaluate_case(case: dict, docs: list) -> dict:
     is_negative = any(item in {normalize(x) for x in NEGATIVE_EXPECTATIONS} for item in expected_norms)
 
     if is_negative:
+        if retrieval_only:
+            return {
+                "id": question_id,
+                "question": case.get("question"),
+                "expected_work": case.get("expected_work"),
+                "expected_author": case.get("expected_author"),
+                "status": "unsupported",
+                "reasons": ["retrieval_only_negative_case_skipped"],
+                "answer_preview": None,
+                "top_docs": [summarize_doc(doc) for doc in docs],
+            }
         answer = app.run_query(case.get("question") or "")
         answer_norm = normalize(answer)
         has_refusal = any(normalize(marker) in answer_norm for marker in REFUSAL_MARKERS)
@@ -182,6 +193,11 @@ def main() -> int:
     parser.add_argument("--dataset", default=str(DATASET_PATH))
     parser.add_argument("--top-k", type=int, default=8)
     parser.add_argument("--report", default=str(REPORT_PATH))
+    parser.add_argument(
+        "--retrieval-only",
+        action="store_true",
+        help="Evaluate retrieval hits only; skip LLM answer checks for negative cases.",
+    )
     args = parser.parse_args()
 
     dataset_path = Path(args.dataset)
@@ -193,7 +209,7 @@ def main() -> int:
     for index, case in enumerate(dataset, start=1):
         question = case["question"]
         docs = retrieve(db, question, args.top_k)
-        result = evaluate_case(case, docs)
+        result = evaluate_case(case, docs, retrieval_only=args.retrieval_only)
         results.append(result)
         print(f"[{result['status'].upper():11}] {case.get('id', index):>2} {question}")
         if result["reasons"]:

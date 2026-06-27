@@ -1,7 +1,25 @@
 from __future__ import annotations
 
 
-def final_answer_style_rules():
+def final_answer_style_rules(mode=None):
+    selected = (mode or "deep").lower()
+    if selected == "fast":
+        return (
+            "\n最终回答风格：\n"
+            "1. 直接回答，不问候，不自我介绍，结尾不追加邀请式话语。\n"
+            "2. 不输出“【原著内容】”“【检索材料】”“CTX-1”“资料1”等内部栏目或编号。\n"
+            "3. 只使用上下文给出的出处，不编造篇名、卷次或页码。\n"
+            "4. 句子短，段落短，避免口号和空泛铺陈。\n"
+        )
+    if selected == "standard":
+        return (
+            "\n最终回答风格：\n"
+            "1. 直接回答问题，不问候，不自我介绍，结尾不追加邀请式话语。\n"
+            "2. 不输出“【原著内容】”“【检索材料】”“CTX-1”“资料1”等内部栏目或编号。\n"
+            "3. 只使用上下文给出的出处，不编造篇名、卷次或页码。\n"
+            "4. 先写结论，再展开依据；句子和段落保持简短。\n"
+            "5. 禁止空洞口号、模板化排比和不自然的书面腔。\n"
+        )
     return (
         "\n最终回答风格：\n"
         "1. 直接回答问题，不要问候，不要自我介绍，不要说“你好”或“我是 MarxOS”。\n"
@@ -34,6 +52,24 @@ def footnote_citation_rules():
     )
 
 
+def compact_citation_rules(mode):
+    mode = prompt_mode(mode)
+    if mode == "deep":
+        return footnote_citation_rules()
+    if mode == "fast":
+        return (
+            "\n出处规则：\n"
+            "1. 回答正文只写证据编号，如 [E1]、[E2]；不要自己书写书名、卷次或页码。\n"
+            "2. 后端会把 [E1] 渲染为正式出处；你不得编造出处，不写 PDF 页码，不写“同上”。\n"
+        )
+    return (
+        "\n出处规则：\n"
+        "1. 回答正文优先写证据编号，如 [E1]、[E2]；不要自己书写书名、卷次或页码。\n"
+        "2. 后端会把证据编号渲染为正式出处。逐字引用只能引用证据卡原文，不得改写成伪原文。\n"
+        "3. 不编造页码；不要写 PDF、pdf_page 或“同上”。\n"
+    )
+
+
 def clarity_rules():
     return (
         "\n表达清晰度要求：\n"
@@ -56,11 +92,71 @@ def coverage_rules():
     )
 
 
-def build_quote_prompt(query, context):
+def prompt_mode(mode):
+    selected = (mode or "deep").lower()
+    if selected in {"fast", "standard", "deep"}:
+        return selected
+    return "deep"
+
+
+def length_rules(mode, intent):
+    mode = prompt_mode(mode)
+    if mode == "fast":
+        if intent == "quote_lookup":
+            return (
+                "\n快速模式：\n"
+                "1. 只回答出处或最接近候选。\n"
+                "2. 不展开理论解释，全文尽量不超过 120 字。\n"
+            )
+        return (
+            "\n快速模式：\n"
+            "1. 直接给答案，全文控制在 300-500 字。\n"
+            "2. 只保留最关键的定义、依据和结论，不写长背景。\n"
+            "3. 最多使用 2 条出处；材料不足时简短说明。\n"
+        )
+    if mode == "standard":
+        return (
+            "\n标准模式：\n"
+            "1. 全文控制在 600-900 字。\n"
+            "2. 先给结论，再分 2-3 点展开。\n"
+            "3. 使用 2-3 条出处支撑关键判断。\n"
+        )
+    if intent == "deep_analysis":
+        return (
+            "\n深度模式：\n"
+            "可以展开为小型学术分析，但仍要避免空泛铺陈和无关背景。\n"
+        )
+    return (
+        "\n深度模式：\n"
+        "可以适度展开，但优先保证判断清楚、引用准确、结构紧凑。\n"
+    )
+
+
+def mode_style_rules(mode):
+    mode = prompt_mode(mode)
+    if mode == "fast":
+        return (
+            "\n快速表达规则：\n"
+            "1. 不写标题、小节标题和长篇引言。\n"
+            "2. 用 2-4 个短段或短点回答。\n"
+            "3. 避免列举过多篇目，优先解释用户当前问题。\n"
+        )
+    if mode == "standard":
+        return (
+            "\n标准表达规则：\n"
+            "1. 可以使用简短分点，但每点只讲一个中心判断。\n"
+            "2. 不要为了覆盖更多材料而拉长答案。\n"
+        )
+    return clarity_rules() + coverage_rules()
+
+
+def build_quote_prompt(query, context, mode=None):
+    mode = prompt_mode(mode)
     return (
         f"\n你是 MarxOS 的出处核对器。\n\n"
         f"任务：用户给出一句或一段原文，请只根据【检索材料】判断最可能出处。\n"
-        f"{final_answer_style_rules()}\n"
+        f"{final_answer_style_rules(mode)}\n"
+        f"{length_rules(mode, 'quote_lookup')}"
         f"回答要求：\n"
         f"1. 只输出出处，不做理论分析。\n"
         f"2. 优先使用检索材料中的“句子引文格式”或“段落具体出处格式”。\n"
@@ -71,32 +167,34 @@ def build_quote_prompt(query, context):
     )
 
 
-def build_concept_prompt(query, context):
+def build_concept_prompt(query, context, mode=None):
+    mode = prompt_mode(mode)
     return (
         f"\n你是 MarxOS，一个马克思主义学术助手。\n\n"
         f"任务：解释用户提出的概念。优先依据【原著内容】，再做必要的理论概括。\n"
-        f"{final_answer_style_rules()}\n"
-        f"{clarity_rules()}\n"
-        f"{coverage_rules()}\n"
+        f"{final_answer_style_rules(mode)}\n"
+        f"{mode_style_rules(mode)}\n"
+        f"{length_rules(mode, 'concept_explain')}"
         f"回答要求：\n"
         f"1. 先给出简明定义。\n"
         f"2. 再说明它在马克思主义理论中的位置。\n"
         f"3. 如需引用原著材料，附简短出处。\n"
         f"4. 不要输出“检索来源”等内部调试信息。\n"
         f"5. 不要把定义、背景、争论、批判压成一个长段；最多分为 2-3 个短段。\n"
-        f"{footnote_citation_rules()}\n"
+        f"{compact_citation_rules(mode)}\n"
         f"禁止输出：不要写“资料1”“资料2”“片段1”“检索材料”等内部编号；需要引用时，只使用出处文本。\n\n"
         f"# 原著内容\n{context}\n\n# 用户问题\n{query}\n"
     )
 
 
-def build_analysis_prompt(query, context):
+def build_analysis_prompt(query, context, mode=None):
+    mode = prompt_mode(mode)
     return (
         f"\n你是 MarxOS，一个马克思主义学术智能体。\n\n"
         f"任务：基于【原著内容】和马克思主义理论，对用户问题做结构性分析。\n"
-        f"{final_answer_style_rules()}\n"
-        f"{clarity_rules()}\n"
-        f"{coverage_rules()}\n"
+        f"{final_answer_style_rules(mode)}\n"
+        f"{mode_style_rules(mode)}\n"
+        f"{length_rules(mode, 'theory_analysis')}"
         f"分析框架：生产力与生产关系、经济基础与上层建筑、阶级关系、资本逻辑、劳动过程。\n"
         f"回答要求：\n"
         f"1. 优先依据原著内容，且至少使用两条不同材料支撑关键判断。\n"
@@ -105,19 +203,20 @@ def build_analysis_prompt(query, context):
         f"4. 至少给出两处简短出处；若材料不足以支持某判断，要明确说明不确定处。\n"
         f"5. 围绕概念、逻辑和现实指向展开，不空喊口号。\n"
         f"6. 每一层最多 2-3 句；不要在同一句里同时处理结论、论证和补充条件。\n"
-        f"{footnote_citation_rules()}\n"
+        f"{compact_citation_rules(mode)}\n"
         f"禁止输出：不要写“资料1”“资料2”“片段1”“检索材料”等内部编号；需要引用时，只使用出处文本。\n\n"
         f"# 原著内容\n{context}\n\n# 用户问题\n{query}\n"
     )
 
 
-def build_default_prompt(query, context):
+def build_default_prompt(query, context, mode=None):
+    mode = prompt_mode(mode)
     return (
         f"\n你是 MarxOS，一个马克思主义学术助手。\n\n"
         f"请根据【原著内容】回答用户问题，优先给出结构化、信息密度高但表达自然的回答。\n"
-        f"{final_answer_style_rules()}\n"
-        f"{clarity_rules()}\n"
-        f"{coverage_rules()}\n"
+        f"{final_answer_style_rules(mode)}\n"
+        f"{mode_style_rules(mode)}\n"
+        f"{length_rules(mode, 'rag_answer')}"
         f"回答结构：\n"
         f"1. 先用 1-2 句直接回答问题结论。\n"
         f"2. 再分 2-4 点展开，每点只讲一个中心判断，可写概念定义、机制逻辑、历史背景或现实意义。\n"
@@ -129,7 +228,7 @@ def build_default_prompt(query, context):
         f"1. 只能使用上下文给出的出处格式，不得自行编造页码。\n"
         f"2. 页码统一写“第X页”，不要写 PDF、pdf_page 或“同上”。\n"
         f"3. 不要写 1930 年上海江南书店、1940 年延安解放社等版本沿革描述，统一使用“北京：人民出版社”。\n\n"
-        f"{footnote_citation_rules()}\n"
+        f"{compact_citation_rules(mode)}\n"
         f"不要输出“检索来源”等内部调试信息。\n\n"
         f"禁止输出：不要写“资料1”“资料2”“片段1”“检索材料”等内部编号；需要引用时，只使用出处文本。\n\n"
         f"# 原著内容\n{context}\n\n# 用户问题\n{query}\n"
@@ -157,14 +256,33 @@ def build_constraint_guard(constraints):
     )
 
 
-def build_deep_analysis_prompt(query, context):
+def build_deep_analysis_prompt(query, context, mode=None):
     """Prompt for multi-work synthesis, social analysis, and academic paper writing."""
+    mode = prompt_mode(mode)
+    if mode == "fast":
+        return build_analysis_prompt(query, context, mode=mode)
+    if mode == "standard":
+        return (
+            f"\n你是 MarxOS，一个马克思主义学术研究助手。\n\n"
+            f"任务：基于【原著内容】，对用户问题做较深入但紧凑的理论分析。\n"
+            f"{final_answer_style_rules(mode)}\n"
+            f"{mode_style_rules(mode)}\n"
+            f"{length_rules(mode, 'deep_analysis')}"
+            f"回答要求：\n"
+            f"1. 先概括核心论点。\n"
+            f"2. 分 2-3 点说明理论机制、历史条件或现实指向。\n"
+            f"3. 至少使用两处原著出处，优先使用能直接支撑判断的材料。\n"
+            f"4. 不写长篇论文式铺陈，不空喊口号。\n"
+            f"{compact_citation_rules(mode)}\n"
+            f"禁止输出：不要写\"资料1\"\"检索材料\"等内部编号；引用时只使用出处文本。\n\n"
+            f"# 原著内容\n{context}\n\n# 分析主题\n{query}\n"
+        )
     return (
         f"\n你是 MarxOS，一个马克思主义学术研究助手。\n\n"
         f"任务：基于【原著内容】，撰写一篇马克思主义理论分析。\n"
         f"这不是简答题，而是一篇小型学术分析。你需要综合多篇原著的材料，\n"
         f"运用马克思主义的理论框架，对用户问题进行深入分析。\n\n"
-        f"{final_answer_style_rules()}\n"
+        f"{final_answer_style_rules(mode)}\n"
         f"{clarity_rules()}\n"
         f"{coverage_rules()}\n"
         f"分析框架：\n"
@@ -189,7 +307,7 @@ def build_deep_analysis_prompt(query, context):
     )
 
 
-def build_prompt(intent, query, context):
+def build_prompt(intent, query, context, mode=None):
     prompt_builders = {
         "quote_lookup": build_quote_prompt,
         "concept_explain": build_concept_prompt,
@@ -197,4 +315,4 @@ def build_prompt(intent, query, context):
         "theory_analysis": build_analysis_prompt,
         "rag_answer": build_default_prompt,
     }
-    return prompt_builders.get(intent, build_default_prompt)(query, context)
+    return prompt_builders.get(intent, build_default_prompt)(query, context, mode=mode)

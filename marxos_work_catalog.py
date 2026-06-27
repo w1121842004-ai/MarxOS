@@ -190,6 +190,29 @@ class WorkCatalog:
 
         return None
 
+    def match_title_query(self, query, normalize_fn=None):
+        """Match only explicit title/alias mentions, without concept fallback."""
+        norm_fn = normalize_fn or _normalize
+        qn = norm_fn(query)
+        if not qn:
+            return None
+
+        best_match = None
+        best_len = 0
+        for norm_title, work in self._title_index.items():
+            if norm_title and len(norm_title) >= 4 and norm_title in qn:
+                if len(norm_title) > best_len:
+                    best_match = work
+                    best_len = len(norm_title)
+
+        for norm_alias, work in self._alias_index.items():
+            if norm_alias and len(norm_alias) >= 3 and norm_alias in qn:
+                if len(norm_alias) > best_len:
+                    best_match = work
+                    best_len = len(norm_alias)
+
+        return best_match
+
     def match_by_concepts(self, query, normalize_fn=None):
         """Find works whose concepts appear in the query.
 
@@ -242,6 +265,8 @@ class WorkCatalog:
                 "classic_title": work["title"],
                 "classic_author": work.get("author"),
                 "classic_work_type": work.get("work_type"),
+                "classic_primary_concepts": work.get("primary_concepts", []),
+                "classic_concepts": work.get("concepts", []),
                 "entry_type": ev.get("entry_type", "primary"),
                 "is_full_text": ev.get("is_full_text", True),
             }

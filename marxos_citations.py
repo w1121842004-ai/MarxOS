@@ -125,6 +125,72 @@ def extract_answer_citation_lines(answer, normalize_final_answer):
     return citations
 
 
+def extract_inline_citation_candidates(answer):
+    candidates = []
+    seen = set()
+    patterns = [
+        r"[\[\uff3b]\s*见[:：]\s*(《[^》]+》[^。\]\uff3d\n]{0,120}?第\d+页。?)\s*[\]\uff3d]",
+        r"(《[^》]+》[^。\n]{0,120}?北京：人民出版社[^。\n]{0,80}?第\d+页。?)",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, answer or ""):
+            citation = match.group(1).strip()
+            if citation in seen:
+                continue
+            seen.add(citation)
+            candidates.append(citation)
+    return candidates
+
+
+def extract_evidence_refs(answer):
+    refs = []
+    seen = set()
+    for match in re.finditer(r"[\[\uff3b]\s*E\s*(\d+)\s*[\]\uff3d]", answer or "", flags=re.I):
+        index = int(match.group(1))
+        if index in seen:
+            continue
+        seen.add(index)
+        refs.append(index)
+    return refs
+
+
+def evidence_by_refs(answer, evidence):
+    evidence = evidence or []
+    matched = []
+    seen = set()
+    for ref in extract_evidence_refs(answer):
+        if ref < 1 or ref > len(evidence):
+            continue
+        item = evidence[ref - 1]
+        key = (
+            item.get("source"),
+            item.get("printed_page"),
+            item.get("citation_page"),
+            item.get("paragraph_id"),
+            item.get("excerpt"),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        matched.append({**item, "answer_citation": _preferred_citation_text(item)})
+    return [{**item, "id": f"E{index}"} for index, item in enumerate(matched, start=1)]
+
+
+def render_evidence_refs(answer, evidence):
+    evidence = evidence or []
+
+    def replace(match):
+        index = int(match.group(1))
+        if index < 1 or index > len(evidence):
+            return match.group(0)
+        citation = _preferred_citation_text(evidence[index - 1])
+        if not citation:
+            return match.group(0)
+        return f"[见：{citation}]"
+
+    return re.sub(r"[\[\uff3b]\s*E\s*(\d+)\s*[\]\uff3d]", replace, answer or "", flags=re.I)
+
+
 def citation_match_key(citation, normalize_for_match):
     return normalize_for_match(citation or "")
 
@@ -167,6 +233,10 @@ def evidence_matches_citation(item, citation, normalize_for_match):
 
 def filter_evidence_to_answer(answer, evidence, fallback_limit, normalize_final_answer, normalize_for_match):
     evidence = evidence or []
+    ref_matched = evidence_by_refs(answer, evidence)
+    if ref_matched:
+        return ref_matched
+
     citations = extract_answer_citation_lines(answer, normalize_final_answer)
     if not citations:
         return [{**item, "id": f"E{index}"} for index, item in enumerate(evidence[:fallback_limit], start=1)]
@@ -237,6 +307,17 @@ def repair_answer_citations(
     if not normalized.strip() or not evidence:
         return normalized
 
+    ref_matched = evidence_by_refs(normalized, evidence)
+    if ref_matched:
+        normalized = render_evidence_refs(normalized, evidence)
+        section_lines = _build_citation_section_lines(ref_matched, fallback_limit)
+        if not section_lines:
+            return normalized
+        body, _had_marker = _split_answer_body_and_citations(normalized)
+        if body.strip():
+            return body.rstrip() + "\n\n" + "\n".join(section_lines)
+        return "\n".join(section_lines)
+
     citation_lines = extract_answer_citation_lines(normalized, normalize_final_answer)
     matched = []
     seen = set()
@@ -281,6 +362,12 @@ def audit_answer_citations(answer, evidence, normalize_final_answer, normalize_f
     evidence_citations |= {item.get("detailed_citation") for item in evidence or []}
     evidence_citations = {item for item in evidence_citations if item}
     citation_lines = extract_answer_citation_lines(normalized, normalize_final_answer)
+    inline_citations = extract_inline_citation_candidates(normalized)
+    refs = extract_evidence_refs(normalized)
+
+    for ref in refs:
+        if ref < 1 or ref > len(evidence or []):
+            issues.append({"type": "evidence_ref_out_of_range", "ref": f"E{ref}"})
 
     if citation_lines and not evidence_citations:
         issues.append({"type": "citation_without_verified_evidence"})
@@ -290,6 +377,12 @@ def audit_answer_citations(answer, evidence, normalize_final_answer, normalize_f
             evidence_matches_citation(item, citation, normalize_for_match) for item in evidence or []
         ):
             issues.append({"type": "citation_not_in_evidence", "citation": citation})
+
+    for citation in inline_citations:
+        if evidence_citations and not any(
+            evidence_matches_citation(item, citation, normalize_for_match) for item in evidence or []
+        ):
+            issues.append({"type": "inline_citation_not_in_evidence", "citation": citation})
 
     return {
         "ok": not issues,

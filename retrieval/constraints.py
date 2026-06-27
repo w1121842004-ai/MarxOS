@@ -17,7 +17,7 @@ def build_page_ranges(entries):
     return page_ranges
 
 
-ME_SOURCE_RE = re.compile(r"^me\d{2}[abc]?\.pdf$")
+ME_SOURCE_RE = re.compile(r"^me(?:\d{2}[abc]?|a\d{2}|s\d{2})\.pdf$")
 ME_VOLUME_SOURCE_RE = re.compile(r"me(\d{2})([abc]?)\.pdf", re.IGNORECASE)
 ME_EXPLICIT_SOURCE_RE = re.compile(r"me(\d{1,2})([abc]?)\.pdf", re.IGNORECASE)
 CHINESE_VOLUME_RE = re.compile(r"(?:全集)?第\s*([0-9０-９]{1,2})\s*卷\s*([ABCabcＡＢＣａｂｃ]?)")
@@ -186,6 +186,30 @@ def load_me_article_locators(path=None):
 
 def is_me_source(source):
     return bool(ME_SOURCE_RE.fullmatch(str(source or "").lower()))
+
+
+def is_work_location_query(query, ctx):
+    normalize_for_match = _helper(ctx, "normalize_for_match")
+    query_norm = normalize_for_match(query)
+    markers = [
+        "出自哪里",
+        "出自哪部著作",
+        "出自哪本",
+        "是否出自",
+        "是不是出自",
+        "出自马克思原著",
+        "主要出自",
+        "经典来源",
+        "最经典出处",
+        "定位原文",
+        "请定位",
+        "所在章节",
+        "在哪一章",
+        "哪一章",
+        "哪部著作",
+        "哪些著作",
+    ]
+    return any(normalize_for_match(marker) in query_norm for marker in markers)
 
 
 def collection_requested(query, ctx):
@@ -712,6 +736,7 @@ def constraints_from_query(query, ctx):
     enrich_core_classic_entries = _helper(ctx, "enrich_core_classic_entries")
     find_toc_entries = _helper(ctx, "find_toc_entries")
     work_catalog_entries_for_query = _helper(ctx, "work_catalog_entries_for_query")
+    work_catalog_title_entries_for_query = _helper(ctx, "work_catalog_title_entries_for_query")
     title = extract_bibliographic_title(query)
     normalize_for_match = _helper(ctx, "normalize_for_match")
     query_norm = normalize_for_match(query)
@@ -797,6 +822,35 @@ def constraints_from_query(query, ctx):
             if isinstance(first_title, (list, tuple)):
                 first_title = first_title[1] if len(first_title) > 1 else first_title[0]
             return constraints_result(display_title or first_title, hinted_entries, query, ctx)
+
+    title_catalog_entries = prefer_sources_for_query(work_catalog_title_entries_for_query(query), query, ctx)
+    if title_catalog_entries:
+        title_catalog_title = (
+            title_catalog_entries[0].get("classic_title")
+            or title_catalog_entries[0].get("article")
+            or title
+            or ""
+        )
+        work_concepts = []
+        for entry in title_catalog_entries:
+            work_concepts.extend(entry.get("classic_primary_concepts") or [])
+            work_concepts.extend(entry.get("classic_concepts") or [])
+        work_concepts = list(dict.fromkeys(str(item).strip() for item in work_concepts if str(item).strip()))[:8]
+        work_query_seeds = []
+        if work_concepts:
+            work_query_seeds.append(f"{title_catalog_title} {' '.join(work_concepts[:4])}")
+            work_query_seeds.append(f"{title_catalog_title} 核心观点 {' '.join(work_concepts[:3])}")
+        return {
+            "title": title_catalog_title,
+            "strict_title": True,
+            "entries": title_catalog_entries,
+            "sources": {entry["source"] for entry in title_catalog_entries},
+            "page_ranges": build_page_ranges(title_catalog_entries),
+            "page_tolerance": 2,
+            "work_catalog_title_match": True,
+            "work_concepts": work_concepts,
+            "work_query_seeds": work_query_seeds,
+        }
 
     catalog_entries = prefer_sources_for_query(work_catalog_entries_for_query(query), query, ctx)
     catalog_title = ""
@@ -964,6 +1018,8 @@ def controlled_multi_queries(query, constraints, ctx):
 
     if title:
         add_seed(seeds, title)
+        for seed in constraints.get("work_query_seeds") or []:
+            add_seed(seeds, seed)
         if concept_terms:
             add_seed(seeds, f"{title} {' '.join(concept_terms[:2])}")
 

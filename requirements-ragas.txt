@@ -1,0 +1,9 @@
+# Optional RAGAS evaluation stack.
+# Keep this separate from requirements.txt because ragas pulls newer eval/runtime
+# dependencies and should not affect the core MarxOS runtime or CI install.
+#
+# Verified in a separate eval venv. Newer ragas 0.4.x currently pulls a
+# LangChain stack that conflicts with this project's pinned runtime.
+ragas==0.2.15
+datasets>=2.20.0
+langchain-openai==0.2.14

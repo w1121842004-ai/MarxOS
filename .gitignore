@@ -1,5 +1,6 @@
 .env
 .venv/
+.venv-ragas/
 venv/
 __pycache__/
 *.py[cod]

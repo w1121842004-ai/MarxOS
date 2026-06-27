@@ -153,6 +153,30 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertIn("EVIDENCE-CARD E1", context)
         self.assertNotIn("\u3010\u8d44\u6599", context)
 
+    def test_build_context_applies_performance_budget(self):
+        long_text = "\u7532" * 5000
+        docs = [
+            Document(
+                page_content=long_text,
+                metadata={
+                    "book": "\u6d4b\u8bd5\u4e66",
+                    "article": "\u6d4b\u8bd5\u7bc7",
+                    "source": "test.pdf",
+                    "printed_page": 12,
+                },
+            )
+        ]
+
+        context = app.build_context(
+            docs,
+            "theory_analysis",
+            performance={"context_doc_char_limit": 200, "context_total_char_limit": 1200},
+        )
+
+        self.assertLess(len(context), 1200)
+        self.assertIn("\u4e2d\u95f4\u5185\u5bb9\u5df2\u6309\u4e0a\u4e0b\u6587\u9884\u7b97\u7701\u7565", context)
+        self.assertIn("EVIDENCE-CARD E1", context)
+
     def test_paragraph_retrieval_does_not_use_exact_quote_shortcut(self):
         query = "\u201c\u56fd\u5bb6\u662f\u793e\u4f1a\u5728\u4e00\u5b9a\u53d1\u5c55\u9636\u6bb5\u4e0a\u7684\u4ea7\u7269\u3002\u201d\u51fa\u81ea\u54ea\u91cc\uff1f"
         paragraph_doc = Document(
@@ -1133,6 +1157,72 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertIn("\u7b2c1\u5377", repaired)
         self.assertIn("\u7b2c401\u9875", repaired)
         self.assertNotIn("\u7b2c9\u5377\uff0c\u7b2c999\u9875", repaired)
+
+    def test_repair_answer_citations_renders_evidence_ids(self):
+        answer = "\u8fd9\u4e2a\u5224\u65ad\u7531\u7b2c\u4e8c\u6761\u8bc1\u636e\u652f\u6301 [E2]\u3002"
+        evidence = [
+            {
+                "citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c376\u9875\u3002",
+                "detailed_citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u300a\u5171\u4ea7\u515a\u5ba3\u8a00\u300b\uff0c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e2012\u5e74\uff0c\u7b2c376\u9875\u3002",
+                "source": "mes01.pdf",
+                "printed_page": 376,
+                "excerpt": "A",
+            },
+            {
+                "citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c401\u9875\u3002",
+                "detailed_citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u300a\u5173\u4e8e\u8d39\u5c14\u5df4\u54c8\u7684\u63d0\u7eb2\u300b\uff0c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e2012\u5e74\uff0c\u7b2c401\u9875\u3002",
+                "source": "mes01.pdf",
+                "printed_page": 401,
+                "excerpt": "B",
+            },
+        ]
+
+        repaired = app.repair_answer_citations(answer, evidence, fallback_limit=2)
+        filtered = app.filter_evidence_to_answer(answer, evidence, fallback_limit=2)
+
+        self.assertIn("[\u89c1\uff1a\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u300a\u5173\u4e8e\u8d39\u5c14\u5df4\u54c8\u7684\u63d0\u7eb2\u300b", repaired)
+        self.assertIn("\u7b2c401\u9875", repaired)
+        self.assertNotIn("[E2]", repaired)
+        self.assertEqual(len(filtered), 1)
+        self.assertEqual(filtered[0]["printed_page"], 401)
+
+    def test_audit_answer_citations_flags_out_of_range_evidence_id(self):
+        answer = "\u8fd9\u4e2a\u5224\u65ad\u4f9d\u636e\u8bc1\u636e [E3]\u3002"
+        evidence = [{"citation": "\u300aA\u300b\uff0c\u7b2c1\u9875\u3002"}, {"citation": "\u300aB\u300b\uff0c\u7b2c2\u9875\u3002"}]
+
+        audit = app.audit_answer_citations(answer, evidence)
+
+        self.assertFalse(audit["ok"])
+        self.assertIn("evidence_ref_out_of_range", [issue["type"] for issue in audit["issues"]])
+
+    def test_audit_answer_citations_flags_inline_citation_not_in_evidence(self):
+        answer = "\u8fd9\u4e2a\u5224\u65ad\u6709\u672a\u6388\u6743\u51fa\u5904[\u89c1\uff1a\u300a\u865a\u6784\u6587\u96c6\u300b\u7b2c9\u5377\uff0c\u7b2c999\u9875\u3002]\u3002"
+        evidence = [{"citation": "\u300a\u9a6c\u514b\u601d\u6069\u683c\u65af\u9009\u96c6\u300b\u7b2c1\u5377\uff0c\u7b2c401\u9875\u3002"}]
+
+        audit = app.audit_answer_citations(answer, evidence)
+
+        self.assertFalse(audit["ok"])
+        self.assertIn("inline_citation_not_in_evidence", [issue["type"] for issue in audit["issues"]])
+
+    def test_performance_settings_use_lightweight_audit_outside_deep_mode(self):
+        fast = app.performance_settings("fast")
+        standard = app.performance_settings("standard")
+        deep = app.performance_settings("deep")
+
+        self.assertEqual(fast["citation_audit_mode"], "lightweight")
+        self.assertFalse(fast["citation_recovery"])
+        self.assertFalse(fast["citation_page_refinement"])
+        self.assertFalse(fast["hybrid_retrieval"])
+        self.assertEqual(standard["citation_audit_mode"], "lightweight")
+        self.assertFalse(standard["citation_recovery"])
+        self.assertFalse(standard["citation_page_refinement"])
+        self.assertFalse(standard["planner_multi_query"])
+        self.assertFalse(standard["hybrid_retrieval"])
+        self.assertEqual(standard["max_recovery_rounds"], 0)
+        self.assertEqual(deep["citation_audit_mode"], "deep")
+        self.assertTrue(deep["citation_recovery"])
+        self.assertTrue(deep["citation_page_refinement"])
+        self.assertTrue(deep["hybrid_retrieval"])
 
     def test_repair_answer_citations_uses_detailed_entries_for_multi_work_visibility(self):
         answer = "\u8fd9\u662f\u4e00\u6bb5\u56de\u7b54\u3002"

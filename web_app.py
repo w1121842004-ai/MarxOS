@@ -2,6 +2,7 @@ import html
 import json
 import os
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -126,7 +127,8 @@ function renderChat(){const c=getConv(),ms=c?c.messages:[];if(!ms.length){chatEl
 function renderAll(){renderHistory();renderChat()}
 function setMode(m){currentMode=m;modeAuto.classList.toggle("active",m==="auto");modePrecise.classList.toggle("active",m==="precise");modeDeep.classList.toggle("active",m==="deep")}
 modeAuto.addEventListener("click",()=>setMode("auto"));modePrecise.addEventListener("click",()=>setMode("precise"));modeDeep.addEventListener("click",()=>setMode("deep"));
-async function ask(){const query=qEl.value.trim();if(!query)return;const conv=getConv();if(!conv)return;btnEl.disabled=true;conv.messages.push({role:"user",text:query});conv.updatedAt=Date.now();setTitle(conv);renderAll();persist();intentBadge.textContent="处理中...";costLabel.textContent="";qEl.value="";try{const res=await fetch("/api/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,history:buildHistory(),mode:currentMode})});const data=await res.json();if(!res.ok)throw new Error(data.error||"请求失败");conv.messages.push({role:"bot",text:data.answer||"",intent:data.intent||"-",mode:data.mode||"",cost:data.elapsed_ms||"-",evidence:Array.isArray(data.evidence)?data.evidence:[],verify:data.citation_audit?.content_verification||null,crag:(data.citation_audit?.crag_report?.score)||null,topicId:(data.topic?.topic_id)||"",topicLabel:(data.topic?.topic_label)||"",topicSection:(data.topic?.topic_section)||""});conv.updatedAt=Date.now();setTitle(conv);prune();renderAll();persist();const vfy=data.citation_audit?.content_verification;const vOk=vfy?(vfy.verified||0)+(vfy.partial||0):0;const vTotal=vfy?.total||0;intentBadge.textContent=data.intent||"-";costLabel.textContent=(data.elapsed_ms||"-")+"ms"+(vTotal?" | 校验:"+vOk+"/"+vTotal:"")}catch(err){const msg=err?.message||"请求失败";conv.messages.push({role:"bot",text:"请求失败："+msg,intent:"-",cost:"-"});conv.updatedAt=Date.now();setTitle(conv);renderAll();persist()}finally{btnEl.disabled=false;qEl.focus()}}
+function pushBotFinal(conv,data){conv.messages.push({role:"bot",text:data.answer||"",intent:data.intent||"-",mode:data.mode||"",cost:data.elapsed_ms||"-",evidence:Array.isArray(data.evidence)?data.evidence:[],verify:data.citation_audit?.content_verification||null,crag:(data.citation_audit?.crag_report?.score)||null,topicId:(data.topic?.topic_id)||"",topicLabel:(data.topic?.topic_label)||"",topicSection:(data.topic?.topic_section)||""});conv.updatedAt=Date.now();setTitle(conv);prune();renderAll();persist();const vfy=data.citation_audit?.content_verification;const vOk=vfy?(vfy.verified||0)+(vfy.partial||0):0;const vTotal=vfy?.total||0;intentBadge.textContent=data.intent||"-";costLabel.textContent=(data.elapsed_ms||"-")+"ms"+(vTotal?" | 校验:"+vOk+"/"+vTotal:"")}
+async function ask(){const query=qEl.value.trim();if(!query)return;const conv=getConv();if(!conv)return;btnEl.disabled=true;conv.messages.push({role:"user",text:query});const historyPayload=buildHistory();const pending={role:"bot",text:"正在分析问题...",intent:"stream",mode:currentMode,cost:"-"};conv.messages.push(pending);conv.updatedAt=Date.now();setTitle(conv);renderAll();persist();intentBadge.textContent="处理中...";costLabel.textContent="";qEl.value="";try{const res=await fetch("/api/ask_stream",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,history:historyPayload,mode:currentMode})});if(!res.ok||!res.body)throw new Error("流式请求失败");const reader=res.body.getReader();const decoder=new TextDecoder("utf-8");let buf="",doneFinal=false;while(true){const {value,done}=await reader.read();if(done)break;buf+=decoder.decode(value,{stream:true});let parts=buf.split("\n\n");buf=parts.pop()||"";for(const part of parts){let ev="message",dataLine="";for(const line of part.split("\n")){if(line.startsWith("event:"))ev=line.slice(6).trim();if(line.startsWith("data:"))dataLine+=line.slice(5).trim()}if(!dataLine)continue;const data=JSON.parse(dataLine);if(ev==="status"){pending.text=data.message||"处理中...";conv.updatedAt=Date.now();renderAll();persist()}else if(ev==="final"){const idx=conv.messages.indexOf(pending);if(idx>=0)conv.messages.splice(idx,1);pushBotFinal(conv,data);doneFinal=true}else if(ev==="error"){throw new Error(data.error||"请求失败")}}}if(!doneFinal)throw new Error("流式响应未完成")}catch(err){const msg=err?.message||"请求失败";pending.text="请求失败："+msg;pending.intent="-";conv.updatedAt=Date.now();renderAll();persist()}finally{btnEl.disabled=false;qEl.focus()}}
 btnEl.addEventListener("click",ask);qEl.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();ask()}});newChatBtnEl.addEventListener("click",newChat);load();
 </script>
 </body>
@@ -295,7 +297,7 @@ class MarxOSHandler(BaseHTTPRequestHandler):
         self.send_error(404, "Not Found")
 
     def do_POST(self):
-        if self.path != "/api/ask":
+        if self.path not in ("/api/ask", "/api/ask_stream"):
             self.send_error(404, "Not Found")
             return
         content_len = int(self.headers.get("Content-Length", "0"))
@@ -306,37 +308,56 @@ class MarxOSHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": "无效 JSON"})
             return
 
+        if self.path == "/api/ask_stream":
+            self._handle_ask_stream(data)
+            return
+        self._handle_ask_json(data)
+
+    def _mode_routing(self, mode):
+        if mode == "fast":
+            return None, "fast"
+        if mode == "standard":
+            return None, "standard"
+        if mode == "deep":
+            return "deep_analysis", "deep"
+        if mode == "precise":
+            return None, "fast"
+        return None, "fast"
+
+    def _run_ask_payload(self, data, emit=None):
         query = (data.get("query") or "").strip()
         history = data.get("history") or []
         mode = data.get("mode", "auto")
         if not query:
-            self._send_json(400, {"error": "问题不能为空"})
-            return
+            return 400, {"error": "问题不能为空"}
 
         started = time.perf_counter()
         try:
+            if emit:
+                emit("status", {"message": "正在分析问题..."})
             direct_answer = self._answer_history_followup(query, history)
             if direct_answer:
                 intent = "citation_followup"
                 answer = direct_answer
+                performance = "local"
             else:
                 route_query = self._topic_scoped_query(query, history)
                 is_followup = self._is_contextual_followup(query)
                 contextual_query = self._build_contextual_query(route_query, history) if is_followup else route_query
 
-                # Mode routing: force deep_analysis or precise based on user selection
-                if mode == "deep":
-                    force = "deep_analysis"
-                else:
-                    force = None  # auto: let run_query classify internally
+                force, performance = self._mode_routing(mode)
+                if emit:
+                    emit("status", {"message": f"正在检索证据（{performance}）..."})
 
                 try:
-                    kwargs = {"route_query": route_query, "history": history}
+                    kwargs = {"route_query": route_query, "history": history, "performance": performance}
                     if force is not None:
                         kwargs["force_intent"] = force
+                    if emit:
+                        emit("status", {"message": "正在生成回答..."})
                     answer = app.run_query(contextual_query, **kwargs)
                 except TypeError as exc:
-                    if "history" not in str(exc):
+                    if "history" not in str(exc) and "performance" not in str(exc):
                         raise
                     if force is not None:
                         answer = app.run_query(contextual_query, route_query=route_query, force_intent=force)
@@ -344,14 +365,14 @@ class MarxOSHandler(BaseHTTPRequestHandler):
                         answer = app.run_query(contextual_query, route_query=route_query)
                 intent = app.LAST_CITATION_AUDIT.get("crag_report", {}).get("intent") or force or app.classify_query(route_query)
         except Exception as exc:
-            self._send_json(500, {"error": f"服务异常: {html.escape(str(exc))}"})
-            return
+            return 500, {"error": f"服务异常: {html.escape(str(exc))}"}
 
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         evidence = getattr(app, "LAST_EVIDENCE", [])
         citation_audit = getattr(app, "LAST_CITATION_AUDIT", {})
         topic_info = getattr(app, "LAST_TOPIC_INFO", {})
         crag_report = getattr(app, "LAST_CRAG_REPORT", {})
+        timing = getattr(app, "LAST_TIMING", {})
         metrics = self._build_ask_metrics(
             query=query, intent=intent, history=history, answer=answer,
             evidence=evidence, citation_audit=citation_audit, elapsed_ms=elapsed_ms,
@@ -362,13 +383,50 @@ class MarxOSHandler(BaseHTTPRequestHandler):
             print(json.dumps(metrics, ensure_ascii=False), file=sys.stderr)
         except UnicodeEncodeError:
             print(json.dumps(metrics, ensure_ascii=True), file=sys.stderr)
-        self._send_json(
-            200,
-            web_support.build_ask_response(
+        return 200, web_support.build_ask_response(
                 intent, answer, evidence, citation_audit, topic_info,
                 crag_report, elapsed_ms, history, MAX_HISTORY_TURNS,
-            ),
+                mode=performance, timing=timing,
         )
+
+    def _handle_ask_json(self, data):
+        status, payload = self._run_ask_payload(data)
+        self._send_json(status, payload)
+
+    def _send_sse_headers(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+
+    def _write_sse(self, event, payload):
+        message = f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        self.wfile.write(message.encode("utf-8"))
+        self.wfile.flush()
+
+    def _handle_ask_stream(self, data):
+        self._send_sse_headers()
+
+        def emit(event, payload):
+            try:
+                self._write_sse(event, payload)
+            except (BrokenPipeError, ConnectionResetError):
+                raise
+
+        try:
+            status, payload = self._run_ask_payload(data, emit=emit)
+            if status == 200:
+                emit("final", payload)
+            else:
+                emit("error", payload)
+        except (BrokenPipeError, ConnectionResetError):
+            return
+        except Exception as exc:
+            try:
+                emit("error", {"error": f"服务异常: {html.escape(str(exc))}"})
+            except (BrokenPipeError, ConnectionResetError):
+                return
 
     def log_message(self, fmt, *args):
         return
@@ -378,6 +436,11 @@ def main():
     app.load_vectorstore()
     if app.paragraph_vectorstore_exists():
         app.load_paragraph_vectorstore()
+    if (
+        app.hybrid_retrieval_enabled()
+        and os.getenv("MARXOS_WARM_SPARSE_INDEX", "1").lower() in {"1", "true", "yes", "on"}
+    ):
+        threading.Thread(target=app.warm_sparse_index, daemon=True).start()
     try:
         server = ThreadingHTTPServer((HOST, PORT), MarxOSHandler)
     except OSError as exc:

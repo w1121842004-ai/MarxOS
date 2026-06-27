@@ -17,8 +17,8 @@ PDF
 -> 文本清洗与页码识别
 -> chunk / paragraph cache
 -> embeddings
--> FAISS vectorstore
--> 检索 / rerank / citation refine
+-> Milvus Lite BGE-M3 dense+sparse index
+-> hybrid retrieval / rerank / citation refine
 -> DeepSeek
 -> 带引文回答
 ```
@@ -97,40 +97,51 @@ venv\Scripts\python.exe app.py
 
 ## 构建知识库
 
-从 OCR cache 构建核心向量库：
+**V2 管线（推荐）**——分三步从 OCR 缓存构建向量库：
 
-```powershell
-venv\Scripts\python.exe rag\build_vectorstore_from_cache.py
+```bash
+# Step 1: 段落检测（从 OCR 缓存生成段落记录）
+python scripts/build_paragraph_cache.py
+
+# Step 2: 子块向量库（180-char 小块，带 parent_paragraph_id，支持大块扩展）
+python scripts/build_semantic_child_vectorstore.py
+
+# Step 3: 段落向量库（完整段落向量，用于双路检索补充）
+python scripts/build_paragraph_vectorstore.py
 ```
 
-常用环境变量示例：
+常用环境变量（三步通用）：
 
-```powershell
-$env:ME_VOLUMES_ONLY="1"
-$env:SKIP_PDFS="capital.pdf"
-$env:BATCH_SIZE="1024"
-venv\Scripts\python.exe rag\build_vectorstore_from_cache.py
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `TARGET_PDFS` | mea01-10 + mes01-04 | 逗号分隔的 PDF 列表（如 `me01.pdf,me02.pdf,...`） |
+| `SKIP_PDFS` | `capital.pdf` | 跳过的 PDF |
+| `BATCH_SIZE` | `1024` | Embedding 批大小 |
+| `SEMANTIC_CHILD_CHUNK_SIZE` | `180` | 子块大小 (chars) |
+| `SEMANTIC_CHILD_CHUNK_OVERLAP` | `40` | 子块重叠 |
+
+```bash
+# macOS/Linux 示例：只构建特定卷
+TARGET_PDFS="me01.pdf,me02.pdf" python scripts/build_paragraph_cache.py
 ```
 
-生成核心 article map 并构建核心库：
-
 ```powershell
-$targets="mea01.pdf,mea02.pdf,mea03.pdf,mea04.pdf,mea05.pdf,mea06.pdf,mea07.pdf,mea08.pdf,mea09.pdf,mea10.pdf,mes01.pdf,mes02.pdf,mes03.pdf,mes04.pdf"
-$env:TARGET_PDFS=$targets
-$env:SKIP_PDFS=""
-$env:ARTICLE_MAP_PATH="rag/article_map_core.json"
-venv\Scripts\python.exe rag\generate_article_map.py
-
-$env:VECTORSTORE_DIR="vectorstore/marx_reader_core"
-$env:BATCH_SIZE="1024"
-venv\Scripts\python.exe -u rag\build_vectorstore_from_cache.py
+# Windows 示例：构建全部 75 卷（排除 capital）
+$env:TARGET_PDFS="me01.pdf,me01a.pdf,...,mes04.pdf"
+venv\Scripts\python.exe scripts\build_paragraph_cache.py
 ```
+
+> ⚠️ **V1 构建脚本 (`rag/build_vectorstore_from_cache.py`) 已废弃。** 它产生的 chunk 缺少 `parent_paragraph_id`，无法通过 `expand_semantic_parent_docs()` 扩展为段落窗口，丧失"小块检索/大块召回"能力。该文件的工具函数仍被其他模块使用。
 
 ## 本地验证
 
 快速回归：
 
-```powershell
+```bash
+# macOS/Linux
+.venv/bin/python scripts/check.py --mode quick
+
+# Windows
 venv\Scripts\python.exe scripts\check.py --mode quick
 ```
 
@@ -211,8 +222,9 @@ RAG / OCR：
 ## 重要数据路径
 
 - `data/ocr_cache/`: OCR 缓存
-- `vectorstore/marx_reader_core/`: 核心向量库
-- `vectorstore/marx_reader_paragraph/`: 段落向量库
+- `data/milvus_lite/marxos_bgem3_sparse.db`: 默认 Milvus Lite 向量库
+- `vectorstore/marx_reader_core/`: FAISS fallback 子块向量库
+- `vectorstore/marx_reader_paragraph/`: FAISS fallback 段落向量库
 - `rag/article_map_core.json`: 核心篇目映射
 - `rag/core_classics.json`: 核心经典目录
 - `rag/topic_catalog.json`: 专题目录

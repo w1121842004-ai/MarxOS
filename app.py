@@ -6,6 +6,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 import marxos_citations as citations
 import marxos_answers as answer_utils
@@ -24,7 +25,10 @@ from marxos_citation_verifier import CitationVerifier
 from rag.core_classics import classic_entries_for_query, load_core_classics
 from rag.exact_quote_lookup import exact_quote_lookup
 from rag.semantic_retrieval import expand_semantic_parent_docs as expand_semantic_parent_windows
-from rag.semantic_retrieval import sparse_retrieve_documents as sparse_parent_retrieval
+from rag.semantic_retrieval import (
+    load_sparse_paragraph_index,
+    sparse_retrieve_documents as sparse_parent_retrieval,
+)
 
 
 load_dotenv()
@@ -32,17 +36,24 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 
-EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+EMBEDDING_MODEL = os.getenv("MARXOS_EMBEDDING_MODEL", "BAAI/bge-m3")
 VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader_core")
 PARAGRAPH_VECTORSTORE_DIR = os.getenv("PARAGRAPH_VECTORSTORE_DIR", "vectorstore/marx_reader_paragraph")
+VECTOR_BACKEND_ENV = "MARXOS_VECTOR_BACKEND"
+MILVUS_URI = os.getenv("MILVUS_URI", "./data/milvus_lite/marxos_bgem3_sparse.db")
+MILVUS_COLLECTION = os.getenv("MILVUS_COLLECTION", "marxos_me_passages")
+MILVUS_EMBEDDING_DEVICE = os.getenv("MARXOS_EMBEDDING_DEVICE", "cpu")
 PARAGRAPH_CACHE_PATH = os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache_core.jsonl")
+SEMANTIC_PARENT_CACHE_PATH = os.getenv("SEMANTIC_PARENT_CACHE_PATH", "data/semantic_parent_cache_core.jsonl")
 OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "data/ocr_cache")
 PAGE_MAP_PATH = os.getenv("PAGE_MAP_PATH", "data/page_map.json")
 SEMANTIC_PARENT_WINDOW = int(os.getenv("SEMANTIC_PARENT_WINDOW", "1"))
+SEMANTIC_CHILD_PARENT_WINDOW = int(os.getenv("SEMANTIC_CHILD_PARENT_WINDOW", "0"))
 LAST_EVIDENCE = []
 LAST_CITATION_AUDIT = {}
 LAST_TOPIC_INFO = {}
 LAST_CRAG_REPORT = {}
+LAST_TIMING = {}
 ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json")
 TOPIC_CATALOG_PATH = os.getenv("TOPIC_CATALOG_PATH", "rag/topic_catalog.json")
 DEFAULT_PUBLISHER = "人民出版社"
@@ -64,6 +75,10 @@ RUNTIME = RuntimeState(
     trace_env=TRACE_ENV,
     trace_only_env=TRACE_ONLY_ENV,
     dual_retrieval_env=DUAL_RETRIEVAL_ENV,
+    vector_backend_env=VECTOR_BACKEND_ENV,
+    milvus_uri=MILVUS_URI,
+    milvus_collection=MILVUS_COLLECTION,
+    milvus_embedding_device=MILVUS_EMBEDDING_DEVICE,
 )
 VOLUME_PUBLICATION_YEARS = {
     "me46a": "1979年",
@@ -414,6 +429,15 @@ def work_catalog_entries_for_query(query):
     return catalog.get_entries(work)
 
 
+def work_catalog_title_entries_for_query(query):
+    """Return work catalog entries only for explicit title or alias mentions."""
+    catalog = _get_work_catalog()
+    work = catalog.match_title_query(query, normalize_fn=normalize_for_match)
+    if work is None:
+        return []
+    return catalog.get_entries(work)
+
+
 # ── Book Locator Agent ────────────────────────────────────────────
 
 _book_locator = None
@@ -425,6 +449,8 @@ def _get_book_locator():
         client = OpenAI(
             api_key=os.getenv("DEEPSEEK_API_KEY"),
             base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+            max_retries=2,
+            timeout=30.0,
         )
         catalog = _get_work_catalog()
         _book_locator = BookLocator(client, catalog)
@@ -451,6 +477,8 @@ def _get_citation_verifier():
         client = OpenAI(
             api_key=os.getenv("DEEPSEEK_API_KEY"),
             base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+            max_retries=2,
+            timeout=30.0,
         )
         _citation_verifier = CitationVerifier(client, OCR_CACHE_DIR)
     return _citation_verifier
@@ -484,6 +512,7 @@ def _retrieval_ctx():
         "find_toc_entries": find_toc_entries,
         "extract_bibliographic_title": extract_bibliographic_title,
         "work_catalog_entries_for_query": work_catalog_entries_for_query,
+        "work_catalog_title_entries_for_query": work_catalog_title_entries_for_query,
         "book_locator_constraints": book_locator_constraints,
         "locator_entries_for_query": locator_entries_for_query,
         "classic_entries_for_query": classic_entries_for_query,
@@ -510,23 +539,44 @@ def _retrieval_ctx():
         "controlled_multi_queries": controlled_multi_queries,
         "expand_semantic_parent_docs": expand_semantic_parent_docs,
         "hybrid_retrieval_enabled": hybrid_retrieval_enabled,
+        "sparse_index_ready": sparse_index_ready,
         "sparse_retrieve_documents": sparse_retrieve_documents,
     }
 
 
 def expand_semantic_parent_docs(docs):
+    uses_semantic_child = any(
+        (doc.metadata or {}).get("retrieval_unit") == "semantic_child"
+        for doc in docs or []
+    )
     return expand_semantic_parent_windows(
         docs,
-        window=SEMANTIC_PARENT_WINDOW,
-        path=PARAGRAPH_CACHE_PATH,
+        window=SEMANTIC_CHILD_PARENT_WINDOW if uses_semantic_child else SEMANTIC_PARENT_WINDOW,
+        path=SEMANTIC_PARENT_CACHE_PATH if uses_semantic_child else PARAGRAPH_CACHE_PATH,
     )
 
 
 def hybrid_retrieval_enabled():
+    if (
+        RUNTIME.vector_backend() == "milvus"
+        and os.getenv("MILVUS_HYBRID_SEARCH", os.getenv("MARXOS_MILVUS_HYBRID", "0")).lower()
+        in {"1", "true", "yes", "on"}
+        and os.getenv("MARXOS_ENABLE_LOCAL_HYBRID_WITH_MILVUS", "0").lower()
+        not in {"1", "true", "yes", "on"}
+    ):
+        return False
     value = os.getenv(HYBRID_RETRIEVAL_ENV, "")
     if not value:
         return True
     return value.lower() in {"1", "true", "yes", "on"}
+
+
+def sparse_index_ready():
+    return load_sparse_paragraph_index.cache_info().currsize > 0
+
+
+def warm_sparse_index():
+    return load_sparse_paragraph_index(PARAGRAPH_CACHE_PATH)
 
 
 def sparse_retrieve_documents(query, limit=24):
@@ -913,45 +963,44 @@ def is_classic_sayings_query(query):
 
 
 def classify_query(query):
-    """Classify a user query with work_catalog-aware routing.
+    """Classify a user query with work_catalog-aware routing (v2 scoring).
 
-    bibliographic_lookup: locate a work → work_catalog or TOC.
-    quote_lookup: confirm source/page for exact text → quote index + constrained search.
-    concept_explain: explain a concept → primary_concept work match + constrained retrieval.
-    deep_analysis: multi-work synthesis, contemporary application → LLM analysis mode.
-    theory_analysis: analyze through Marxist theory → broad multi-work retrieval.
-    rag_answer: default fallback → standard hybrid retrieval.
+    Uses the layered-scoring engine from ``marxos_query_intent.classify_query_v2``
+    enriched with work_catalog match signals.  Returns a plain string for
+    backward compatibility — call ``classify_query_v2()`` for the rich
+    ``IntentResult`` with confidence / ambiguity signals.
+
+    Intents: bibliographic_lookup | quote_lookup | concept_explain |
+             comparison | deep_analysis | theory_analysis | rag_answer
     """
-    q_clean = clean_text(query, "")
+    v2 = query_intent.classify_query_v2(query, clean_text)
 
-    # 1. Bibliographic: direct work lookup
-    if is_bibliographic_query(query) and extract_bibliographic_title(query):
+    # Boost bibliographic / quote confidence when work_catalog confirms a match
+    if v2.primary in ("bibliographic_lookup", "quote_lookup"):
         catalog = _get_work_catalog()
         if catalog.match_query(query, normalize_fn=normalize_for_match):
-            return "bibliographic_lookup"
-        return "bibliographic_lookup"
+            return v2.primary
+        # Degraded: no catalog match → fall through to secondary intent
+        if v2.is_ambiguous:
+            secondary = v2.secondary_intents(threshold=0.18)
+            if secondary:
+                return secondary[0][0]
 
-    # 2. Quote lookup: exact text matching
-    if is_quote_lookup_query(query):
-        catalog = _get_work_catalog()
-        if catalog.match_query(query, normalize_fn=normalize_for_match):
-            return "quote_lookup"
-        return "quote_lookup"
-
-    # 3. Deep analysis: LLM-powered multi-work synthesis (checked before concept)
-    if query_intent.is_deep_analysis_query(query, clean_text):
-        return "deep_analysis"
-
-    # 4. Concept explain: prefer primary_concept works
-    if is_concept_query(query):
+    # Boost concept when concept terms are active
+    if v2.primary == "concept_explain" and is_concept_query(query):
         return "concept_explain"
 
-    # 5. Theory analysis
-    if is_analysis_query(query):
-        return "theory_analysis"
+    return v2.primary
 
-    # 6. Default: standard RAG
-    return "rag_answer"
+
+def classify_query_v2(query):
+    """Rich intent classification with confidence / ambiguity signals.
+
+    Returns ``marxos_query_intent.IntentResult``.  The object compares
+    equal to its primary intent string (e.g. ``result == "rag_answer"``)
+    for drop-in backward compatibility.
+    """
+    return query_intent.classify_query_v2(query, clean_text)
 
 
 def cache_files_for_toc_scan():
@@ -996,6 +1045,38 @@ def best_toc_entries(entries):
     )
 
 
+def requested_capital_volume(title):
+    normalized = normalize_for_match(title)
+    if "资本论" not in normalized:
+        return ""
+    volume_markers = {
+        "第一卷": "第一卷",
+        "第1卷": "第一卷",
+        "一卷": "第一卷",
+        "第二卷": "第二卷",
+        "第2卷": "第二卷",
+        "二卷": "第二卷",
+        "第三卷": "第三卷",
+        "第3卷": "第三卷",
+        "三卷": "第三卷",
+    }
+    for marker, canonical in volume_markers.items():
+        if normalize_for_match(marker) in normalized:
+            return canonical
+    return ""
+
+
+def filter_capital_volume_entries(title, entries):
+    requested_volume = requested_capital_volume(title)
+    if not requested_volume:
+        return entries
+    requested_norm = normalize_for_match(requested_volume)
+    return [
+        entry for entry in entries
+        if requested_norm in normalize_for_match(entry.get("classic_title") or entry.get("article") or "")
+    ]
+
+
 def enrich_core_classic_entries(entries):
     enriched = []
 
@@ -1032,7 +1113,9 @@ def enrich_core_classic_entries(entries):
 def find_toc_entries_from_map(title):
     core_entries = classic_entries_for_query(title)
     if core_entries:
-        return enrich_core_classic_entries(core_entries)
+        filtered_core_entries = filter_capital_volume_entries(title, enrich_core_classic_entries(core_entries))
+        if filtered_core_entries:
+            return filtered_core_entries
 
     entries = []
     normalized_title = normalize_for_match(title)
@@ -1123,7 +1206,7 @@ def find_toc_entries_from_map(title):
         if primary_entries:
             entries = primary_entries
 
-    return best_toc_entries(entries)
+    return filter_capital_volume_entries(title, best_toc_entries(entries))
 
 
 def find_toc_entries(title):
@@ -2060,6 +2143,12 @@ def score_document_quality(metadata, content):
     if metadata.get("page_type") in {"toc", "title_page"}:
         score -= 80
 
+    if content.startswith(("说明本卷", "本卷收入", "本卷是")):
+        score -= 120
+
+    if article == clean_text(metadata.get("book"), "") and metadata_citation_page(metadata) is not None and metadata_citation_page(metadata) <= 10:
+        score -= 100
+
     if is_noisy_article_title(article):
         score -= 60
 
@@ -2176,13 +2265,17 @@ def concept_constrained_candidates(query, db, constraints, fetch_k):
     )
 
 
-def retrieve_documents(query, db, k=5, allow_exact_quote=True):
+def retrieve_documents(query, db, k=5, allow_exact_quote=True, performance=None):
+    ctx = _retrieval_ctx()
+    if performance is not None:
+        ctx = dict(ctx)
+        ctx["hybrid_retrieval"] = bool(performance.get("hybrid_retrieval", True))
     return retrieval_utils.retrieve_documents(
         query,
         db,
         k,
         allow_exact_quote,
-        _retrieval_ctx(),
+        ctx,
     )
 
 
@@ -2211,36 +2304,52 @@ def footnote_citation_rules():
     return prompts.footnote_citation_rules()
 
 
-def build_quote_prompt(query, context):
-    return prompts.build_quote_prompt(query, context)
+def build_quote_prompt(query, context, mode=None):
+    return prompts.build_quote_prompt(query, context, mode=mode)
 
 
-def build_concept_prompt(query, context):
-    return prompts.build_concept_prompt(query, context)
+def build_concept_prompt(query, context, mode=None):
+    return prompts.build_concept_prompt(query, context, mode=mode)
 
 
-def build_analysis_prompt(query, context):
-    return prompts.build_analysis_prompt(query, context)
+def build_analysis_prompt(query, context, mode=None):
+    return prompts.build_analysis_prompt(query, context, mode=mode)
 
 
-def build_default_prompt(query, context):
-    return prompts.build_default_prompt(query, context)
+def build_default_prompt(query, context, mode=None):
+    return prompts.build_default_prompt(query, context, mode=mode)
 
 
 def build_constraint_guard(constraints):
     return prompts.build_constraint_guard(constraints)
 
 
-def build_prompt(intent, query, context):
-    return prompts.build_prompt(intent, query, context)
+def build_prompt(intent, query, context, mode=None):
+    return prompts.build_prompt(intent, query, context, mode=mode)
 
 
 def build_ambiguous_locator_answer(query, constraints, limit=10):
     return ambiguous_utils.build_ambiguous_locator_answer(query, constraints, limit=limit)
 
-def build_context(docs, query_intent):
+def _clip_context_text(text, limit):
+    text = clean_text(text, "")
+    if not limit or limit <= 0 or len(text) <= limit:
+        return text
+    head_limit = max(int(limit * 0.72), 1)
+    tail_limit = max(limit - head_limit, 0)
+    head = text[:head_limit].rstrip()
+    tail = text[-tail_limit:].lstrip() if tail_limit else ""
+    if tail:
+        return f"{head}\n……（中间内容已按上下文预算省略）……\n{tail}"
+    return head
+
+
+def build_context(docs, query_intent, performance=None):
     # Chunk creation happens in the vectorstore build step. This function only
     # consumes chunks and keeps their metadata visible for citation and prompts.
+    performance = performance or {}
+    doc_char_limit = int(performance.get("context_doc_char_limit") or 0)
+    total_char_limit = int(performance.get("context_total_char_limit") or 0)
     context_parts = []
 
     for i, doc in enumerate(docs, start=1):
@@ -2293,7 +2402,8 @@ def build_context(docs, query_intent):
                 "locator_fields: suppressed_for_letter=true\n"
             )
 
-        context_parts.append(
+        clipped_content = _clip_context_text(doc.page_content, doc_char_limit)
+        card = (
             f"EVIDENCE-CARD E{i}\n"
             f"evidence_id={evidence_id}\n"
             f"\u6765\u6e90\uff1a\u300a{book}\u300b{article}{section_text}\uff0c{source_page}\uff0csource={source}\n"
@@ -2305,8 +2415,14 @@ def build_context(docs, query_intent):
             f"position_fields: line_start={line_start}, line_end={line_end}\n"
             f"\u53e5\u5b50\u5f15\u6587\u683c\u5f0f\uff1a{sentence_citation}\n"
             f"\u6bb5\u843d\u5177\u4f53\u51fa\u5904\u683c\u5f0f\uff1a{detailed_source}\n"
-            f"\u539f\u6587\uff1a{clean_text(doc.page_content)}"
+            f"\u539f\u6587\uff1a{clipped_content}"
         )
+        next_total = len("\n\n".join(context_parts + [card]))
+        if total_char_limit and context_parts and next_total > total_char_limit:
+            break
+        if total_char_limit and next_total > total_char_limit:
+            card = card[:total_char_limit].rstrip() + "\n……（上下文预算已截断）"
+        context_parts.append(card)
 
     context = "\n\n".join(context_parts)
 
@@ -2386,6 +2502,17 @@ def build_trace_only_answer(query_intent, docs, prompt, paragraph_docs=None):
 
 def load_embeddings():
     return RUNTIME.load_embeddings()
+
+
+def embed_query(query: str):
+    """Return an embedding vector for *query*.
+
+    Used by the ML intent classifier (v3) to blend rule-based scores with
+    a lightweight logistic-regression head.  Raises ``RuntimeError`` if the
+    embedding model has not been initialised.
+    """
+    emb = RUNTIME.load_embeddings()
+    return emb.embed_query(query)
 
 
 def load_vectorstore():
@@ -2644,6 +2771,11 @@ def set_last_crag_report(report=None):
     LAST_CRAG_REPORT = report or {}
 
 
+def set_last_timing(info=None):
+    global LAST_TIMING
+    LAST_TIMING = info or {}
+
+
 def normalize_final_answer(answer):
     answer = clean_text(answer, "")
     answer = answer.replace("PDF\u7b2c", "\u7b2c").replace("PDF?", "?")
@@ -2667,12 +2799,110 @@ def normalize_final_answer(answer):
 
     return "\n".join(normalized_lines)
 
-def run_query(query, route_query=None, force_intent=None, history=None):
+
+def performance_settings(mode=None):
+    """Return retrieval/generation knobs for web and CLI answer paths."""
+    selected = (mode or os.getenv("MARXOS_PERFORMANCE_MODE", "deep") or "deep").lower()
+    presets = {
+        "fast": {
+            "mode": "fast",
+            "retrieve_k": 3,
+            "rag_retrieve_k": 5,
+            "paragraph_retrieval": False,
+            "corrective_retrieval": False,
+            "planner_multi_query": False,
+            "hybrid_retrieval": False,
+            "content_verification": False,
+            "max_recovery_rounds": 0,
+            "citation_audit_mode": "lightweight",
+            "citation_recovery": False,
+            "citation_page_refinement": False,
+            "context_doc_char_limit": 800,
+            "context_total_char_limit": 2500,
+            "max_tokens": 700,
+            "llm_timeout": 35.0,
+        },
+        "standard": {
+            "mode": "standard",
+            "retrieve_k": 4,
+            "rag_retrieve_k": 8,
+            "paragraph_retrieval": False,
+            "corrective_retrieval": True,
+            "planner_multi_query": False,
+            "hybrid_retrieval": False,
+            "content_verification": False,
+            "max_recovery_rounds": 0,
+            "citation_audit_mode": "lightweight",
+            "citation_recovery": False,
+            "citation_page_refinement": False,
+            "context_doc_char_limit": 1500,
+            "context_total_char_limit": 6000,
+            "max_tokens": 1100,
+            "llm_timeout": 60.0,
+        },
+        "deep": {
+            "mode": "deep",
+            "retrieve_k": 5,
+            "rag_retrieve_k": 12,
+            "paragraph_retrieval": True,
+            "corrective_retrieval": True,
+            "planner_multi_query": True,
+            "hybrid_retrieval": True,
+            "content_verification": True,
+            "max_recovery_rounds": 2,
+            "citation_audit_mode": "deep",
+            "citation_recovery": True,
+            "citation_page_refinement": True,
+            "context_doc_char_limit": 4000,
+            "context_total_char_limit": 16000,
+            "max_tokens": None,
+            "llm_timeout": 120.0,
+        },
+    }
+    return presets.get(selected, presets["deep"])
+
+
+def run_query(query, route_query=None, force_intent=None, history=None, performance=None):
     with phoenix.trace_manager.start_as_current_span("marxos.run_query") as root_span:
         try:
+            run_started = time.perf_counter()
+            timings = {}
+
+            def _mark_phase(phase, started, extra=None):
+                elapsed_ms = int((time.perf_counter() - started) * 1000)
+                total_ms = int((time.perf_counter() - run_started) * 1000)
+                timings[phase] = elapsed_ms
+                payload = {
+                    "event": "marxos_timing",
+                    "phase": phase,
+                    "elapsed_ms": elapsed_ms,
+                    "total_ms": total_ms,
+                }
+                if extra:
+                    payload.update(extra)
+                try:
+                    print(json.dumps(payload, ensure_ascii=False), file=sys.stderr, flush=True)
+                except UnicodeEncodeError:
+                    print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+
+            def _mark_event(phase, extra=None):
+                payload = {
+                    "event": "marxos_timing",
+                    "phase": phase,
+                    "total_ms": int((time.perf_counter() - run_started) * 1000),
+                }
+                if extra:
+                    payload.update(extra)
+                try:
+                    print(json.dumps(payload, ensure_ascii=False), file=sys.stderr, flush=True)
+                except UnicodeEncodeError:
+                    print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+
+            perf = performance_settings(performance)
             set_last_evidence([])
             set_last_topic_info({})
             set_last_crag_report({})
+            set_last_timing({})
 
             # Use provided classification function or default
             _classify = classify_query
@@ -2697,9 +2927,20 @@ def run_query(query, route_query=None, force_intent=None, history=None):
             query = request["query"]
             route_query = request["route_query"]
             query_intent = request["query_intent"]
+            plan_started = time.perf_counter()
             plan = query_planner.plan_query(route_query, query_intent, history=history or [])
             if plan.standalone_query and plan.standalone_query != route_query:
                 route_query = plan.standalone_query
+            _mark_phase(
+                "query_plan",
+                plan_started,
+                {
+                    "mode": perf.get("mode"),
+                    "intent": query_intent,
+                    "plan_mode": plan.mode,
+                    "variants": len(plan.retrieval_queries),
+                },
+            )
             trace = trace_enabled()
             trace_only = trace_only_enabled()
             dual_retrieval = dual_retrieval_enabled()
@@ -2713,33 +2954,57 @@ def run_query(query, route_query=None, force_intent=None, history=None):
                 )
 
             def _build_prompt_for_docs(active_docs, span_name):
+                phase_started = time.perf_counter()
                 with phoenix.trace_manager.start_as_current_span(span_name) as span:
-                    context = build_context(active_docs, query_intent)
-                    prompt = clean_text(build_prompt(query_intent, query, context) + build_constraint_guard(constraints))
+                    context = build_context(active_docs, query_intent, performance=perf)
+                    prompt = clean_text(
+                        build_prompt(query_intent, query, context, mode=perf.get("mode"))
+                        + build_constraint_guard(constraints)
+                    )
                     phoenix.set_attributes(
                         span,
                         {
+                            "prompt.mode": perf.get("mode") or "",
                             "prompt.length": len(prompt),
                             "prompt.preview": phoenix.compact_text(prompt, limit=240),
                         },
                     )
+                _mark_phase(
+                    span_name,
+                    phase_started,
+                    {"prompt_length": len(prompt), "doc_count": len(active_docs or [])},
+                )
                 return prompt
 
             def _generate_raw_answer(prompt, span_name):
+                phase_started = time.perf_counter()
                 with phoenix.trace_manager.start_as_current_span(span_name) as span:
                     client = OpenAI(
                         api_key=os.getenv("DEEPSEEK_API_KEY"),
                         base_url="https://api.deepseek.com",
+                        max_retries=3,
+                        timeout=float(perf.get("llm_timeout") or 120.0),
                     )
-                    response = client.chat.completions.create(
-                        model="deepseek-chat",
-                        messages=[
+                    request_kwargs = {
+                        "model": "deepseek-chat",
+                        "messages": [
                             {
                                 "role": "user",
                                 "content": prompt,
                             }
                         ],
+                    }
+                    if perf.get("max_tokens"):
+                        request_kwargs["max_tokens"] = int(perf["max_tokens"])
+                    _mark_event(
+                        f"{span_name}_start",
+                        {
+                            "prompt_length": len(prompt or ""),
+                            "max_tokens": int(perf.get("max_tokens") or 0),
+                            "timeout": float(perf.get("llm_timeout") or 120.0),
+                        },
                     )
+                    response = client.chat.completions.create(**request_kwargs)
                     raw_answer = response.choices[0].message.content
                     phoenix.set_attributes(
                         span,
@@ -2748,25 +3013,31 @@ def run_query(query, route_query=None, force_intent=None, history=None):
                             "llm.api_style": "openai_compatible",
                             "llm.model": "deepseek-chat",
                             "llm.output_length": len(raw_answer or ""),
+                            "llm.max_tokens": int(perf["max_tokens"] or 0),
                         },
                     )
+                _mark_phase(span_name, phase_started, {"answer_length": len(raw_answer or "")})
                 return raw_answer
 
             def _finalize_answer(raw_answer, active_evidence, active_crag_report, span_name, recovery_used=False):
+                phase_started = time.perf_counter()
                 with phoenix.trace_manager.start_as_current_span(span_name) as span:
                     repaired_answer = repair_answer_citations(raw_answer, active_evidence)
                     display_evidence = filter_evidence_to_answer(repaired_answer, active_evidence)
                     audit = audit_answer_citations(repaired_answer, display_evidence)
-                    # Content verification against OCR text
-                    content_verify = verify_citations(repaired_answer, display_evidence)
-                    if content_verify:
-                        audit["content_verification"] = content_verify
+                    audit["mode"] = perf.get("citation_audit_mode") or "lightweight"
+                    if perf.get("content_verification", True):
+                        # Content verification against OCR text is valuable but expensive.
+                        content_verify = verify_citations(repaired_answer, display_evidence)
+                        if content_verify:
+                            audit["content_verification"] = content_verify
                     audit["crag_report"] = dict(active_crag_report or {})
                     audit["crag_recovery_used"] = recovery_used
                     phoenix.set_attributes(
                         span,
                         {
                             "citation.audit_ok": bool(audit.get("ok")),
+                            "citation.audit_mode": audit.get("mode") or "",
                             "citation.issue_count": len(audit.get("issues") or []),
                             "answer.length": len(audit["answer"]),
                             "crag.path": (active_crag_report or {}).get("path") or "",
@@ -2774,6 +3045,15 @@ def run_query(query, route_query=None, force_intent=None, history=None):
                         },
                     )
                     phoenix.set_attributes(span, phoenix.summarize_evidence(display_evidence))
+                _mark_phase(
+                    span_name,
+                    phase_started,
+                    {
+                        "audit_ok": bool(audit.get("ok")),
+                        "issue_count": len(audit.get("issues") or []),
+                        "evidence_count": len(display_evidence or []),
+                    },
+                )
                 return audit, display_evidence
 
             phoenix.set_attributes(
@@ -2787,6 +3067,7 @@ def run_query(query, route_query=None, force_intent=None, history=None):
                     "app.trace_enabled": trace,
                     "app.trace_only": trace_only,
                     "app.dual_retrieval": dual_retrieval,
+                    "app.performance_mode": perf.get("mode"),
                     "phoenix.enabled": phoenix.trace_manager.enabled(),
                 },
             )
@@ -2836,6 +3117,7 @@ def run_query(query, route_query=None, force_intent=None, history=None):
                     return local_answer
 
             constraints = constraints_from_query(route_query)
+            retrieval_started = time.perf_counter()
             with phoenix.trace_manager.start_as_current_span("marxos.retrieval") as span:
                 phoenix.set_attributes(span, phoenix.summarize_constraints(constraints))
                 retrieval_state = orchestration.collect_retrieval_materials(
@@ -2860,6 +3142,7 @@ def run_query(query, route_query=None, force_intent=None, history=None):
                     evidence_from_docs,
                     is_topic_view_list_query,
                     query_plan=plan.as_dict(),
+                    performance=perf,
                 )
                 docs = retrieval_state["docs"]
                 evidence = retrieval_state["evidence"]
@@ -2886,6 +3169,16 @@ def run_query(query, route_query=None, force_intent=None, history=None):
                         "crag.ok": bool(crag_report.get("ok", False)),
                     },
                 )
+            _mark_phase(
+                "retrieval",
+                retrieval_started,
+                {
+                    "doc_count": len(docs or []),
+                    "evidence_count": len(evidence or []),
+                    "crag_path": crag_report.get("path") or "",
+                    "crag_score": int(crag_report.get("score") or 0),
+                },
+            )
 
             ambiguous_answer = build_ambiguous_locator_answer(route_query, constraints)
             if ambiguous_answer:
@@ -2970,6 +3263,8 @@ def run_query(query, route_query=None, force_intent=None, history=None):
                 recovery_round += 1
                 if recovery_round > 2:
                     return audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence
+                if recovery_round > int(perf.get("max_recovery_rounds", 2)):
+                    return audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence
 
                 with phoenix.trace_manager.start_as_current_span(
                     f"marxos.recovery_{recovery_round}_{recovery_reason}"
@@ -2987,6 +3282,7 @@ def run_query(query, route_query=None, force_intent=None, history=None):
                         evidence_from_docs, is_topic_view_list_query,
                         force_corrective=True,
                         query_plan=plan.as_dict(),
+                        performance=perf,
                     )
                     new_docs = recovery_state["docs"]
                     new_evidence = recovery_state["evidence"]
@@ -3005,14 +3301,14 @@ def run_query(query, route_query=None, force_intent=None, history=None):
                 return audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence
 
             # Round 1: citation format recovery (existing)
-            if not audit.get("ok"):
+            if perf.get("citation_recovery", True) and not audit.get("ok"):
                 audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence = _try_recover(
                     audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence,
                     "citation_format")
 
             # Round 2: content verification recovery (new)
             content_verify = audit.get("content_verification") or {}
-            if content_verify and content_verify.get("total", 0) > 0:
+            if perf.get("citation_recovery", True) and content_verify and content_verify.get("total", 0) > 0:
                 hall_rate = content_verify.get("hallucinated", 0) / content_verify["total"]
                 if hall_rate > 0.5:  # >50% citations flagged → verify-driven recovery
                     audit, docs, evidence, paragraph_docs, crag_report, prompt, display_evidence = _try_recover(
@@ -3020,6 +3316,11 @@ def run_query(query, route_query=None, force_intent=None, history=None):
                         "content_verification")
 
             set_last_evidence(display_evidence, audit)
+            timings["total"] = int((time.perf_counter() - run_started) * 1000)
+            timings["mode"] = perf.get("mode")
+            timings["intent"] = query_intent
+            set_last_timing(timings)
+            _mark_event("run_query_done", {"total_ms": timings["total"], "mode": perf.get("mode")})
             phoenix.set_attributes(
                 root_span,
                 {

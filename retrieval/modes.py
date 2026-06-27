@@ -1,4 +1,7 @@
 import json
+import os
+import sys
+import time
 from pathlib import Path
 
 from langchain_core.documents import Document
@@ -10,6 +13,7 @@ from retrieval.constraints import (
     concept_seed_queries,
     constraints_from_query,
     controlled_multi_queries,
+    is_work_location_query,
     is_me_source,
     metadata_matches_constraints,
     page_in_expected_range,
@@ -104,9 +108,17 @@ def _has_narrow_page_ranges(constraints, max_width=3):
 def _hybrid_merge_candidates(query, dense_candidates, constraints, fetch_k, ctx):
     hybrid_retrieval_enabled = _helper(ctx, "hybrid_retrieval_enabled")
     controlled_multi_queries = _helper(ctx, "controlled_multi_queries")
+    sparse_index_ready = _helper(ctx, "sparse_index_ready")
     sparse_retrieve_documents = _helper(ctx, "sparse_retrieve_documents")
 
+    if "hybrid_retrieval" in ctx and not ctx.get("hybrid_retrieval"):
+        return dense_candidates
     if not hybrid_retrieval_enabled():
+        return dense_candidates
+    if (
+        os.getenv("SEMANTIC_SPARSE_COLD_START", "skip").lower() in {"skip", "off", "false", "0"}
+        and not sparse_index_ready()
+    ):
         return dense_candidates
 
     dense_candidates = list(dense_candidates or [])
@@ -212,8 +224,21 @@ def _controlled_dense_candidates(query, db, constraints, fetch_k, ctx):
     variants = controlled_multi_queries(query, constraints, ctx)
     per_query_k = max(18, fetch_k // max(len(variants), 1))
     for variant in variants:
-        candidates.extend(db.similarity_search(variant, k=per_query_k))
+        candidates.extend(_similarity_search(db, variant, per_query_k, constraints))
     return dedupe_documents(candidates, ctx)
+
+
+def _similarity_search(db, query, k, constraints=None):
+    filters = {}
+    sources = (constraints or {}).get("sources") or set()
+    if sources:
+        filters["source"] = sorted(sources)
+    if filters:
+        try:
+            return db.similarity_search(query, k=k, filters=filters)
+        except TypeError:
+            pass
+    return db.similarity_search(query, k=k)
 
 
 def strict_title_cache_documents(query, constraints, limit, ctx):
@@ -429,7 +454,7 @@ def topic_constrained_candidates(query, db, constraints, fetch_k, ctx):
     seeds = topic_seed_queries(query, constraints, ctx)
     per_seed_k = max(24, fetch_k // max(len(seeds), 1))
     for seed in seeds:
-        candidates.extend(db.similarity_search(seed, k=per_seed_k))
+        candidates.extend(_similarity_search(db, seed, per_seed_k, constraints))
 
     candidates = [
         doc for doc in dedupe_documents(candidates, ctx)
@@ -454,7 +479,7 @@ def concept_constrained_candidates(query, db, constraints, fetch_k, ctx):
         candidates.extend(
             _hybrid_merge_candidates(
                 seed,
-                db.similarity_search(seed, k=per_seed_k),
+                _similarity_search(db, seed, per_seed_k, constraints),
                 constraints,
                 per_seed_k,
                 ctx,
@@ -477,6 +502,21 @@ def concept_constrained_candidates(query, db, constraints, fetch_k, ctx):
 
 
 def retrieve_documents(query, db, k, allow_exact_quote, ctx):
+    retrieve_started = time.perf_counter()
+
+    def log_phase(phase, started, **extra):
+        payload = {
+            "event": "marxos_retrieve_documents_timing",
+            "phase": phase,
+            "elapsed_ms": int((time.perf_counter() - started) * 1000),
+            "total_ms": int((time.perf_counter() - retrieve_started) * 1000),
+        }
+        payload.update(extra)
+        try:
+            print(json.dumps(payload, ensure_ascii=False), file=sys.stderr, flush=True)
+        except UnicodeEncodeError:
+            print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+
     normalize_for_match = _helper(ctx, "normalize_for_match")
     active_concept_terms = _helper(ctx, "active_concept_terms")
     exact_quote_lookup = _helper(ctx, "exact_quote_lookup")
@@ -491,11 +531,15 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
     is_front_matter_candidate = _helper(ctx, "is_front_matter_candidate")
     requests_derivative_material = _helper(ctx, "requests_derivative_material")
     expand_semantic_parent_docs = _helper(ctx, "expand_semantic_parent_docs")
+    score_document_quality = _helper(ctx, "score_document_quality")
 
+    phase_started = time.perf_counter()
     constraints = constraints_from_query(query, ctx)
+    log_phase("constraints_from_query", phase_started, has_constraints=bool(constraints))
     if (
         constraints.get("sources")
         and collection_requested(query, ctx) != "non_me"
+        and not constraints.get("work_catalog_title_match")
         and not any(is_me_source(source) for source in constraints.get("sources") or [])
     ):
         constraints = dict(constraints)
@@ -508,7 +552,7 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
     if constraints.get("strict_title") and "无产阶级专政" in normalized_query:
         return locator_backstop_documents(constraints, limit=k)
 
-    if allow_exact_quote and is_quote_lookup_query(query):
+    if allow_exact_quote and is_quote_lookup_query(query) and not is_work_location_query(query, ctx):
         if not constraints.get("entries"):
             return []
         # Pass work_catalog constraints to scope OCR search
@@ -623,13 +667,18 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
                 ctx,
             )
     else:
+        phase_started = time.perf_counter()
+        dense_candidates = _controlled_dense_candidates(query, db, constraints, fetch_k, ctx)
+        log_phase("controlled_dense_candidates", phase_started, candidate_count=len(dense_candidates or []), fetch_k=fetch_k)
+        phase_started = time.perf_counter()
         candidates = _hybrid_merge_candidates(
             query,
-            _controlled_dense_candidates(query, db, constraints, fetch_k, ctx),
+            dense_candidates,
             constraints,
             fetch_k,
             ctx,
         )
+        log_phase("hybrid_merge_candidates", phase_started, candidate_count=len(candidates or []))
 
     if is_classic_sayings_query(query):
         expanded = []
@@ -651,7 +700,7 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
         for seed in CLASSIC_SAYING_QUERY_SEEDS:
             for doc in _hybrid_merge_candidates(
                 seed,
-                db.similarity_search(seed, k=seed_k),
+                _similarity_search(db, seed, seed_k, constraints),
                 constraints,
                 seed_k,
                 ctx,
@@ -700,9 +749,22 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
         if body_candidates:
             candidates = body_candidates
 
+    quality_candidates = [
+        doc for doc in candidates
+        if score_document_quality(doc.metadata or {}, clean_text(doc.page_content, "")) > -75
+    ]
+    if len(quality_candidates) >= max(k * 3, 10):
+        candidates = quality_candidates
+
+    phase_started = time.perf_counter()
     ranked_docs = rerank_documents(query, candidates, constraints, ctx)
+    log_phase("rerank_documents", phase_started, candidate_count=len(candidates or []), ranked_count=len(ranked_docs or []))
+    phase_started = time.perf_counter()
     ranked_docs = collapse_content_near_duplicates(ranked_docs, ctx)
+    log_phase("collapse_content_near_duplicates", phase_started, ranked_count=len(ranked_docs or []))
+    phase_started = time.perf_counter()
     ranked_docs = _prefer_source_order(ranked_docs, query, ctx)
+    log_phase("prefer_source_order", phase_started, ranked_count=len(ranked_docs or []))
     if constraints.get("topic_id"):
         docs = select_topic_documents(ranked_docs, constraints, k, ctx)
     elif (not constraints and classify_query(query) == "rag_answer" and k > 5) or constraints.get("min_distinct_sources"):
@@ -718,14 +780,22 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
     if classify_query(query) == "concept_explain":
         docs = enrich_concept_metadata(query, docs)
 
-    if allow_exact_quote and is_quote_lookup_query(query):
+    if allow_exact_quote and is_quote_lookup_query(query) and not is_work_location_query(query, ctx):
         for doc in docs:
             doc.metadata["match_type"] = "vector_candidate"
             doc.metadata["confidence"] = 0.0
 
+    phase_started = time.perf_counter()
     docs = annotate_docs_with_constraints(docs, constraints, ctx)
+    log_phase("annotate_docs_with_constraints", phase_started, doc_count=len(docs or []))
+    phase_started = time.perf_counter()
     docs = expand_semantic_parent_docs(docs)
-    return append_locator_backstops(docs, constraints, k, ctx)
+    log_phase("expand_semantic_parent_docs", phase_started, doc_count=len(docs or []))
+    phase_started = time.perf_counter()
+    docs = append_locator_backstops(docs, constraints, k, ctx)
+    log_phase("append_locator_backstops", phase_started, doc_count=len(docs or []))
+    log_phase("retrieve_documents_total", retrieve_started, doc_count=len(docs or []))
+    return docs
 
 
 def refine_doc_citation_page_for_query(doc, query, ctx):
