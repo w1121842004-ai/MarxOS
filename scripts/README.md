@@ -22,6 +22,11 @@
 - 构建 Milvus 检索 collection（当前范围：马恩全集、文集、选集）
 - 构建、训练、评测 intent 小模型相关数据
 
+默认构建目标现在使用全集优先的非 core 路径，例如
+`data/paragraph_cache.jsonl`、`data/semantic_parent_cache.jsonl`、
+`vectorstore/marx_reader`。`*_core` 文件和目录只作为早期文集/选集小范围测试的
+兼容回退；如果确实要复现实验，需要显式设置对应环境变量。
+
 ## 2. 评测类
 
 - `check.py`
@@ -75,6 +80,18 @@ RAGAS 指标。
 
 `answer_relevancy` 会默认调用 OpenAI embedding；如果没有 OpenAI key，结果会是
 `nan`。当前推荐先跑上面的 DeepSeek-only 指标。
+
+日常快速看检索和引用是否靠谱，可以先跑 MarxOS 确定性指标，不调用 judge：
+
+```bash
+.venv-ragas/bin/python scripts/evaluate_ragas.py \
+  --input-samples logs/ragas_samples.jsonl \
+  --marxos-only \
+  --report logs/ragas_report_marxos_only.json
+```
+
+报告里的 `marxos_summary` 会给出预期篇目命中率、作者命中率、硬负例污染率、
+答案引用标记率等项目内指标，适合和 RAGAS 分数一起看。
 
 ## 3. 审计类
 

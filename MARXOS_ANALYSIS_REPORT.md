@@ -77,7 +77,7 @@ MarxOS 可以定义为：
 ┌──────────────────────▼─────────────────────┐
 │  编排层                                     │
 │  run_query / intent / planner / CRAG / LLM  │
-│  app.py + marxos_orchestration.py           │
+│  app.py + marxos/app/orchestration.py       │
 └──────────────────────┬─────────────────────┘
                        │
 ┌──────────────────────▼─────────────────────┐
@@ -103,14 +103,14 @@ MarxOS 可以定义为：
 | --- | --- | --- |
 | `app.py` | CLI 入口、主查询链路、上下文构建、运行期 glue code | 功能完整，但仍是最大的复杂度集中点 |
 | `web_app.py` | 自定义 HTTP 服务、内嵌前端、`/api/ask` | 轻量直接，适合本地产品形态 |
-| `marxos_runtime.py` | 向量库与运行状态缓存、开发模式开关 | 让入口文件不直接承担所有加载逻辑 |
-| `marxos_query_intent.py` | 查询意图分类和路由辅助 | 规则主导，响应快，可解释 |
-| `marxos_query_planner.py` | 查询分解、多查询、HyDE 等规划能力 | 适合复杂问题扩展 |
+| `marxos/runtime.py` | 向量库与运行状态缓存、开发模式开关 | 让入口文件不直接承担所有加载逻辑 |
+| `marxos/query_intent.py` | 查询意图分类和路由辅助 | 规则主导，响应快，可解释 |
+| `marxos/query_planner.py` | 查询分解、多查询、HyDE 等规划能力 | 适合复杂问题扩展 |
 | `retrieval/constraints.py` | 标题、篇目、主题、页码等约束构建 | 检索准确性的关键模块 |
 | `retrieval/modes.py` | Dense、BM25、Hybrid、backstop、引文页 refinement | 实际检索执行核心 |
 | `retrieval/ranking.py` | 重排序、去重、多样化、约束标注 | 控制上下文质量和证据分布 |
-| `marxos_citations.py` | 证据卡、引文格式、回答审计和修复 | 系统可信度的关键模块 |
-| `marxos_answers.py` | 本地规则回答、拒答、专题列表回答 | 减少不必要的 LLM 调用 |
+| `marxos/generation/citations.py` | 证据卡、引文格式、回答审计和修复 | 系统可信度的关键模块 |
+| `marxos/generation/answers.py` | 本地规则回答、拒答、专题列表回答 | 减少不必要的 LLM 调用 |
 | `rag/` | OCR、文本清洗、段落缓存、精确引文、语义召回 | 数据资产和 RAG 能力的底座 |
 | `scripts/` | 构建、评测、审计、质量门禁 | 工程化程度较高 |
 
@@ -173,7 +173,7 @@ MarxOS 通过“检索阶段小、生成阶段大”的策略，在召回精度�
 
 ### 4.4 Milvus 演进线
 
-代码库已经加入 `marxos_vector_backend.py` 和 `scripts/build_milvus_collection.py`，并提供 `docker-compose.milvus.yml`。当前默认检索主线已经切换到 Milvus Lite + BGE-M3 dense/sparse hybrid。
+代码库已经加入 `marxos/vector_backend.py` 和 `scripts/build_milvus_collection.py`，并提供 `docker-compose.milvus.yml`。当前默认检索主线已经切换到 Milvus Lite + BGE-M3 dense/sparse hybrid。
 
 当前应将 Milvus 理解为“默认主检索/扩展后端”，FAISS 保留为可再生成的离线 fallback：
 
@@ -248,7 +248,7 @@ MarxOS 通过“检索阶段小、生成阶段大”的策略，在召回精度�
 
 ### 6.1 Prompt 体系
 
-`marxos_prompts.py` 按不同意图构建 Prompt，包括引文、概念、理论分析、深度分析和默认 RAG。Prompt 共同强调：
+`marxos/generation/prompts.py` 按不同意图构建 Prompt，包括引文、概念、理论分析、深度分析和默认 RAG。Prompt 共同强调：
 
 - 必须基于提供的材料回答。
 - 引文需要对应证据。
@@ -267,7 +267,7 @@ MarxOS 通过“检索阶段小、生成阶段大”的策略，在召回精度�
 
 ### 6.3 引文审计与修复
 
-`marxos_citations.py` 和 `marxos_citation_verifier.py` 构成回答后的质量控制层。主要检查包括：
+`marxos/generation/citations.py` 和 `marxos/generation/citation_verifier.py` 构成回答后的质量控制层。主要检查包括：
 
 - 回答中的证据编号是否存在。
 - 行内引文是否能匹配证据卡。

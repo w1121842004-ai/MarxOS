@@ -31,7 +31,7 @@
 │   │          Query Pipeline                  │  │           Quality Control                     │ │
 │   │                                         │  │                                              │ │
 │   │  ① 意图识别     classify_query()         │  │  ⑤ CRAG 评分    assess_retrieval_quality()   │ │
-│   │     7 种意图    (marxos_query_intent)     │  │     阈值 45-55   ──→ 纠正性重新检索 (≤2轮)    │ │
+│   │     7 种意图    (marxos/query_intent)     │  │     阈值 45-55   ──→ 纠正性重新检索 (≤2轮)    │ │
 │   │          │                              │  │                                              │ │
 │   │          ▼                              │  │  ⑥ 引文审计    audit_answer_citations()      │ │
 │   │  ② 约束构建   constraints_from_query()   │  │     格式检查 + OCR 内容验证                   │ │
@@ -68,7 +68,7 @@
 │   │  角色: 主检索              │  │  角色: 离线 / fallback     │  │                              │ │
 │   └──────────────────────────┘  └──────────────────────────┘  └──────────────────────────────┘ │
 │                                                                                                 │
-│                         VectorBackend Protocol (marxos_vector_backend.py)                        │
+│                         VectorBackend Protocol (marxos/vector_backend.py)                        │
 │                         ┌────────────────────────────────────────┐                               │
 │                         │  search(query, k, filters) → [Result]  │                               │
 │                         └────────────────────────────────────────┘                               │
@@ -176,21 +176,21 @@
   ├── app.py                        主入口 (run_query, classify_query, build_context)
   ├── web_app.py                    Web 服务 (HTTP + SPA)
   │
-  ├── marxos_query_intent.py        意图识别 (7类评分 + ML混合)
-  ├── marxos_orchestration.py       编排调度 (检索→CRAG→生成→审计)
-  ├── marxos_query_planner.py       查询规划 (分解/HyDE/多查询)
-  ├── marxos_prompts.py             Prompt 模板 (5种)
-  ├── marxos_citations.py           引文格式化 + 审计
-  ├── marxos_answers.py             本地规则回答 (无需 LLM)
-  ├── marxos_ambiguous.py           歧义查询处理
-  ├── marxos_runtime.py             FAISS 运行时状态
-  ├── marxos_vector_backend.py      Milvus/FAISS 抽象层
-  ├── marxos_embeddings.py          Embedding 模型适配
-  ├── marxos_work_catalog.py        著作目录匹配 (89部)
-  ├── marxos_book_locator.py        LLM 著作定位
-  ├── marxos_citation_verifier.py   LLM 引文验证
-  ├── marxos_phoenix.py             可观测追踪
-  ├── marxos_intent_classifier.py   ML 意图分类器
+  ├── marxos/query_intent.py              意图识别 (7类评分 + ML混合)
+  ├── marxos/app/orchestration.py         编排调度 (检索→CRAG→生成→审计)
+  ├── marxos/query_planner.py             查询规划 (分解/HyDE/多查询)
+  ├── marxos/generation/prompts.py        Prompt 模板 (5种)
+  ├── marxos/generation/citations.py      引文格式化 + 审计
+  ├── marxos/generation/answers.py        本地规则回答 (无需 LLM)
+  ├── marxos/ambiguous.py                 歧义查询处理
+  ├── marxos/runtime.py                   FAISS 运行时状态
+  ├── marxos/vector_backend.py            Milvus/FAISS 抽象层
+  ├── marxos/embeddings.py                Embedding 模型适配
+  ├── marxos/work_catalog.py              著作目录匹配 (89部)
+  ├── marxos/book_locator.py              LLM 著作定位
+  ├── marxos/generation/citation_verifier.py  LLM 引文验证
+  ├── marxos/phoenix.py                   可观测追踪
+  ├── marxos/intent_classifier.py         ML 意图分类器
   │
   ├── retrieval/                    检索子系统
   │   ├── constraints.py            约束构建 (WorkCatalog→Locator→概念→主题)

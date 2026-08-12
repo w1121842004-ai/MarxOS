@@ -8,22 +8,26 @@ import re
 import sys
 import time
 from pathlib import Path
-import marxos_citations as citations
-import marxos_answers as answer_utils
-import marxos_ambiguous as ambiguous_utils
-import marxos_orchestration as orchestration
-import marxos_phoenix as phoenix
-import marxos_prompts as prompts
-import marxos_query_planner as query_planner
-import marxos_query_intent as query_intent
 import retrieval as retrieval_utils
-import marxos_trace as trace_utils
-from marxos_runtime import RuntimeState
-from marxos_work_catalog import WorkCatalog
-from marxos_book_locator import BookLocator
-from marxos_citation_verifier import CitationVerifier
+from marxos.config import get_settings
+from marxos import ambiguous as ambiguous_utils
+from marxos import phoenix
+from marxos import query_intent
+from marxos import query_planner
+from marxos import trace as trace_utils
+from marxos.data.loaders import load_merged_article_map, load_topic_catalog as load_topic_catalog_data
+from marxos.book_locator import BookLocator
+from marxos.generation import answers as answer_utils
+from marxos.generation import citations
+from marxos.generation import prompts
+from marxos.generation.citation_audit import CitationVerifier
+from marxos.generation.llm_client import create_deepseek_client, deepseek_model
+from marxos.app import orchestration
+from marxos.app.runtime import RuntimeState
+from marxos.work_catalog import WorkCatalog
+from marxos.relevance_classifier import is_marxism_relevant
 from rag.core_classics import classic_entries_for_query, load_core_classics
-from rag.exact_quote_lookup import exact_quote_lookup
+from rag.exact_quote_lookup import exact_quote_lookup, extract_query_quote
 from rag.semantic_retrieval import expand_semantic_parent_docs as expand_semantic_parent_windows
 from rag.semantic_retrieval import (
     load_sparse_paragraph_index,
@@ -34,37 +38,39 @@ from rag.semantic_retrieval import (
 load_dotenv()
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+SETTINGS = get_settings()
 
 
-EMBEDDING_MODEL = os.getenv("MARXOS_EMBEDDING_MODEL", "BAAI/bge-m3")
-VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader_core")
-PARAGRAPH_VECTORSTORE_DIR = os.getenv("PARAGRAPH_VECTORSTORE_DIR", "vectorstore/marx_reader_paragraph")
-VECTOR_BACKEND_ENV = "MARXOS_VECTOR_BACKEND"
-MILVUS_URI = os.getenv("MILVUS_URI", "./data/milvus_lite/marxos_bgem3_sparse.db")
-MILVUS_COLLECTION = os.getenv("MILVUS_COLLECTION", "marxos_me_passages")
-MILVUS_EMBEDDING_DEVICE = os.getenv("MARXOS_EMBEDDING_DEVICE", "cpu")
-PARAGRAPH_CACHE_PATH = os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache_core.jsonl")
-SEMANTIC_PARENT_CACHE_PATH = os.getenv("SEMANTIC_PARENT_CACHE_PATH", "data/semantic_parent_cache_core.jsonl")
-OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "data/ocr_cache")
-PAGE_MAP_PATH = os.getenv("PAGE_MAP_PATH", "data/page_map.json")
-SEMANTIC_PARENT_WINDOW = int(os.getenv("SEMANTIC_PARENT_WINDOW", "1"))
-SEMANTIC_CHILD_PARENT_WINDOW = int(os.getenv("SEMANTIC_CHILD_PARENT_WINDOW", "0"))
+EMBEDDING_MODEL = SETTINGS.models.embedding_model
+VECTORSTORE_DIR = SETTINGS.index.vectorstore_dir
+PARAGRAPH_VECTORSTORE_DIR = SETTINGS.index.paragraph_vectorstore_dir
+VECTOR_BACKEND_ENV = SETTINGS.retrieval.vector_backend_env
+MILVUS_URI = SETTINGS.index.milvus_uri
+MILVUS_COLLECTION = SETTINGS.index.milvus_collection
+MILVUS_EMBEDDING_DEVICE = SETTINGS.models.embedding_device
+PARAGRAPH_CACHE_PATH = SETTINGS.corpus.paragraph_cache_path
+SEMANTIC_PARENT_CACHE_PATH = SETTINGS.corpus.semantic_parent_cache_path
+OCR_CACHE_DIR = SETTINGS.corpus.ocr_cache_dir
+PAGE_MAP_PATH = SETTINGS.corpus.page_map_path
+SEMANTIC_PARENT_WINDOW = SETTINGS.retrieval.semantic_parent_window
+SEMANTIC_CHILD_PARENT_WINDOW = SETTINGS.retrieval.semantic_child_parent_window
 LAST_EVIDENCE = []
 LAST_CITATION_AUDIT = {}
 LAST_TOPIC_INFO = {}
 LAST_CRAG_REPORT = {}
 LAST_TIMING = {}
-ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json")
-TOPIC_CATALOG_PATH = os.getenv("TOPIC_CATALOG_PATH", "rag/topic_catalog.json")
+ARTICLE_MAP_PATH = SETTINGS.corpus.article_map_path
+ARTICLE_MAP_EXTRA_PATHS = SETTINGS.corpus.article_map_extra_paths
+TOPIC_CATALOG_PATH = SETTINGS.corpus.topic_catalog_path
 DEFAULT_PUBLISHER = "人民出版社"
-RERANK_DEBUG_ENV = "MARXOS_DEBUG_RERANK"
-TRACE_ENV = "MARXOS_TRACE"
-TRACE_ONLY_ENV = "MARXOS_TRACE_ONLY"
-DUAL_RETRIEVAL_ENV = "MARXOS_DUAL_RETRIEVAL"
-HYBRID_RETRIEVAL_ENV = "MARXOS_HYBRID_RETRIEVAL"
-DEV_MODE_ENV = "MARXOS_DEV_MODE"
-DEV_TOKEN_ENV = "MARXOS_DEV_TOKEN"
-DEV_TOKEN_INPUT_ENV = "MARXOS_DEV_TOKEN_INPUT"
+RERANK_DEBUG_ENV = SETTINGS.retrieval.rerank_debug_env
+TRACE_ENV = SETTINGS.trace_env
+TRACE_ONLY_ENV = SETTINGS.trace_only_env
+DUAL_RETRIEVAL_ENV = SETTINGS.retrieval.dual_retrieval_env
+HYBRID_RETRIEVAL_ENV = SETTINGS.retrieval.hybrid_retrieval_env
+DEV_MODE_ENV = SETTINGS.dev_mode_env
+DEV_TOKEN_ENV = SETTINGS.dev_token_env
+DEV_TOKEN_INPUT_ENV = SETTINGS.dev_token_input_env
 RUNTIME = RuntimeState(
     embedding_model=EMBEDDING_MODEL,
     vectorstore_dir=VECTORSTORE_DIR,
@@ -76,6 +82,7 @@ RUNTIME = RuntimeState(
     trace_only_env=TRACE_ONLY_ENV,
     dual_retrieval_env=DUAL_RETRIEVAL_ENV,
     vector_backend_env=VECTOR_BACKEND_ENV,
+    vector_backend_default=SETTINGS.retrieval.vector_backend_default,
     milvus_uri=MILVUS_URI,
     milvus_collection=MILVUS_COLLECTION,
     milvus_embedding_device=MILVUS_EMBEDDING_DEVICE,
@@ -141,24 +148,14 @@ def printed_page_source_is_untrusted(metadata):
     return False
 
 def load_article_map():
-    if not os.path.exists(ARTICLE_MAP_PATH):
-        return {}
-
-    with open(ARTICLE_MAP_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return load_merged_article_map(ARTICLE_MAP_PATH, ARTICLE_MAP_EXTRA_PATHS)
 
 
 ARTICLE_MAP = load_article_map()
 
 
 def load_topic_catalog():
-    if not os.path.exists(TOPIC_CATALOG_PATH):
-        return []
-
-    with open(TOPIC_CATALOG_PATH, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    return data if isinstance(data, list) else []
+    return load_topic_catalog_data(TOPIC_CATALOG_PATH)
 
 
 TOPIC_CATALOG = load_topic_catalog()
@@ -348,19 +345,22 @@ def infer_printed_page_from_ocr_cache(metadata):
         return None
     lines = [normalize_digit_text(line).strip() for line in str(raw_text).splitlines()]
     lines = [line for line in lines if line]
-    edge_lines = lines[:3] + lines[-3:]
+    if len(lines) == 1:
+        line = lines[0]
+        edge_lines = [line[-360:], line[:360]]
+    else:
+        edge_lines = lines[-3:] + lines[:3]
 
     candidates = []
     for line in edge_lines:
-        match = re.fullmatch(r"[-—–]*\s*(\d{1,4})\s*[-—–]*", line)
-        if not match:
-            continue
-        page = as_int(match.group(1))
-        if page is None or page <= 0:
-            continue
-        # Printed pages usually trail PDF pages by the front-matter offset.
-        if -5 <= pdf_page - page <= 180:
-            candidates.append(page)
+        matches = list(re.finditer(r"(?<![0-9A-Za-z])(\d{1,4})(?![0-9A-Za-z])", line))
+        for match in matches:
+            page = as_int(match.group(1))
+            if page is None or page <= 0:
+                continue
+            # Printed pages usually trail PDF pages by the front-matter offset.
+            if -80 <= pdf_page - page <= 220:
+                candidates.append(page)
 
     if not candidates:
         return None
@@ -445,13 +445,7 @@ _book_locator = None
 def _get_book_locator():
     global _book_locator
     if _book_locator is None:
-        from openai import OpenAI
-        client = OpenAI(
-            api_key=os.getenv("DEEPSEEK_API_KEY"),
-            base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-            max_retries=2,
-            timeout=30.0,
-        )
+        client = create_deepseek_client(max_retries=2, timeout=30.0)
         catalog = _get_work_catalog()
         _book_locator = BookLocator(client, catalog)
     return _book_locator
@@ -473,13 +467,7 @@ _citation_verifier = None
 def _get_citation_verifier():
     global _citation_verifier
     if _citation_verifier is None:
-        from openai import OpenAI
-        client = OpenAI(
-            api_key=os.getenv("DEEPSEEK_API_KEY"),
-            base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-            max_retries=2,
-            timeout=30.0,
-        )
+        client = create_deepseek_client(max_retries=2, timeout=30.0)
         _citation_verifier = CitationVerifier(client, OCR_CACHE_DIR)
     return _citation_verifier
 
@@ -559,7 +547,10 @@ def expand_semantic_parent_docs(docs):
 def hybrid_retrieval_enabled():
     if (
         RUNTIME.vector_backend() == "milvus"
-        and os.getenv("MILVUS_HYBRID_SEARCH", os.getenv("MARXOS_MILVUS_HYBRID", "0")).lower()
+        and os.getenv(
+            "MILVUS_HYBRID_SEARCH",
+            os.getenv("MARXOS_MILVUS_HYBRID", "1" if SETTINGS.index.milvus_hybrid_search else "0"),
+        ).lower()
         in {"1", "true", "yes", "on"}
         and os.getenv("MARXOS_ENABLE_LOCAL_HYBRID_WITH_MILVUS", "0").lower()
         not in {"1", "true", "yes", "on"}
@@ -965,7 +956,7 @@ def is_classic_sayings_query(query):
 def classify_query(query):
     """Classify a user query with work_catalog-aware routing (v2 scoring).
 
-    Uses the layered-scoring engine from ``marxos_query_intent.classify_query_v2``
+    Uses the layered-scoring engine from ``marxos.query_intent.classify_query_v2``
     enriched with work_catalog match signals.  Returns a plain string for
     backward compatibility — call ``classify_query_v2()`` for the rich
     ``IntentResult`` with confidence / ambiguity signals.
@@ -973,6 +964,16 @@ def classify_query(query):
     Intents: bibliographic_lookup | quote_lookup | concept_explain |
              comparison | deep_analysis | theory_analysis | rag_answer
     """
+    if orchestration.is_chitchat_query(query):
+        return "chitchat"
+
+    # ── Relevance gate: skip RAG for non-Marxism queries ──
+    if not is_marxism_relevant(query):
+        return "out_of_domain"
+
+    if is_quote_lookup_query(query) and extract_query_quote(query) and not extract_bibliographic_title(query):
+        return "quote_lookup"
+
     v2 = query_intent.classify_query_v2(query, clean_text)
 
     # Boost bibliographic / quote confidence when work_catalog confirms a match
@@ -996,7 +997,7 @@ def classify_query(query):
 def classify_query_v2(query):
     """Rich intent classification with confidence / ambiguity signals.
 
-    Returns ``marxos_query_intent.IntentResult``.  The object compares
+    Returns ``marxos.query_intent.IntentResult``.  The object compares
     equal to its primary intent string (e.g. ``result == "rag_answer"``)
     for drop-in backward compatibility.
     """
@@ -1041,8 +1042,19 @@ def best_toc_entries(entries):
 
     return sorted(
         best_by_source.values(),
-        key=lambda item: (item["source"], item["start_page"], item["end_page"]),
+        key=lambda item: (toc_source_priority(item["source"]), item["source"], item["start_page"], item["end_page"]),
     )
+
+
+def toc_source_priority(source):
+    source = str(source or "").lower()
+    if re.fullmatch(r"me\d{2}[abc]?\.pdf", source):
+        return 0
+    if source.startswith("mea"):
+        return 1
+    if source.startswith("mes"):
+        return 2
+    return 3
 
 
 def requested_capital_volume(title):
@@ -1111,12 +1123,6 @@ def enrich_core_classic_entries(entries):
 
 
 def find_toc_entries_from_map(title):
-    core_entries = classic_entries_for_query(title)
-    if core_entries:
-        filtered_core_entries = filter_capital_volume_entries(title, enrich_core_classic_entries(core_entries))
-        if filtered_core_entries:
-            return filtered_core_entries
-
     entries = []
     normalized_title = normalize_for_match(title)
 
@@ -1188,7 +1194,15 @@ def find_toc_entries_from_map(title):
         if normalize_for_match(entry["article"]) == normalized_title
     ]
     if exact_entries:
-        entries = exact_entries
+        exact_me_entries = [
+            entry for entry in exact_entries
+            if toc_source_priority(entry.get("source")) == 0
+        ]
+        any_me_entries = any(toc_source_priority(entry.get("source")) == 0 for entry in entries)
+        if exact_me_entries:
+            entries = exact_me_entries
+        elif not any_me_entries:
+            entries = exact_entries
 
     suffix_entries = [
         entry for entry in entries
@@ -1206,7 +1220,17 @@ def find_toc_entries_from_map(title):
         if primary_entries:
             entries = primary_entries
 
-    return filter_capital_volume_entries(title, best_toc_entries(entries))
+    map_entries = filter_capital_volume_entries(title, best_toc_entries(entries))
+    if map_entries:
+        return map_entries
+
+    core_entries = classic_entries_for_query(title)
+    if core_entries:
+        filtered_core_entries = filter_capital_volume_entries(title, enrich_core_classic_entries(core_entries))
+        if filtered_core_entries:
+            return filtered_core_entries
+
+    return []
 
 
 def find_toc_entries(title):
@@ -1284,23 +1308,38 @@ def find_toc_entries(title):
 
 def answer_bibliographic_query(query):
     title = extract_bibliographic_title(query)
-    if not title:
-        return None
+    entries = []
+    if title:
+        entries = find_toc_entries(title)
 
-    entries = find_toc_entries(title)
     if not entries:
-        return None
+        constraints = constraints_from_query(query)
+        entries = constraints.get("entries") or []
+        title = constraints.get("title") or title
 
     lines = []
 
     for index, entry in enumerate(entries, start=1):
-        lines.append(
-            f"({index})\u300a{entry['book_title']}\u300b{entry['volume']}\uff0c"
-            f"{entry['article']}\uff0c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e\uff0c"
-            f"\u7b2c{entry['start_page']}-{entry['end_page']}\u9875\u3002"
+        metadata = {
+            "source": entry.get("source"),
+            "book": entry.get("book_title") or ARTICLE_MAP.get(entry.get("source"), {}).get("book", ""),
+            "article": entry.get("article") or title or "",
+        }
+        _, book_title, volume, year = normalize_book_parts(metadata)
+        page = (
+            str(entry["start_page"])
+            if entry.get("start_page") == entry.get("end_page")
+            else f"{entry['start_page']}-{entry['end_page']}"
         )
+        lines.append(
+            f"({index})\u300a{book_title or entry.get('source', '')}\u300b{volume}\uff0c"
+            f"{entry.get('article') or title}\uff0c\u5317\u4eac\uff1a\u4eba\u6c11\u51fa\u7248\u793e{year}\uff0c"
+            f"\u7b2c{page}\u9875\u3002"
+        )
+        if index >= 8:
+            break
 
-    return "\n".join(lines)
+    return "\n".join(lines) if lines else None
 
 
 def answer_quote_query(query, limit=5, trace=False):
@@ -2265,11 +2304,14 @@ def concept_constrained_candidates(query, db, constraints, fetch_k):
     )
 
 
-def retrieve_documents(query, db, k=5, allow_exact_quote=True, performance=None):
+def retrieve_documents(query, db, k=5, allow_exact_quote=True, performance=None, strategy=None):
     ctx = _retrieval_ctx()
-    if performance is not None:
+    if performance is not None or strategy is not None:
         ctx = dict(ctx)
+    if performance is not None:
         ctx["hybrid_retrieval"] = bool(performance.get("hybrid_retrieval", True))
+    if strategy is not None:
+        ctx["strategy"] = strategy
     return retrieval_utils.retrieve_documents(
         query,
         db,
@@ -2802,7 +2844,11 @@ def normalize_final_answer(answer):
 
 def performance_settings(mode=None):
     """Return retrieval/generation knobs for web and CLI answer paths."""
-    selected = (mode or os.getenv("MARXOS_PERFORMANCE_MODE", "deep") or "deep").lower()
+    selected = (
+        mode
+        or os.getenv("MARXOS_PERFORMANCE_MODE", SETTINGS.answer.default_performance_mode)
+        or SETTINGS.answer.default_performance_mode
+    ).lower()
     presets = {
         "fast": {
             "mode": "fast",
@@ -2882,8 +2928,13 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                     payload.update(extra)
                 try:
                     print(json.dumps(payload, ensure_ascii=False), file=sys.stderr, flush=True)
+                except BrokenPipeError:
+                    pass
                 except UnicodeEncodeError:
-                    print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+                    try:
+                        print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+                    except BrokenPipeError:
+                        pass
 
             def _mark_event(phase, extra=None):
                 payload = {
@@ -2895,8 +2946,13 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                     payload.update(extra)
                 try:
                     print(json.dumps(payload, ensure_ascii=False), file=sys.stderr, flush=True)
+                except BrokenPipeError:
+                    pass
                 except UnicodeEncodeError:
-                    print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+                    try:
+                        print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+                    except BrokenPipeError:
+                        pass
 
             perf = performance_settings(performance)
             set_last_evidence([])
@@ -2927,6 +2983,12 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
             query = request["query"]
             route_query = request["route_query"]
             query_intent = request["query_intent"]
+
+            # Apply intent-specific retrieval strategy overrides (NEW)
+            from marxos.config.retrieval_strategies import get_intent_strategy, apply_strategy
+            strategy = get_intent_strategy(query_intent)
+            perf = apply_strategy(perf, strategy)
+
             plan_started = time.perf_counter()
             plan = query_planner.plan_query(route_query, query_intent, history=history or [])
             if plan.standalone_query and plan.standalone_query != route_query:
@@ -2979,14 +3041,12 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
             def _generate_raw_answer(prompt, span_name):
                 phase_started = time.perf_counter()
                 with phoenix.trace_manager.start_as_current_span(span_name) as span:
-                    client = OpenAI(
-                        api_key=os.getenv("DEEPSEEK_API_KEY"),
-                        base_url="https://api.deepseek.com",
+                    client = create_deepseek_client(
                         max_retries=3,
                         timeout=float(perf.get("llm_timeout") or 120.0),
                     )
                     request_kwargs = {
-                        "model": "deepseek-chat",
+                        "model": deepseek_model(),
                         "messages": [
                             {
                                 "role": "user",
@@ -3011,7 +3071,7 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                         {
                             "llm.vendor": "deepseek",
                             "llm.api_style": "openai_compatible",
-                            "llm.model": "deepseek-chat",
+                            "llm.model": deepseek_model(),
                             "llm.output_length": len(raw_answer or ""),
                             "llm.max_tokens": int(perf["max_tokens"] or 0),
                         },
@@ -3116,6 +3176,45 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                     )
                     return local_answer
 
+            # Local and malformed-input paths must resolve before the general
+            # out-of-domain LLM fallback. They are deterministic and must not
+            # require network credentials merely because relevance is unclear.
+            if not is_marxism_relevant(query):
+                prompt = (
+                    f"用户问题：{query}\n\n"
+                    "这是一个与马克思主义专业领域无关的问题。"
+                    "请以通用助手的身份简洁回答，不要引用马克思或恩格斯的著作。"
+                )
+                with phoenix.trace_manager.start_as_current_span("marxos.llm_generate_out_of_domain") as span:
+                    client = create_deepseek_client(max_retries=2, timeout=30.0)
+                    response = client.chat.completions.create(
+                        model=deepseek_model(),
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    raw_answer = response.choices[0].message.content or ""
+                    phoenix.set_attributes(
+                        span,
+                        {
+                            "llm.vendor": "deepseek",
+                            "llm.model": deepseek_model(),
+                            "llm.output_length": len(raw_answer),
+                        },
+                    )
+                phoenix.set_attributes(
+                    root_span,
+                    {
+                        "app.query": phoenix.compact_text(query, limit=240),
+                        "answer.path": "out_of_domain",
+                        "answer.length": len(raw_answer),
+                    },
+                )
+                timings["total"] = int((time.perf_counter() - run_started) * 1000)
+                timings["mode"] = perf.get("mode")
+                timings["intent"] = "out_of_domain"
+                set_last_timing(timings)
+                set_last_evidence([], {"ok": True, "issues": [], "evidence_count": 0})
+                return raw_answer
+
             constraints = constraints_from_query(route_query)
             retrieval_started = time.perf_counter()
             with phoenix.trace_manager.start_as_current_span("marxos.retrieval") as span:
@@ -3143,6 +3242,7 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                     is_topic_view_list_query,
                     query_plan=plan.as_dict(),
                     performance=perf,
+                    strategy=strategy,
                 )
                 docs = retrieval_state["docs"]
                 evidence = retrieval_state["evidence"]

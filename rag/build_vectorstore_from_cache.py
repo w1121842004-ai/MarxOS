@@ -27,7 +27,8 @@ import json
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from marxos_embeddings import HuggingFaceEmbeddings, embedding_encode_kwargs
+from marxos.embeddings import HuggingFaceEmbeddings, embedding_encode_kwargs
+from marxos.config import get_settings
 try:
     from clean_ocr_text import clean_ocr_page
 except ModuleNotFoundError:
@@ -38,16 +39,18 @@ except ModuleNotFoundError:
     from rag.page_number_detection import margin_page_candidates
 
 
-OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "data/ocr_cache")
-VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader_core")
+SETTINGS = get_settings()
+OCR_CACHE_DIR = SETTINGS.corpus.ocr_cache_dir
+VECTORSTORE_DIR = SETTINGS.index.vectorstore_dir
 TEMP_VECTORSTORE_DIR = f"{VECTORSTORE_DIR}_tmp"
-ARTICLE_MAP_PATH = os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json")
-PARAGRAPH_CACHE_PATH = os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache_core.jsonl")
+ARTICLE_MAP_PATH = SETTINGS.corpus.article_map_path
+ARTICLE_MAP_EXTRA_PATHS = SETTINGS.corpus.article_map_extra_paths
+PARAGRAPH_CACHE_PATH = SETTINGS.corpus.paragraph_cache_path
 
-EMBEDDING_MODEL = os.getenv("MARXOS_EMBEDDING_MODEL", "BAAI/bge-m3")
+EMBEDDING_MODEL = SETTINGS.models.embedding_model
 
-CHUNK_SIZE = int(os.getenv("SEMANTIC_CHILD_CHUNK_SIZE", "180"))
-CHUNK_OVERLAP = int(os.getenv("SEMANTIC_CHILD_CHUNK_OVERLAP", "40"))
+CHUNK_SIZE = SETTINGS.retrieval.semantic_child_chunk_size
+CHUNK_OVERLAP = SETTINGS.retrieval.semantic_child_chunk_overlap
 MIN_TEXT_LENGTH = 20
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1024"))
 READ_PROGRESS_EVERY = int(os.getenv("READ_PROGRESS_EVERY", "5000"))
@@ -198,7 +201,7 @@ def is_plausible_for_pdf_page(printed_page, pdf_page):
     # OCR cache page numbers include front matter and inserted plates, so a
     # moderate offset is normal. Hundreds of pages of drift usually means a
     # date, note number, or S22PDF artifact was mistaken for a page number.
-    return -5 <= pdf_page - printed_page <= 140
+    return -80 <= pdf_page - printed_page <= 220
 
 
 def infer_reversed_footer_page(normalized_text, pdf_page):
@@ -320,11 +323,21 @@ def infer_page_metadata_from_layout(cleaned_page, fallback_article, pdf_page=Non
 
 
 def load_article_map():
-    if not os.path.exists(ARTICLE_MAP_PATH):
-        return {}
+    paths = [ARTICLE_MAP_PATH]
+    paths.extend(path for path in ARTICLE_MAP_EXTRA_PATHS.split(os.pathsep) if path)
 
-    with open(ARTICLE_MAP_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+    merged = {}
+    for index, path in enumerate(paths):
+        if not os.path.exists(path):
+            continue
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if index == 0:
+            merged.update(data)
+        else:
+            for source, payload in data.items():
+                merged.setdefault(source, payload)
+    return merged
 
 
 ARTICLE_MAP = load_article_map()
@@ -376,6 +389,7 @@ def infer_page_from_sequence(
 ):
     """Fill short page-number gaps from the previous trusted page in the same source."""
     previous = page_sequence_context.get(source)
+    trusted_page_source = page_source in {"ocr_layout", "text_margin"}
 
     if previous:
         previous_pdf_page = previous.get("pdf_page")
@@ -391,6 +405,8 @@ def infer_page_from_sequence(
                     printed_page = expected_page
                     page_source = "page_sequence"
                 elif (
+                    not trusted_page_source
+                    and
                     printed_page != expected_page
                     and previous_run_length >= min_run_for_correction
                     and is_plausible_for_pdf_page(expected_page, pdf_page)

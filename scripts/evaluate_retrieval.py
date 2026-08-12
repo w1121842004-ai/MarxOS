@@ -24,8 +24,8 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 
-VECTORSTORE_DIR = Path("vectorstore/marx_reader_core")
-ARTICLE_MAP_PATH = Path("rag/article_map_core.json")
+VECTORSTORE_DIR = Path(os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader"))
+ARTICLE_MAP_PATH = Path(os.getenv("ARTICLE_MAP_PATH", "rag/article_map.json"))
 
 
 @dataclass(frozen=True)

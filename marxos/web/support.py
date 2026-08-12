@@ -12,7 +12,10 @@ def append_metrics_log(metrics, metrics_log_path: Path) -> None:
         with metrics_log_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(metrics, ensure_ascii=False) + "\n")
     except OSError as exc:
-        print(f"metrics_log_write_failed: {exc}", file=sys.stderr)
+        try:
+            print(f"metrics_log_write_failed: {exc}", file=sys.stderr)
+        except BrokenPipeError:
+            pass
 
 
 def build_ask_metrics(query, intent, history, answer, evidence, citation_audit, elapsed_ms, topic_info, crag_report, max_history_turns, extract_answer_citation_lines):
@@ -115,6 +118,14 @@ def is_contextual_followup(query):
         "上面",
         "刚才",
         "上一条",
+        "继续",
+        "接着",
+        "展开",
+        "详细",
+        "详细说明",
+        "具体说",
+        "具体说明",
+        "再说",
         "摘下来",
         "完整段落",
     ]

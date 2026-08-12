@@ -6,13 +6,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from langchain_community.vectorstores import FAISS
-from marxos_embeddings import HuggingFaceEmbeddings, create_sparse_encoder, embedding_encode_kwargs
-from marxos_vector_backend import MilvusVectorBackend
+from marxos.config import get_settings
+from marxos.embeddings import HuggingFaceEmbeddings, create_sparse_encoder, embedding_encode_kwargs
+from marxos.vector_backend import MilvusVectorBackend
 
 try:
     from langchain_core._api.deprecation import LangChainDeprecationWarning
 except ImportError:
     LangChainDeprecationWarning = DeprecationWarning
+
+SETTINGS = get_settings()
 
 
 @dataclass
@@ -27,6 +30,7 @@ class RuntimeState:
     trace_only_env: str
     dual_retrieval_env: str
     vector_backend_env: str = "MARXOS_VECTOR_BACKEND"
+    vector_backend_default: str = "milvus"
     milvus_uri: str = "./data/milvus_lite/marxos_bgem3_sparse.db"
     milvus_collection: str = "marxos_me_passages"
     milvus_embedding_device: str = "cpu"
@@ -64,6 +68,8 @@ class RuntimeState:
         configured = os.getenv(self.vector_backend_env, "").strip().lower()
         if configured:
             return configured
+        if self.vector_backend_default:
+            return self.vector_backend_default
         if self.milvus_uri and Path(self.milvus_uri).exists():
             return "milvus"
         return "faiss"
@@ -153,7 +159,7 @@ class RuntimeState:
         return self.milvus_vectorstore_instance
 
     def load_sparse_embeddings(self):
-        provider = os.getenv("MILVUS_SPARSE_PROVIDER", "none")
+        provider = os.getenv("MILVUS_SPARSE_PROVIDER", SETTINGS.index.milvus_sparse_provider)
         if provider.strip().lower() in {"", "0", "false", "off", "none"}:
             return None
         if self.sparse_embeddings_instance is None:

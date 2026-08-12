@@ -12,7 +12,7 @@ Architecture:
   4. Return verification report: verified / partial / hallucinated
 
 Usage:
-    from marxos_citation_verifier import CitationVerifier
+    from marxos.generation.citation_verifier import CitationVerifier
     verifier = CitationVerifier(client, ocr_cache_dir)
     report = verifier.verify(answer_text, evidence_cards)
 """
@@ -56,14 +56,18 @@ class CitationVerifier:
     def load_page_text(self, source_stem, page_num):
         """Load OCR text for a given source and PDF page number."""
         path = self.ocr_cache_dir / source_stem / f"page_{page_num}.json"
-        if not path.exists():
-            return ""
+        txt_path = self.ocr_cache_dir / source_stem / f"page_{page_num}.txt"
         try:
-            with open(path, encoding="utf-8") as f:
-                data = json.load(f)
-            return data.get("raw_text") or data.get("cleaned_text") or ""
+            if path.exists():
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+                return data.get("raw_text") or data.get("cleaned_text") or ""
+            if txt_path.exists():
+                with open(txt_path, encoding="utf-8") as f:
+                    return f.read()
         except (OSError, json.JSONDecodeError):
             return ""
+        return ""
 
     def extract_claims(self, answer_text, evidence_cards):
         """Extract citation claims from the answer using evidence cards.

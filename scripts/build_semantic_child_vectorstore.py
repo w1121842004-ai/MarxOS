@@ -13,7 +13,8 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from langchain_community.vectorstores import FAISS
-from marxos_embeddings import HuggingFaceEmbeddings, embedding_encode_kwargs
+from marxos.embeddings import HuggingFaceEmbeddings, embedding_encode_kwargs
+from marxos.config import get_settings
 
 from rag.paragraph_cache import read_paragraph_cache  # noqa: E402
 from rag.semantic_retrieval import build_semantic_child_documents  # noqa: E402
@@ -23,12 +24,13 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
-EMBEDDING_MODEL = os.getenv("MARXOS_EMBEDDING_MODEL", "BAAI/bge-m3")
-PARAGRAPH_CACHE_PATH = Path(os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache_core.jsonl"))
-VECTORSTORE_DIR = Path(os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader_core"))
+SETTINGS = get_settings()
+EMBEDDING_MODEL = SETTINGS.models.embedding_model
+PARAGRAPH_CACHE_PATH = Path(os.getenv("PARAGRAPH_CACHE_PATH", SETTINGS.corpus.semantic_parent_cache_path))
+VECTORSTORE_DIR = Path(SETTINGS.index.vectorstore_dir)
 TEMP_VECTORSTORE_DIR = Path(f"{VECTORSTORE_DIR}_tmp")
-CHUNK_SIZE = int(os.getenv("SEMANTIC_CHILD_CHUNK_SIZE", "180"))
-CHUNK_OVERLAP = int(os.getenv("SEMANTIC_CHILD_CHUNK_OVERLAP", "40"))
+CHUNK_SIZE = SETTINGS.retrieval.semantic_child_chunk_size
+CHUNK_OVERLAP = SETTINGS.retrieval.semantic_child_chunk_overlap
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1024"))
 
 

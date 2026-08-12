@@ -46,43 +46,43 @@
   - Web API / UI 入口
   - 调用 `app.run_query(...)`
 
-- [marxos_web_support.py](../marxos_web_support.py)
+- [marxos/web/support.py](../marxos/web/support.py)
   - Web 层公共辅助函数
   - 包括 metrics、history 压缩、follow-up 判断和响应 payload 拼装
 
-- [marxos_web_followups.py](../marxos_web_followups.py)
+- [marxos/web/followups.py](../marxos/web/followups.py)
   - Web 层专题 follow-up 规则
   - 包括专题追问改写、条目解释、专题历史追问整理
 
-- [marxos_web_citations.py](../marxos_web_citations.py)
+- [marxos/web/citations.py](../marxos/web/citations.py)
   - Web 层引文与页码 follow-up 规则
   - 包括脚注解析、OCR 页定位、页码追问和原页摘录
 
 ### 流程编排
 
-- [marxos_orchestration.py](../marxos_orchestration.py)
+- [marxos/app/orchestration.py](../marxos/app/orchestration.py)
   - `run_query(...)` 的流程胶水
   - 包括输入预处理、本地查答分支、检索材料收集、本地列表题分支
 
 ### 运行时与依赖
 
-- [marxos_runtime.py](../marxos_runtime.py)
+- [marxos/runtime.py](../marxos/runtime.py)
   - vectorstore / paragraph vectorstore 加载
   - dev/trace/dual retrieval 开关
 
-- [marxos_embeddings.py](../marxos_embeddings.py)
+- [marxos/embeddings.py](../marxos/embeddings.py)
   - 统一 embedding 导入和兼容层
 
 ### 路由与回答
 
-- [marxos_query_intent.py](../marxos_query_intent.py)
+- [marxos/query_intent.py](../marxos/query_intent.py)
   - bibliographic / quote / concept / analysis / rag 路由判断
 
-- [marxos_answers.py](../marxos_answers.py)
+- [marxos/generation/answers.py](../marxos/generation/answers.py)
   - 本地回答拼装
   - 列表题、专题题、拒答规则、摘录整理
 
-- [marxos_prompts.py](../marxos_prompts.py)
+- [marxos/generation/prompts.py](../marxos/generation/prompts.py)
   - prompt builders
 
 ### 检索与引文
@@ -99,12 +99,12 @@
 - [retrieval/modes.py](../retrieval/modes.py)
   - hybrid (dense+BM25) retrieval、strict-title backstop、paragraph/dual retrieval、citation refinement
 
-- [marxos_citations.py](../marxos_citations.py)
+- [marxos/generation/citations.py](../marxos/generation/citations.py)
   - 引文格式
   - evidence cards
   - final answer citation audit
 
-- [marxos_trace.py](../marxos_trace.py)
+- [marxos/trace.py](../marxos/trace.py)
   - trace 输出和 TRACE_ONLY 调试
 
 ## 3. 数据与构建链路

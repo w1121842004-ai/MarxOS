@@ -35,6 +35,18 @@ def final_answer_style_rules(mode=None):
     )
 
 
+def task_boundary_rules():
+    return (
+        "\n任务边界识别（强制）：\n"
+        "1. 如果用户说“列出/摘录/整理/给出/找出 N 条（或若干条）原文、论述、引文、段落、材料、语录”，"
+        "这是一类【原文摘录清单】任务，不是理论分析任务。\n"
+        "2. 原文摘录清单任务必须按“序号 + 原文 + 出处”输出；不得把原文改写成“观点/核心判断/理论分析”。\n"
+        "3. 原文摘录清单任务只能使用证据卡中的原文片段；片段不完整时可以保持截断，但不能补写、润色或伪造原文。\n"
+        "4. 如果证据不足以列满用户要求的数量，明确写“当前证据只支持列出 X 条”，不要为了凑数编造或泛化。\n"
+        "5. 只有当用户问“如何理解/怎么看/为什么/意义/机制/现实启示/分析”时，才输出结构性理论分析。\n"
+    )
+
+
 
 def footnote_citation_rules():
     return (
@@ -167,11 +179,34 @@ def build_quote_prompt(query, context, mode=None):
     )
 
 
+def build_excerpt_list_prompt(query, context, mode=None):
+    mode = prompt_mode(mode)
+    return (
+        f"\n你是 MarxOS 的原著摘录助手。\n\n"
+        f"任务：根据【原著内容】，列出用户要求的原文摘录清单。\n"
+        f"{task_boundary_rules()}\n"
+        f"{final_answer_style_rules(mode)}\n"
+        f"输出格式（强制）：\n"
+        f"1. 原文：证据卡中的原文片段\n"
+        f"   出处：证据卡提供的出处\n"
+        f"2. 原文：证据卡中的原文片段\n"
+        f"   出处：证据卡提供的出处\n\n"
+        f"要求：\n"
+        f"1. 不写理论分析、观点归纳、现实意义或总结性阐释。\n"
+        f"2. 不把原文改写成自己的话；不得补写证据卡中没有的句子。\n"
+        f"3. 如果证据不足以列满用户要求数量，最后说明当前证据只能支持列出多少条。\n"
+        f"{compact_citation_rules(mode)}\n"
+        f"禁止输出：不要写“资料1”“片段1”“检索材料”等内部编号。\n\n"
+        f"# 原著内容\n{context}\n\n# 用户问题\n{query}\n"
+    )
+
+
 def build_concept_prompt(query, context, mode=None):
     mode = prompt_mode(mode)
     return (
         f"\n你是 MarxOS，一个马克思主义学术助手。\n\n"
         f"任务：解释用户提出的概念。优先依据【原著内容】，再做必要的理论概括。\n"
+        f"{task_boundary_rules()}\n"
         f"{final_answer_style_rules(mode)}\n"
         f"{mode_style_rules(mode)}\n"
         f"{length_rules(mode, 'concept_explain')}"
@@ -192,6 +227,7 @@ def build_analysis_prompt(query, context, mode=None):
     return (
         f"\n你是 MarxOS，一个马克思主义学术智能体。\n\n"
         f"任务：基于【原著内容】和马克思主义理论，对用户问题做结构性分析。\n"
+        f"{task_boundary_rules()}\n"
         f"{final_answer_style_rules(mode)}\n"
         f"{mode_style_rules(mode)}\n"
         f"{length_rules(mode, 'theory_analysis')}"
@@ -214,6 +250,7 @@ def build_default_prompt(query, context, mode=None):
     return (
         f"\n你是 MarxOS，一个马克思主义学术助手。\n\n"
         f"请根据【原著内容】回答用户问题，优先给出结构化、信息密度高但表达自然的回答。\n"
+        f"{task_boundary_rules()}\n"
         f"{final_answer_style_rules(mode)}\n"
         f"{mode_style_rules(mode)}\n"
         f"{length_rules(mode, 'rag_answer')}"
@@ -236,6 +273,16 @@ def build_default_prompt(query, context, mode=None):
 
 
 def build_constraint_guard(constraints):
+    if constraints.get("soft_topic"):
+        topic_title = constraints.get("topic_title") or "该主题"
+        return (
+            "\n主题综合要求：\n"
+            f"1. 本题属于“{topic_title}”的主题综述，不要把单一篇目当作全部理论。\n"
+            "2. 优先综合不同证据卡支持的不同论述维度；如果材料只覆盖少数维度，必须说明材料边界。\n"
+            "3. 回答应按理论维度组织，而不是按检索到的篇目机械罗列。\n"
+            "4. 引用仍只能使用证据卡提供的出处，不得补造篇名、卷次或页码。\n"
+        )
+
     sources = sorted(constraints.get("sources") or [])
     if not sources:
         return ""
@@ -265,6 +312,7 @@ def build_deep_analysis_prompt(query, context, mode=None):
         return (
             f"\n你是 MarxOS，一个马克思主义学术研究助手。\n\n"
             f"任务：基于【原著内容】，对用户问题做较深入但紧凑的理论分析。\n"
+            f"{task_boundary_rules()}\n"
             f"{final_answer_style_rules(mode)}\n"
             f"{mode_style_rules(mode)}\n"
             f"{length_rules(mode, 'deep_analysis')}"
@@ -282,6 +330,7 @@ def build_deep_analysis_prompt(query, context, mode=None):
         f"任务：基于【原著内容】，撰写一篇马克思主义理论分析。\n"
         f"这不是简答题，而是一篇小型学术分析。你需要综合多篇原著的材料，\n"
         f"运用马克思主义的理论框架，对用户问题进行深入分析。\n\n"
+        f"{task_boundary_rules()}\n"
         f"{final_answer_style_rules(mode)}\n"
         f"{clarity_rules()}\n"
         f"{coverage_rules()}\n"
@@ -307,10 +356,50 @@ def build_deep_analysis_prompt(query, context, mode=None):
     )
 
 
+def build_comparison_prompt(query, context, mode=None):
+    """Prompt for comparison / contrast queries.
+
+    Guides the LLM to analyse each side independently, then identify
+    similarities, differences, and contextual reasons for divergence.
+    """
+    mode = prompt_mode(mode)
+    return (
+        f"\n你是 MarxOS，一个马克思主义学术助手。\n\n"
+        f"任务：比较分析用户提出的两个或多个对象（著作、概念、人物观点等），优先依据【原著内容】。\n"
+        f"{task_boundary_rules()}\n"
+        f"{final_answer_style_rules(mode)}\n"
+        f"{mode_style_rules(mode)}\n"
+        f"{length_rules(mode, 'rag_answer')}"
+        f"分析框架（按顺序展开）：\n"
+        f"1. 分别梳理各方观点：先说明 A 的立场/论述，再说明 B 的立场/论述。每方至少引用一处原著支撑。\n"
+        f"2. 找共同点：双方在哪些判断或前提上一致。\n"
+        f"3. 找差异点：核心分歧是什么，各自的理论依据在哪里。\n"
+        f"4. 语境与原因：结合历史语境或理论背景，说明差异产生的原因。\n\n"
+        f"回答要求：\n"
+        f"1. 对比要平衡——双方都用同等篇幅和同等引证标准。\n"
+        f"2. 不强行统一：允许呈现理论内部的张力和分歧。\n"
+        f"3. 不要写成 A 全面、B 片面的单线结论。\n"
+        f"4. 至少为每一方提供一处出处，且出处必须出自检索材料。\n"
+        f"5. 若材料不足支持某一方的判断，要明确写“当前材料不足以支撑X的判断”。\n"
+        f"{compact_citation_rules(mode)}\n"
+        f"禁止输出：不要写“资料1”“资料2”“片段1”“检索材料”等内部编号；需要引用时，只使用出处文本。\n\n"
+        f"# 原著内容\n{context}\n\n# 用户问题\n{query}\n"
+    )
+
+
 def build_prompt(intent, query, context, mode=None):
+    normalized_query = str(query or "")
+    excerpt_list_markers = ["列出", "摘录", "摘出", "整理", "给出", "找出", "罗列"]
+    excerpt_object_markers = ["原文", "论述", "引文", "段落", "材料", "语录", "文献", "原著"]
+    if any(marker in normalized_query for marker in excerpt_list_markers) and any(
+        marker in normalized_query for marker in excerpt_object_markers
+    ):
+        return build_excerpt_list_prompt(query, context, mode=mode)
+
     prompt_builders = {
         "quote_lookup": build_quote_prompt,
         "concept_explain": build_concept_prompt,
+        "comparison": build_comparison_prompt,
         "deep_analysis": build_deep_analysis_prompt,
         "theory_analysis": build_analysis_prompt,
         "rag_answer": build_default_prompt,

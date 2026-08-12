@@ -3106,6 +3106,14 @@
       ],
       "quotes": [],
       "editions": {
+        "me_v20": {
+          "source": "me20.pdf",
+          "article_title": "反杜林论",
+          "start_page": 7,
+          "end_page": 354,
+          "entry_type": "primary",
+          "is_full_text": true
+        },
         "wenji_v9": {
           "source": "mea09.pdf",
           "article_title": "反杜林论",

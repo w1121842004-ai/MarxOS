@@ -7,10 +7,12 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
+from marxos.config import get_settings
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-PAGE_MAP_PATH = ROOT_DIR / os.getenv("PAGE_MAP_PATH", "data/page_map.json")
-ARTICLE_MAP_PATH = ROOT_DIR / os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json")
+SETTINGS = get_settings()
+PAGE_MAP_PATH = ROOT_DIR / os.getenv("PAGE_MAP_PATH", SETTINGS.corpus.page_map_path)
+ARTICLE_MAP_PATH = ROOT_DIR / os.getenv("ARTICLE_MAP_PATH", SETTINGS.corpus.article_map_path)
 
 
 PAGE_ENTRY_SCHEMA = {

@@ -13,7 +13,7 @@ if str(ROOT_DIR) not in sys.path:
 from rag.paragraph_cache import read_paragraph_cache
 
 
-DEFAULT_CACHE = Path("data/paragraph_cache_core.jsonl")
+DEFAULT_CACHE = Path(os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache.jsonl"))
 CHECK_TERMS = [
     "国家是社会在一定发展阶段上的产物",
     "剩余价值",

@@ -29,7 +29,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 
 OCR_CACHE_DIR = Path(os.getenv("OCR_CACHE_DIR", "data/ocr_cache"))
-ARTICLE_MAP_PATH = Path(os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json"))
+ARTICLE_MAP_PATH = Path(os.getenv("ARTICLE_MAP_PATH", "rag/article_map.json"))
 
 
 def compact(text: str, limit: int = 110) -> str:

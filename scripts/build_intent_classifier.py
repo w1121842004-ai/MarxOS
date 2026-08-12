@@ -242,7 +242,7 @@ def load_intent_split(path: Path) -> list[dict]:
 
 def auto_label_with_rules(queries: list[str]) -> list[dict]:
     """Use the current rule-based system to auto-label queries (weak supervision)."""
-    from marxos_query_intent import classify_query
+    from marxos.query_intent import classify_query
 
     def _clean(text):
         import re
@@ -262,7 +262,7 @@ def auto_label_with_rules(queries: list[str]) -> list[dict]:
 
 def load_embedding_model():
     """Lazy-load the embedding model (heavy, ~470 MB)."""
-    from marxos_embeddings import HuggingFaceEmbeddings
+    from marxos.embeddings import HuggingFaceEmbeddings
     return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
 
@@ -473,7 +473,7 @@ def main() -> None:
         print(f"   Classes: {config['classes']}")
 
         print(f"\n4. Saving to {args.output}...")
-        from marxos_intent_classifier import IntentClassifier
+        from marxos.intent_classifier import IntentClassifier
         classifier = IntentClassifier(model, label_encoder, config)
         classifier.save(args.output)
         file_size = args.output.stat().st_size
@@ -530,7 +530,7 @@ def main() -> None:
 
     # ── Step 4: Save ──
     print(f"\n5. Saving to {args.output}...")
-    from marxos_intent_classifier import IntentClassifier
+    from marxos.intent_classifier import IntentClassifier
     classifier = IntentClassifier(model, label_encoder, config)
     classifier.save(args.output)
     file_size = args.output.stat().st_size

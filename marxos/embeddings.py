@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import os
 import warnings
 from collections import Counter
 from pathlib import Path
@@ -77,6 +78,21 @@ class BGEM3SparseEncoder:
             self.model = BGEM3FlagModel(model_path, use_fp16=False, devices=device)
         except TypeError:
             self.model = BGEM3FlagModel(model_path, use_fp16=False, device=device)
+        self.max_length = self._max_length_from_env()
+
+    @staticmethod
+    def _max_length_from_env() -> int | None:
+        value = os.getenv("BGE_M3_MAX_LENGTH", "").strip()
+        if not value:
+            return None
+        try:
+            max_length = int(value)
+        except ValueError:
+            return None
+        return max_length if max_length > 0 else None
+
+    def _encode_kwargs(self) -> dict:
+        return {"max_length": self.max_length} if self.max_length else {}
 
     def embed_documents(self, texts: list[str]) -> list[dict[int, float]]:
         outputs = self.model.encode(
@@ -84,6 +100,7 @@ class BGEM3SparseEncoder:
             return_dense=False,
             return_sparse=True,
             return_colbert_vecs=False,
+            **self._encode_kwargs(),
         )
         lexical_weights = outputs.get("lexical_weights") or outputs.get("sparse_vecs") or []
         return [self._normalize_sparse_vector(vector) for vector in lexical_weights]
@@ -97,6 +114,7 @@ class BGEM3SparseEncoder:
             return_dense=True,
             return_sparse=True,
             return_colbert_vecs=False,
+            **self._encode_kwargs(),
         )
         dense_vecs = outputs.get("dense_vecs")
         dense_vector = dense_vecs[0].tolist() if hasattr(dense_vecs[0], "tolist") else list(dense_vecs[0])
@@ -109,6 +127,7 @@ class BGEM3SparseEncoder:
             return_dense=True,
             return_sparse=True,
             return_colbert_vecs=False,
+            **self._encode_kwargs(),
         )
         dense_vecs = outputs.get("dense_vecs")
         if dense_vecs is None:

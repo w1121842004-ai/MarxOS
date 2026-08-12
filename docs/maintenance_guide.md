@@ -10,8 +10,8 @@
 优先看：
 
 - `app.py`
-- `marxos_orchestration.py`
-- `marxos_runtime.py`
+- `marxos/app/orchestration.py`
+- `marxos/runtime.py`
 
 适用场景：
 
@@ -39,9 +39,9 @@
 
 优先看：
 
-- `marxos_answers.py`
-- `marxos_prompts.py`
-- `marxos_citations.py`
+- `marxos/generation/answers.py`
+- `marxos/generation/prompts.py`
+- `marxos/generation/citations.py`
 
 适用场景：
 
@@ -54,9 +54,9 @@
 优先看：
 
 - `web_app.py`
-- `marxos_web_support.py`
-- `marxos_web_followups.py`
-- `marxos_web_citations.py`
+- `marxos/web/support.py`
+- `marxos/web/followups.py`
+- `marxos/web/citations.py`
 
 适用场景：
 
@@ -88,7 +88,7 @@
 
 先看：
 
-- `marxos_query_intent.py`
+- `marxos/query_intent.py`
 - `app.py`
 
 补充检查：
@@ -113,9 +113,9 @@
 
 先看：
 
-- `marxos_answers.py`
-- `marxos_prompts.py`
-- `marxos_citations.py`
+- `marxos/generation/answers.py`
+- `marxos/generation/prompts.py`
+- `marxos/generation/citations.py`
 
 建议验证：
 
@@ -127,9 +127,9 @@
 先看：
 
 - `web_app.py`
-- `marxos_web_support.py`
-- `marxos_web_followups.py`
-- `marxos_web_citations.py`
+- `marxos/web/support.py`
+- `marxos/web/followups.py`
+- `marxos/web/citations.py`
 
 建议验证：
 
@@ -139,8 +139,8 @@
 
 先看：
 
-- `marxos_citations.py`
-- `marxos_web_citations.py`
+- `marxos/generation/citations.py`
+- `marxos/web/citations.py`
 - `rag/page_number_detection.py`
 - `data/page_map.json`
 

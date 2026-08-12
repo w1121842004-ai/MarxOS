@@ -17,6 +17,30 @@ def is_view_list_query(query, normalize_for_match):
     return any(normalize_for_match(marker) in normalized for marker in list_markers)
 
 
+def is_original_excerpt_list_query(query, normalize_for_match):
+    normalized = normalize_for_match(query)
+    if not normalized:
+        return False
+    list_markers = ["列出", "摘录", "摘出", "整理", "给出", "找出", "罗列"]
+    original_markers = ["原文", "论述", "引文", "段落", "材料", "语录", "文献", "原著"]
+    return (
+        any(normalize_for_match(marker) in normalized for marker in list_markers)
+        and any(normalize_for_match(marker) in normalized for marker in original_markers)
+    )
+
+
+def requested_list_limit(query, default=8, max_limit=12):
+    match = re.search(r"([0-9０-９]{1,2})\s*[条段则个]", str(query or ""))
+    if not match:
+        return default
+    raw = match.group(1).translate(str.maketrans("０１２３４５６７８９", "0123456789"))
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(1, min(value, max_limit))
+
+
 def is_topic_view_list_query(query, constraints, normalize_for_match):
     return bool(constraints.get("topic_id")) and is_view_list_query(query, normalize_for_match)
 
@@ -299,7 +323,57 @@ def topic_answer_evidence(evidence, constraints, clean_text, normalize_for_match
     return direct[:limit]
 
 
+def topic_original_excerpt_evidence(evidence, constraints, clean_text, normalize_for_match, limit=10):
+    markers = [
+        normalize_for_match(marker)
+        for marker in (constraints.get("topic_markers") or [])
+        if normalize_for_match(marker)
+    ]
+    allowed_titles = constraints.get("allowed_titles") or set()
+    selected = []
+    seen = set()
+    for item in evidence or []:
+        article = normalize_for_match(clean_text(item.get("article") or item.get("section"), ""))
+        excerpt = normalize_for_match(clean_text(item.get("excerpt"), ""))
+        title_hit = any(title and title in article for title in allowed_titles)
+        marker_hits = sum(1 for marker in markers if marker and (marker in article or marker in excerpt))
+        if not title_hit and marker_hits <= 0:
+            continue
+        key = (
+            item.get("source"),
+            item.get("printed_page") or item.get("citation_page") or item.get("pdf_page"),
+            excerpt[:80],
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        selected.append((title_hit, marker_hits, item))
+    selected.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    return [item for _, _, item in selected[:limit]]
+
+
 def build_topic_view_list_answer(query, constraints, evidence, clean_text, normalize_for_match, limit=8):
+    if is_original_excerpt_list_query(query, normalize_for_match):
+        limit = min(limit, requested_list_limit(query, default=limit, max_limit=12))
+        direct = topic_original_excerpt_evidence(evidence, constraints, clean_text, normalize_for_match, limit=limit)
+        if not direct:
+            return ""
+
+        topic_label = constraints.get("topic_title") or "该专题"
+        lines = [f"根据当前检索到的原著材料，先列出{topic_label}相关原文摘录：", ""]
+        for index, item in enumerate(direct[:limit], start=1):
+            excerpt = clean_excerpt_for_display(item.get("excerpt"), clean_text, article=item.get("article") or "")
+            if not excerpt:
+                continue
+            citation = item.get("detailed_citation") or item.get("citation") or item.get("sentence_citation") or ""
+            lines.append(f"{index}. 原文：{excerpt}")
+            if citation:
+                lines.append(f"   出处：{citation}")
+        if len(direct) < limit:
+            lines.append("")
+            lines.append(f"说明：当前证据只支持列出 {len(direct)} 条较直接相关的原文摘录；要凑满 {limit} 条需要继续扩大专题语料或提高召回数量。")
+        return "\n".join(lines).rstrip()
+
     direct = topic_answer_evidence(evidence, constraints, clean_text, normalize_for_match, limit=limit)
     if len(direct) < 2:
         return ""

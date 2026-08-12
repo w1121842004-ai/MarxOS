@@ -9,15 +9,24 @@
     "quotes": [
       "一个幽灵，共产主义的幽灵，在欧洲游荡",
       "至今一切社会的历史都是阶级斗争的历史",
-      "工人没有祖国"
+      "工人没有祖国",
+      "全世界无产者，联合起来"
     ],
     "entries": [
+      {
+        "source": "me04.pdf",
+        "article": "卡·马克思和弗·恩格斯。共产党宣言",
+        "start_page": 461,
+        "end_page": 504,
+        "priority": 1,
+        "entry_type": "parallel"
+      },
       {
         "source": "mes01.pdf",
         "article": "卡·马克思和弗·恩格斯共产党宣言",
         "start_page": 376,
         "end_page": 435,
-        "priority": 1,
+        "priority": 2,
         "entry_type": "primary"
       },
       {
@@ -25,7 +34,7 @@
         "article": "卡·马克思和弗·恩格斯共产党宣言",
         "start_page": 3,
         "end_page": 67,
-        "priority": 2,
+        "priority": 3,
         "entry_type": "parallel"
       }
     ],
@@ -250,15 +259,24 @@
       "欧根·杜林先生在科学中实行的变革"
     ],
     "quotes": [
-      "自由是对必然的认识"
+      "自由是对必然的认识",
+      "世界的真正的统一性在于它的物质性"
     ],
     "entries": [
+      {
+        "source": "me20.pdf",
+        "article": "弗·恩格斯反杜林论",
+        "start_page": 7,
+        "end_page": 354,
+        "priority": 1,
+        "entry_type": "primary"
+      },
       {
         "source": "mea09.pdf",
         "article": "弗·恩格斯反杜林论",
         "start_page": 3,
         "end_page": 398,
-        "priority": 1,
+        "priority": 2,
         "entry_type": "primary"
       },
       {
@@ -266,7 +284,7 @@
         "article": "弗·恩格斯反杜林论（节选）",
         "start_page": 477,
         "end_page": 607,
-        "priority": 2,
+        "priority": 3,
         "entry_type": "parallel"
       }
     ],

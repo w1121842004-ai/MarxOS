@@ -21,6 +21,8 @@ def score_page_range(metadata, constraints, ctx):
 def score_topic_title_match(metadata, constraints, ctx):
     if not constraints.get("topic_id"):
         return 0
+    if constraints.get("soft_topic"):
+        return 25 if topic_title_allowed(metadata, constraints, ctx) else 0
     return 45 if topic_title_allowed(metadata, constraints, ctx) else -35
 
 
@@ -117,7 +119,7 @@ def debug_rerank_score(index, doc, score_parts, ctx):
     )
 
 
-def rerank_documents(query, docs, constraints, ctx):
+def rerank_documents(query, docs, constraints, ctx, strategy=None):
     normalize_for_match = _helper(ctx, "normalize_for_match")
     clean_text = _helper(ctx, "clean_text")
     score_concept_focus = _helper(ctx, "score_concept_focus")
@@ -146,6 +148,16 @@ def rerank_documents(query, docs, constraints, ctx):
             "concept_source": score_concept_source_priority(query, metadata),
             "document_quality": score_document_quality(metadata, content),
         }
+
+        # Apply intent-specific rerank adjustments (NEW)
+        if strategy:
+            for dim, boost in (getattr(strategy, "rerank_boost", None) or {}).items():
+                if dim in score_parts:
+                    score_parts[dim] += boost
+            for dim, penalty in (getattr(strategy, "rerank_penalty", None) or {}).items():
+                if dim in score_parts:
+                    score_parts[dim] += penalty
+
         score = sum(score_parts.values())
         debug_rerank_score(index, doc, score_parts, ctx)
         ranked.append((score, doc))
@@ -275,6 +287,42 @@ def annotate_docs_with_constraints(docs, constraints, ctx):
 
 def select_topic_documents(ranked_docs, constraints, k, ctx):
     clean_text = _helper(ctx, "clean_text")
+    if constraints.get("soft_topic"):
+        title_primary = []
+        content_primary = []
+        fallback = []
+        for doc in ranked_docs:
+            content = clean_text(doc.page_content, "")
+            title_hit = topic_title_allowed(doc.metadata, constraints, ctx)
+            content_score = score_topic_content_match(doc.metadata, content, constraints, ctx)
+            if title_hit:
+                title_primary.append(doc)
+            elif content_score >= 45:
+                content_primary.append(doc)
+            else:
+                fallback.append(doc)
+        primary = title_primary + content_primary[:1]
+        selected = diversify_documents(
+            primary,
+            k,
+            ctx,
+            max_per_source=2,
+            max_per_article=1,
+            min_distinct_sources=max(2, int(constraints.get("min_distinct_sources") or 0)),
+        )
+        enough_primary = max(3, min(k, int(constraints.get("min_distinct_sources") or 0) + 1))
+        if len(selected) >= enough_primary:
+            return selected[:k]
+        if len(selected) < k:
+            selected += diversify_documents(
+                [doc for doc in fallback if doc not in selected],
+                k - len(selected),
+                ctx,
+                max_per_source=2,
+                max_per_article=1,
+            )
+        return selected[:k]
+
     preferred = []
     secondary = []
     for doc in ranked_docs:

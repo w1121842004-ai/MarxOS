@@ -10,11 +10,15 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from openai import OpenAI
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VECTORSTORE_PKL = ROOT / "vectorstore" / "marx_reader_core" / "index.pkl"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from marxos.generation.llm_client import create_deepseek_client, deepseek_model  # noqa: E402
+
+VECTORSTORE_PKL = ROOT / os.getenv("VECTORSTORE_PKL", "vectorstore/marx_reader/index.pkl")
 DEFAULT_OUTPUT = ROOT / "eval_dataset_me_200.json"
 
 QUESTION_TYPES = [
@@ -357,7 +361,7 @@ def main() -> int:
     parser.add_argument("--target", type=int, default=200)
     parser.add_argument("--batch-size", type=int, default=10)
     parser.add_argument("--cards-per-batch", type=int, default=14)
-    parser.add_argument("--model", default=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"))
+    parser.add_argument("--model", default=deepseek_model())
     parser.add_argument("--overwrite", action="store_true", help="Ignore any existing output and regenerate from scratch.")
     args = parser.parse_args()
 
@@ -372,10 +376,7 @@ def main() -> int:
 
     items = [] if args.overwrite else load_existing(output)
     docs = load_documents()
-    client = OpenAI(
-        api_key=api_key,
-        base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-    )
+    client = create_deepseek_client()
 
     seen_queries = {item["query"] for item in items}
     batch_index = len(items) // max(args.batch_size, 1)

@@ -215,25 +215,36 @@ def is_work_location_query(query, ctx):
 def collection_requested(query, ctx):
     normalize_for_match = _helper(ctx, "normalize_for_match")
     query_norm = normalize_for_match(query)
-    if any(marker in query_norm for marker in ["文集", "选集", "書信选编", "书信选编"]):
-        return "non_me"
     if "全集" in query_norm or re.search(r"\bme\d{1,2}[abc]?\.pdf\b", str(query or ""), re.I):
         return "me"
+    if "文集" in query_norm or re.search(r"\bmea\d{1,2}\.pdf\b", str(query or ""), re.I):
+        return "mea"
+    if any(marker in query_norm for marker in ["选集", "選集", "書信选编", "书信选编"]) or re.search(
+        r"\bmes\d{1,2}\.pdf\b", str(query or ""), re.I
+    ):
+        return "mes"
     return ""
+
+
+def source_matches_collection(source, requested):
+    source = str(source or "").lower()
+    if requested == "me":
+        return is_me_source(source) and not source.startswith(("mea", "mes"))
+    if requested == "mea":
+        return source.startswith("mea")
+    if requested == "mes":
+        return source.startswith("mes")
+    return True
 
 
 def source_priority(source, query="", ctx=None):
     source = str(source or "").lower()
     requested = collection_requested(query, ctx) if ctx is not None else ""
-    if requested == "non_me":
-        if source.startswith("mea"):
-            return 0
-        if source.startswith("mes"):
-            return 1
-        if is_me_source(source):
-            return 2
+    if requested and source_matches_collection(source, requested):
+        return 0
+    if requested:
         return 3
-    if is_me_source(source):
+    if source_matches_collection(source, "me"):
         return 0
     if source.startswith("mea"):
         return 1
@@ -246,18 +257,29 @@ def prefer_sources_for_query(entries, query, ctx):
     if not entries:
         return entries
     requested = collection_requested(query, ctx)
-    if requested == "non_me":
-        return sorted(entries, key=lambda entry: source_priority(entry.get("source"), query, ctx))
-    me_entries = [entry for entry in entries if is_me_source(entry.get("source"))]
-    if me_entries:
-        return sorted(me_entries, key=lambda entry: (source_priority(entry.get("source"), query, ctx), entry.get("start_page") or 0))
-    return sorted(entries, key=lambda entry: source_priority(entry.get("source"), query, ctx))
+    if requested:
+        requested_entries = [
+            entry for entry in entries if source_matches_collection(entry.get("source"), requested)
+        ]
+        if requested_entries:
+            return sorted(
+                requested_entries,
+                key=lambda entry: (entry.get("priority", 99), entry.get("start_page") or 0),
+            )
+    return sorted(
+        entries,
+        key=lambda entry: (
+            entry.get("priority", 99),
+            source_priority(entry.get("source"), query, ctx),
+            entry.get("start_page") or 0,
+        ),
+    )
 
 
 def constraints_result(title, entries, query, ctx, strict_title=True):
     entries = prefer_sources_for_query(entries, query, ctx)
     requested = collection_requested(query, ctx)
-    if requested != "non_me" and entries and not any(is_me_source(entry.get("source")) for entry in entries):
+    if requested == "me" and entries and not any(source_matches_collection(entry.get("source"), "me") for entry in entries):
         return {
             "title": title,
             "entries": entries,
@@ -328,7 +350,7 @@ def me_title_hint_constraints_from_query(query, ctx):
     normalize_for_match = _helper(ctx, "normalize_for_match")
     query_norm = normalize_for_match(query)
     requested = collection_requested(query, ctx)
-    if requested == "non_me":
+    if requested in {"mea", "mes"}:
         return {}
 
     for marker, specs in ME_PRIORITY_TITLE_HINTS.items():
@@ -363,7 +385,7 @@ def high_precision_locator_constraints_from_query(query, ctx):
     normalize_for_match = _helper(ctx, "normalize_for_match")
     query_norm = normalize_for_match(query)
     requested = collection_requested(query, ctx)
-    if requested == "non_me":
+    if requested in {"mea", "mes"}:
         return {}
 
     entries = []
@@ -405,7 +427,7 @@ def high_precision_locator_constraints_from_query(query, ctx):
 def article_locator_constraints_from_query(query, title, ctx):
     normalize_for_match = _helper(ctx, "normalize_for_match")
     requested = collection_requested(query, ctx)
-    if requested == "non_me":
+    if requested in {"mea", "mes"}:
         return {}
 
     query_norm = normalize_for_match(query)
@@ -574,6 +596,9 @@ def topic_matches_query(topic, query, ctx):
     if not query_norm:
         return False
 
+    if topic.get("id") == "peasant_cooperative" and "农民" in query_norm and is_broad_topic_query(query, ctx):
+        return True
+
     for keyword in topic.get("keywords_any") or []:
         keyword_norm = normalize_for_match(keyword)
         if keyword_norm and keyword_norm in query_norm:
@@ -622,6 +647,40 @@ def topic_entries_for_query(query, ctx):
         }
 
     return {}
+
+
+def is_broad_topic_query(query, ctx):
+    normalize_for_match = _helper(ctx, "normalize_for_match")
+    query_norm = normalize_for_match(query)
+    if not query_norm:
+        return False
+
+    broad_markers = [
+        "主要有哪些论述",
+        "有哪些论述",
+        "主要论述",
+        "系统论述",
+        "综合分析",
+        "总体分析",
+        "理论分析",
+        "怎么看",
+        "如何看待",
+        "如何理解",
+        "怎样理解",
+        "主要观点",
+        "观点",
+        "主要看法",
+        "看法",
+        "主要主张",
+        "主张",
+        "论述",
+        "主要内容",
+        "梳理",
+        "概括",
+        "归纳",
+        "总结",
+    ]
+    return any(normalize_for_match(marker) in query_norm for marker in broad_markers)
 
 
 def topic_info_from_constraints(constraints):
@@ -741,6 +800,14 @@ def constraints_from_query(query, ctx):
     normalize_for_match = _helper(ctx, "normalize_for_match")
     query_norm = normalize_for_match(query)
 
+    if not title and is_broad_topic_query(query, ctx):
+        broad_topic_constraints = narrow_topic_constraints_by_query(query, topic_entries_for_query(query, ctx), ctx)
+        if broad_topic_constraints:
+            broad_topic_constraints = dict(broad_topic_constraints)
+            broad_topic_constraints["soft_topic"] = True
+            broad_topic_constraints["strict_title"] = False
+            return broad_topic_constraints
+
     high_precision_constraints = high_precision_locator_constraints_from_query(query, ctx)
     if high_precision_constraints:
         return high_precision_constraints
@@ -859,6 +926,10 @@ def constraints_from_query(query, ctx):
     explicit_catalog_title = bool(catalog_title and normalize_for_match(catalog_title) in query_norm)
 
     topic_constraints = narrow_topic_constraints_by_query(query, topic_entries_for_query(query, ctx), ctx)
+    if topic_constraints and is_broad_topic_query(query, ctx):
+        topic_constraints = dict(topic_constraints)
+        topic_constraints["soft_topic"] = True
+        topic_constraints["strict_title"] = False
     list_markers = [
         "\u5217\u51fa",
         "\u6982\u62ec",
@@ -899,6 +970,10 @@ def constraints_from_query(query, ctx):
         return concept_constraints
 
     topic_constraints = narrow_topic_constraints_by_query(query, topic_entries_for_query(query, ctx), ctx)
+    if topic_constraints and is_broad_topic_query(query, ctx):
+        topic_constraints = dict(topic_constraints)
+        topic_constraints["soft_topic"] = True
+        topic_constraints["strict_title"] = False
     if topic_constraints:
         return topic_constraints
 
@@ -932,8 +1007,16 @@ def topic_seed_queries(query, constraints, ctx):
     if topic_title:
         seeds.append(topic_title)
 
+    for marker in (constraints.get("topic_markers") or [])[:4]:
+        marker = str(marker or "").strip()
+        if marker and topic_title:
+            seeds.append(f"{topic_title} {marker}")
+        elif marker:
+            seeds.append(marker)
+
     entries = constraints.get("entries") or []
-    for entry in entries[:4]:
+    entry_limit = 8 if constraints.get("soft_topic") else 4
+    for entry in entries[:entry_limit]:
         title = str(entry.get("article") or entry.get("classic_title") or "").strip()
         if title:
             seeds.append(title)
@@ -946,6 +1029,10 @@ def topic_seed_queries(query, constraints, ctx):
             continue
         seen.add(normalized)
         deduped.append(str(seed).strip())
+        if constraints.get("soft_topic") and len(deduped) >= 12:
+            break
+        if not constraints.get("soft_topic") and len(deduped) >= 6:
+            break
     return deduped or [query]
 
 
@@ -1049,7 +1136,8 @@ def controlled_multi_queries(query, constraints, ctx):
             continue
         seen.add(normalized)
         deduped.append(seed)
-        if len(deduped) >= 4:
+        limit = 8 if constraints.get("soft_topic") else 4
+        if len(deduped) >= limit:
             break
     return deduped or ([query] if query else [])
 

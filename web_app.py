@@ -8,18 +8,20 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import app
-import marxos_web_citations as web_citations
-import marxos_web_followups as web_followups
-import marxos_web_support as web_support
+from marxos.config import get_settings
+from marxos.web import citations as web_citations
+from marxos.web import followups as web_followups
+from marxos.web import support as web_support
 
 
-HOST = "127.0.0.1"
-PORT = int(os.getenv("MARXOS_WEB_PORT", "7860"))
+SETTINGS = get_settings()
+HOST = SETTINGS.web.host
+PORT = SETTINGS.web.port
 MAX_HISTORY_TURNS = 6
 MAX_HISTORY_CHARS = 3500
 SUMMARY_MAX_CHARS = 900
 OCR_CACHE_DIR = Path(app.OCR_CACHE_DIR)
-METRICS_LOG_PATH = Path("logs") / "api_ask_metrics.jsonl"
+METRICS_LOG_PATH = Path(SETTINGS.web.metrics_log_path)
 
 
 HTML_PAGE = r"""<!doctype html>
@@ -48,6 +50,7 @@ body{margin:0;font-family:"Segoe UI","PingFang SC","Noto Serif SC","Microsoft Ya
 .subtitle{font-size:11px;color:var(--muted)}
 .chat-wrap{flex:1;min-height:0;max-width:860px;width:100%;margin:0 auto;padding:16px 18px 150px;overflow-y:auto}
 .msg{margin:0 0 12px;padding:12px 14px;border-radius:8px;line-height:1.7;white-space:pre-wrap;word-break:break-word;border:1px solid var(--line);background:#fff;font-size:14px}
+.msg-body{white-space:normal}.msg-body p{margin:0 0 10px}.msg-body p:last-child{margin-bottom:0}.msg-body strong{font-weight:700}.msg-body ol,.msg-body ul{margin:8px 0 10px 22px;padding:0}.msg-body li{margin:3px 0}.msg-body .cite-ref{font-size:12px;color:var(--primary);font-weight:700;vertical-align:super;margin:0 1px}.msg-body .footnotes{margin-top:14px;padding-top:10px;border-top:1px dashed var(--line);font-size:13px;color:#374151}.msg-body .footnotes-title{font-weight:700;margin-bottom:4px}
 .msg-user{background:#fef9f0;border-color:#e8d5b0;margin-left:48px}
 .msg-bot{margin-right:48px;border-left:3px solid var(--primary)}
 .msg-meta{margin-top:6px;color:var(--muted);font-size:11px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -111,6 +114,8 @@ const modeAuto=document.getElementById("modeAuto"),modePrecise=document.getEleme
 const STORE_KEY="marxos_v2",memoryTurns=6;
 let conversations=[],currentId="",currentMode="auto";
 function esc(s){return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;")}
+function inlineMd(s){return esc(s).replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/【(\d+)】/g,'<span class="cite-ref">[$1]</span>')}
+function renderMd(s){const lines=String(s||"").replace(/\r\n/g,"\n").split("\n");let html="",list="",inFoot=false,footOpen=false;function flushList(){if(list){html+=list+"</ol>";list=""}}function closeFoot(){if(footOpen){flushList();html+="</div>";footOpen=false;inFoot=false}}for(const raw of lines){const line=raw.trim();if(!line){flushList();continue}if(/^引文注释$/.test(line)||/^\*+引文注释\*+$/.test(line)){closeFoot();html+='<div class="footnotes"><div class="footnotes-title">引文注释</div>';inFoot=true;footOpen=true;continue}const m=line.match(/^(\d+)[.、]\s+(.+)$/);if(m){if(!list)list="<ol>";list+="<li>"+inlineMd(m[2])+"</li>";continue}if(!inFoot)flushList();if(line.startsWith("- ")||line.startsWith("— ")){html+="<p>"+inlineMd(line.replace(/^[-—]\s*/,""))+"</p>";continue}if(inFoot){flushList();html+="<p>"+inlineMd(line)+"</p>"}else{html+="<p>"+inlineMd(line)+"</p>"}}flushList();closeFoot();return html}
 function nowLabel(ts){try{return new Date(ts).toLocaleString()}catch(_){return""}}
 function createConversation(){const n=Date.now();return{id:String(n)+"_"+Math.random().toString(36).slice(2,8),title:"新对话",createdAt:n,updatedAt:n,messages:[]}}
 function getConv(){return conversations.find(x=>x.id===currentId)}
@@ -119,16 +124,16 @@ function persist(){try{const ne=conversations.filter(c=>c.messages&&c.messages.l
 function prune(){conversations=conversations.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).slice(0,50)}
 function newChat(){conversations=conversations.filter(c=>c.messages&&c.messages.length);const f=createConversation();conversations.unshift(f);prune();currentId=f.id;persist();renderAll()}
 function load(){try{const raw=localStorage.getItem(STORE_KEY);if(raw){const p=JSON.parse(raw);if(Array.isArray(p))conversations=p.filter(x=>x&&Array.isArray(x.messages)&&x.messages.length)}}catch(_){}if(!conversations.length){conversations=[createConversation()];currentId=conversations[0].id}else{newChat();return}persist();renderAll()}
-function buildHistory(){const c=getConv();if(!c)return[];const h=[];for(const m of c.messages){if(m.role==="user")h.push({role:"user",text:m.text});if(m.role==="bot")h.push({role:"bot",text:m.text,evidence:m.evidence||[],topic:{topic_id:m.topicId||"",topic_label:m.topicLabel||"",topic_section:m.topicSection||""}})}return h.slice(-memoryTurns*2)}
+function buildHistory(){const c=getConv();if(!c)return[];const h=[];for(const m of c.messages){if(m.role==="user")h.push({role:"user",text:m.text});if(m.role==="bot")h.push({role:"bot",text:m.text,intent:m.intent||"",evidence:m.evidence||[],topic:{topic_id:m.topicId||"",topic_label:m.topicLabel||"",topic_section:m.topicSection||""}})}return h.slice(-memoryTurns*2)}
 function verifyBadge(v){if(!v||!v.total)return"";const ok=v.verified||0,pa=v.partial||0,ha=v.hallucinated||0;let cls="badge-ok",label="";if(ha>0){cls="badge-err";label=ha+"条引用待确认"}else if(pa>ok){cls="badge-warn";label=pa+"条转述引用"}else{label=ok+"条引用已校验"}return'<span class="badge '+cls+'">'+label+'</span>'}
 function evidenceHtml(ev){if(!Array.isArray(ev)||!ev.length)return"";const items=ev.slice(0,6).map((e,i)=>{const cite=esc(e.citation||e.sentence_citation||""),src=esc(e.source||""),pg=esc(e.printed_page||e.citation_page||""),meta=src+(pg?" | 第"+pg+"页":""),ex=esc(String(e.excerpt||"").slice(0,200));return'<details class="evidence-item"><summary><span class="evidence-cite">['+(i+1)+'] '+cite+'</span><span class="evidence-mini">'+meta+'</span></summary>'+(ex?'<div class="evidence-excerpt">'+ex+'</div>':'')+'</details>'}).join("");return'<details class="evidence-box"><summary>查看证据卡片 ('+ev.length+')</summary>'+items+'</details>'}
 function renderHistory(){const vis=conversations.filter(c=>c.messages&&c.messages.length);if(!vis.length){historyListEl.innerHTML="";return}historyListEl.innerHTML=vis.map(c=>{const act=c.id===currentId?" active":"";return'<button class="history-item'+act+'" data-id="'+esc(c.id)+'"><div class="history-item-title">'+esc(c.title||"新对话")+'</div><div class="history-item-time">'+esc(nowLabel(c.updatedAt||c.createdAt))+'</div></button>'}).join("");for(const n of historyListEl.querySelectorAll(".history-item")){n.addEventListener("click",()=>{const id=n.getAttribute("data-id");if(id){currentId=id;renderAll()}})}}
-function renderChat(){const c=getConv(),ms=c?c.messages:[];if(!ms.length){chatEl.innerHTML='<div class="welcome"><h2>MarxOS 学术助手</h2><p>精确问答：概念解释、引文出处、篇目定位<br>深度分析：理论分析、社会批判、学术论文<br>所有回答均附可核对的原文出处。</p></div>';return}chatEl.innerHTML=ms.map(m=>{if(m.role==="user")return'<div class="msg msg-user">'+esc(m.text)+'</div>';let meta='<div class="msg-meta">';if(m.intent)meta+='<span class="badge">'+esc(m.intent)+'</span>';if(m.mode)meta+='<span class="badge">'+esc(m.mode)+'</span>';if(m.verify)meta+=verifyBadge(m.verify);if(m.crag)meta+='<span class="badge">CRAG:'+esc(String(m.crag))+'</span>';meta+='<span>'+esc(String(m.cost||"-"))+'ms</span></div>';return'<div class="msg msg-bot">'+esc(m.text)+evidenceHtml(m.evidence||[])+meta+'</div>'}).join("");chatEl.scrollTop=chatEl.scrollHeight}
+function renderChat(){const c=getConv(),ms=c?c.messages:[];if(!ms.length){chatEl.innerHTML='<div class="welcome"><h2>MarxOS 学术助手</h2><p>精确问答：概念解释、引文出处、篇目定位<br>深度分析：理论分析、社会批判、学术论文<br>所有回答均附可核对的原文出处。</p></div>';return}chatEl.innerHTML=ms.map(m=>{if(m.role==="user")return'<div class="msg msg-user"><div class="msg-body">'+renderMd(m.text)+'</div></div>';let meta='<div class="msg-meta">';if(m.intent)meta+='<span class="badge">'+esc(m.intent)+'</span>';if(m.mode)meta+='<span class="badge">'+esc(m.mode)+'</span>';if(m.verify)meta+=verifyBadge(m.verify);if(m.crag)meta+='<span class="badge">CRAG:'+esc(String(m.crag))+'</span>';meta+='<span>'+esc(String(m.cost||"-"))+'ms</span></div>';return'<div class="msg msg-bot"><div class="msg-body">'+renderMd(m.text)+'</div>'+evidenceHtml(m.evidence||[])+meta+'</div>'}).join("");chatEl.scrollTop=chatEl.scrollHeight}
 function renderAll(){renderHistory();renderChat()}
 function setMode(m){currentMode=m;modeAuto.classList.toggle("active",m==="auto");modePrecise.classList.toggle("active",m==="precise");modeDeep.classList.toggle("active",m==="deep")}
 modeAuto.addEventListener("click",()=>setMode("auto"));modePrecise.addEventListener("click",()=>setMode("precise"));modeDeep.addEventListener("click",()=>setMode("deep"));
 function pushBotFinal(conv,data){conv.messages.push({role:"bot",text:data.answer||"",intent:data.intent||"-",mode:data.mode||"",cost:data.elapsed_ms||"-",evidence:Array.isArray(data.evidence)?data.evidence:[],verify:data.citation_audit?.content_verification||null,crag:(data.citation_audit?.crag_report?.score)||null,topicId:(data.topic?.topic_id)||"",topicLabel:(data.topic?.topic_label)||"",topicSection:(data.topic?.topic_section)||""});conv.updatedAt=Date.now();setTitle(conv);prune();renderAll();persist();const vfy=data.citation_audit?.content_verification;const vOk=vfy?(vfy.verified||0)+(vfy.partial||0):0;const vTotal=vfy?.total||0;intentBadge.textContent=data.intent||"-";costLabel.textContent=(data.elapsed_ms||"-")+"ms"+(vTotal?" | 校验:"+vOk+"/"+vTotal:"")}
-async function ask(){const query=qEl.value.trim();if(!query)return;const conv=getConv();if(!conv)return;btnEl.disabled=true;conv.messages.push({role:"user",text:query});const historyPayload=buildHistory();const pending={role:"bot",text:"正在分析问题...",intent:"stream",mode:currentMode,cost:"-"};conv.messages.push(pending);conv.updatedAt=Date.now();setTitle(conv);renderAll();persist();intentBadge.textContent="处理中...";costLabel.textContent="";qEl.value="";try{const res=await fetch("/api/ask_stream",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,history:historyPayload,mode:currentMode})});if(!res.ok||!res.body)throw new Error("流式请求失败");const reader=res.body.getReader();const decoder=new TextDecoder("utf-8");let buf="",doneFinal=false;while(true){const {value,done}=await reader.read();if(done)break;buf+=decoder.decode(value,{stream:true});let parts=buf.split("\n\n");buf=parts.pop()||"";for(const part of parts){let ev="message",dataLine="";for(const line of part.split("\n")){if(line.startsWith("event:"))ev=line.slice(6).trim();if(line.startsWith("data:"))dataLine+=line.slice(5).trim()}if(!dataLine)continue;const data=JSON.parse(dataLine);if(ev==="status"){pending.text=data.message||"处理中...";conv.updatedAt=Date.now();renderAll();persist()}else if(ev==="final"){const idx=conv.messages.indexOf(pending);if(idx>=0)conv.messages.splice(idx,1);pushBotFinal(conv,data);doneFinal=true}else if(ev==="error"){throw new Error(data.error||"请求失败")}}}if(!doneFinal)throw new Error("流式响应未完成")}catch(err){const msg=err?.message||"请求失败";pending.text="请求失败："+msg;pending.intent="-";conv.updatedAt=Date.now();renderAll();persist()}finally{btnEl.disabled=false;qEl.focus()}}
+async function ask(){const query=qEl.value.trim();if(!query)return;const conv=getConv();if(!conv)return;btnEl.disabled=true;const historyPayload=buildHistory();conv.messages.push({role:"user",text:query});const pending={role:"bot",text:"正在分析问题...",intent:"stream",mode:currentMode,cost:"-"};conv.messages.push(pending);conv.updatedAt=Date.now();setTitle(conv);renderAll();persist();intentBadge.textContent="处理中...";costLabel.textContent="";qEl.value="";try{const res=await fetch("/api/ask_stream",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,history:historyPayload,mode:currentMode})});if(!res.ok||!res.body)throw new Error("流式请求失败");const reader=res.body.getReader();const decoder=new TextDecoder("utf-8");let buf="",doneFinal=false;while(true){const {value,done}=await reader.read();if(done)break;buf+=decoder.decode(value,{stream:true});let parts=buf.split("\n\n");buf=parts.pop()||"";for(const part of parts){let ev="message",dataLine="";for(const line of part.split("\n")){if(line.startsWith("event:"))ev=line.slice(6).trim();if(line.startsWith("data:"))dataLine+=line.slice(5).trim()}if(!dataLine)continue;const data=JSON.parse(dataLine);if(ev==="status"){pending.text=data.message||"处理中...";conv.updatedAt=Date.now();renderAll();persist()}else if(ev==="final"){const idx=conv.messages.indexOf(pending);if(idx>=0)conv.messages.splice(idx,1);pushBotFinal(conv,data);doneFinal=true}else if(ev==="error"){throw new Error(data.error||"请求失败")}}}if(!doneFinal)throw new Error("流式响应未完成")}catch(err){const msg=err?.message||"请求失败";pending.text="请求失败："+msg;pending.intent="-";conv.updatedAt=Date.now();renderAll();persist()}finally{btnEl.disabled=false;qEl.focus()}}
 btnEl.addEventListener("click",ask);qEl.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();ask()}});newChatBtnEl.addEventListener("click",newChat);load();
 </script>
 </body>
@@ -337,7 +342,8 @@ class MarxOSHandler(BaseHTTPRequestHandler):
                 emit("status", {"message": "正在分析问题..."})
             direct_answer = self._answer_history_followup(query, history)
             if direct_answer:
-                intent = "citation_followup"
+                last_bot = self._last_bot_item(history)
+                intent = "chitchat" if (last_bot.get("intent") == "chitchat") else "citation_followup"
                 answer = direct_answer
                 performance = "local"
             else:
@@ -381,8 +387,13 @@ class MarxOSHandler(BaseHTTPRequestHandler):
         self._append_metrics_log(metrics)
         try:
             print(json.dumps(metrics, ensure_ascii=False), file=sys.stderr)
+        except BrokenPipeError:
+            pass
         except UnicodeEncodeError:
-            print(json.dumps(metrics, ensure_ascii=True), file=sys.stderr)
+            try:
+                print(json.dumps(metrics, ensure_ascii=True), file=sys.stderr)
+            except BrokenPipeError:
+                pass
         return 200, web_support.build_ask_response(
                 intent, answer, evidence, citation_audit, topic_info,
                 crag_report, elapsed_ms, history, MAX_HISTORY_TURNS,

@@ -363,6 +363,28 @@ def answer_topic_history_followup(query, history, last_bot_item_fn, requested_ci
     return None
 
 
+def _last_bot_intent(history):
+    for item in reversed(history or []):
+        if item.get("role") == "bot" and (item.get("text") or "").strip():
+            return item.get("intent") or ""
+    return ""
+
+
+def answer_chitchat_followup(query, history):
+    if _last_bot_intent(history) != "chitchat":
+        return ""
+    markers = ["详细", "展开", "具体", "继续", "接着", "说明", "你可以做什么", "能做什么"]
+    if not any(marker in (query or "") for marker in markers):
+        return ""
+    return (
+        "我主要做四类事：\n\n"
+        "1. 查出处：根据一句话、一段话或篇名，尽量定位到卷册、篇名和页码。\n"
+        "2. 解释概念：围绕剩余价值、异化、阶级、国家、意识形态等概念，给出原著依据和简明解释。\n"
+        "3. 梳理论证：把某篇文本的核心论点、论证层次和关键段落整理出来。\n"
+        "4. 做学术分析：围绕一个主题综合多处原著材料，但会尽量标明材料边界，避免把没有依据的判断写死。"
+    )
+
+
 def answer_history_followup(
     query,
     history,
@@ -372,6 +394,10 @@ def answer_history_followup(
     answer_evidence_page_followup_fn,
     answer_citation_followup_fn,
 ):
+    direct_answer = answer_chitchat_followup(query, history)
+    if direct_answer:
+        return direct_answer
+
     direct_answer = answer_topic_rewrite_followup_fn(query, history)
     if direct_answer:
         return direct_answer

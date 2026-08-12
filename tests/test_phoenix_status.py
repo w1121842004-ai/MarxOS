@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-import marxos_phoenix as phoenix
+from marxos import phoenix
 
 
 class PhoenixStatusTests(unittest.TestCase):
@@ -22,7 +22,7 @@ class PhoenixStatusTests(unittest.TestCase):
                 clear=False,
             ),
             patch.object(phoenix.trace_manager, "init_error", return_value=""),
-            patch("marxos_phoenix.phoenix_ui_reachable", return_value=True),
+            patch("marxos.phoenix.phoenix_ui_reachable", return_value=True),
         ):
             lines = phoenix.startup_status_lines()
 
@@ -41,7 +41,7 @@ class PhoenixStatusTests(unittest.TestCase):
                 clear=False,
             ),
             patch.object(phoenix.trace_manager, "init_error", return_value=""),
-            patch("marxos_phoenix.phoenix_ui_reachable", return_value=False),
+            patch("marxos.phoenix.phoenix_ui_reachable", return_value=False),
         ):
             lines = phoenix.startup_status_lines()
 

@@ -6,7 +6,7 @@ this agent uses DeepSeek to map the user's question to specific works and
 chapters. It returns structured constraints for the retrieval pipeline.
 
 Usage:
-    from marxos_book_locator import BookLocator
+    from marxos.book_locator import BookLocator
     locator = BookLocator(client, catalog)
     result = locator.locate("《资本论》中关于商品拜物教的论述在第几章？")
     # → {work_ids: ["capital-vol1"], constraints: {...}, confidence: 0.9}

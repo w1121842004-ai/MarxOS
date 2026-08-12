@@ -187,13 +187,13 @@ venv\Scripts\python.exe scripts\audit.py exact-quote-top1
 
 核心模块：
 
-- `marxos_runtime.py`: 运行时状态、向量库加载、开发模式开关
-- `marxos_embeddings.py`: HuggingFace embeddings 兼容导入层
-- `marxos_query_intent.py`: query intent 分类与路由辅助
-- `marxos_citations.py`: 引文格式、证据抽取、citation audit
-- `marxos_answers.py`: 本地回答分支、专题列表回答、拒答规则
-- `marxos_prompts.py`: prompt builders 与回答风格规则
-- `marxos_trace.py`: trace/debug/TRACE_ONLY
+- `marxos/runtime.py`: 运行时状态、向量库加载、开发模式开关
+- `marxos/embeddings.py`: HuggingFace embeddings 兼容层
+- `marxos/query_intent.py`: query intent 分类与路由辅助
+- `marxos/generation/citations.py`: 引文格式、证据抽取、citation audit
+- `marxos/generation/answers.py`: 本地回答分支、专题列表回答、拒答规则
+- `marxos/generation/prompts.py`: prompt builders 与回答风格规则
+- `marxos/trace.py`: trace/debug/TRACE_ONLY
 
 检索分层：
 
@@ -332,3 +332,41 @@ The current tracing hooks cover:
 
 If the OpenTelemetry or OpenInference packages are not installed, MarxOS will
 continue to run normally and skip exporting traces.
+
+## PDF Text Layer Cache
+
+For MarxOS academic text ingestion, prefer the PDF text layer when it is
+usable. It preserves clean line breaks on many Marx/Engels PDFs and avoids
+slow OCR for pages that already contain text. The builder writes to a separate
+cache by default, so the original `data/ocr_cache/` is not overwritten.
+
+macOS / zsh:
+
+```bash
+TARGET_PDFS=me20.pdf,mea09.pdf \
+START_PAGE=55 END_PAGE=63 \
+OVERWRITE_TEXT_CACHE=1 \
+.venv/bin/python scripts/build_text_layer_cache.py
+```
+
+PowerShell:
+
+```powershell
+$env:TARGET_PDFS="me20.pdf,mea09.pdf"
+$env:START_PAGE="55"
+$env:END_PAGE="63"
+$env:OVERWRITE_TEXT_CACHE="1"
+venv\Scripts\python.exe scripts\build_text_layer_cache.py
+```
+
+The generated cache is `data/ocr_cache_text_layer/`. To test it downstream:
+
+```bash
+OCR_CACHE_DIR=data/ocr_cache_text_layer \
+PARAGRAPH_CACHE_PATH=logs/text_layer_paragraph_probe.jsonl \
+TARGET_PDFS=me20.pdf,mea09.pdf \
+.venv/bin/python scripts/build_paragraph_cache.py
+```
+
+Use PaddleOCR only as a fallback for PDFs or pages whose text layer is missing
+or too short.

@@ -26,7 +26,7 @@ from collections import defaultdict
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from marxos_work_catalog import WorkCatalog
+from marxos.work_catalog import WorkCatalog
 
 
 def load_dataset(path=None):

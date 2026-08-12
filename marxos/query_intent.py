@@ -30,7 +30,7 @@ whose ``__str__`` / ``__eq__`` delegate to ``.primary``, so existing
 **ML classifier (v3):**  When ``data/intent_classifier.pkl`` exists,
 ``classify_query_v2()`` blends the rule-based scores with a lightweight
 logistic-regression classifier trained on the same embedding model already
-loaded by ``marxos_runtime``.  The classifier head is ~10 KB; inference
+loaded by ``marxos.runtime``.  The classifier head is ~10 KB; inference
 adds <1 ms.  Training script: ``scripts/build_intent_classifier.py``.
 """
 
@@ -550,7 +550,7 @@ def _get_classifier():
         return _classifier_cache  # type: ignore[return-value]
     _CLASSIFIER_LOAD_ATTEMPTED = True
     try:
-        from marxos_intent_classifier import IntentClassifier  # type: ignore
+        from marxos.intent_classifier import IntentClassifier  # type: ignore
         _classifier_cache = IntentClassifier.load()
     except Exception:
         _classifier_cache = None
@@ -574,7 +574,7 @@ def classify_query_v2(query: str, clean_text) -> IntentResult:
     classifier = _get_classifier()
     if classifier is not None:
         try:
-            from marxos_intent_classifier import blend_predictions
+            from marxos.intent_classifier import blend_predictions
             # Get embedding from the runtime (reuses already-loaded model)
             import app
             embedding_fn = getattr(app, "embed_query", None)

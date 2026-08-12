@@ -7,6 +7,10 @@ from typing import Any, Protocol
 import warnings
 
 from langchain_core.documents import Document
+from marxos.config import get_settings
+
+
+SETTINGS = get_settings()
 
 
 @dataclass
@@ -81,7 +85,10 @@ class MilvusVectorBackend:
         self.hybrid_enabled = (
             hybrid_enabled
             if hybrid_enabled is not None
-            else os.getenv("MILVUS_HYBRID_SEARCH", os.getenv("MARXOS_MILVUS_HYBRID", "0")).lower()
+            else os.getenv(
+                "MILVUS_HYBRID_SEARCH",
+                os.getenv("MARXOS_MILVUS_HYBRID", "1" if SETTINGS.index.milvus_hybrid_search else "0"),
+            ).lower()
             in {"1", "true", "yes", "on"}
         )
         self.output_fields = output_fields or [

@@ -13,7 +13,7 @@ from build_vectorstore_from_cache import (
 )
 
 
-VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader_core")
+VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader")
 INDEX_PKL = os.path.join(VECTORSTORE_DIR, "index.pkl")
 BACKUP_PKL = os.path.join(VECTORSTORE_DIR, "index.pkl.bak")
 

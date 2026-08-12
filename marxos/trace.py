@@ -11,7 +11,10 @@ def compact_preview(text, clean_text, limit=180):
 
 
 def print_trace_line(text=""):
-    print(text, file=sys.stderr)
+    try:
+        print(text, file=sys.stderr)
+    except BrokenPipeError:
+        pass
 
 
 def print_query_trace(query, query_intent):

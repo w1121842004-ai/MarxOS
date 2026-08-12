@@ -1,5 +1,7 @@
 import json
+import os
 import re
+import time
 from difflib import SequenceMatcher
 from pathlib import Path
 
@@ -11,6 +13,8 @@ from rag.core_classics import classic_entries_for_query, load_core_classics
 DEFAULT_OCR_CACHE_DIR = Path("data/ocr_cache")
 DEFAULT_PAGE_MAP_PATH = Path("data/page_map.json")
 BOOK_BY_SOURCE = {
+    **{f"me{i:02d}.pdf": f"马克思恩格斯全集 第{i}卷" for i in range(1, 51)},
+    **{f"me{i:02d}{suffix}.pdf": f"马克思恩格斯全集 第{i}卷{suffix.upper()}" for i in range(1, 51) for suffix in ("a", "b", "c")},
     **{f"mea{i:02d}.pdf": f"马克思恩格斯文集 第{i}卷" for i in range(1, 11)},
     **{f"mes{i:02d}.pdf": f"马克思恩格斯选集 第{i}卷" for i in range(1, 5)},
 }
@@ -25,6 +29,20 @@ KNOWN_QUOTE_FALLBACKS = [
         "source": "mes01.pdf",
         "pdf_page": 392,
         "printed_page": 376,
+    },
+    {
+        "quote": "\u5168\u4e16\u754c\u65e0\u4ea7\u8005\u8054\u5408\u8d77\u6765",
+        "classic_id": "communist_manifesto",
+        "source": "me04.pdf",
+        "pdf_page": 524,
+        "printed_page": 504,
+    },
+    {
+        "quote": "\u5168\u4e16\u754c\u65e0\u4ea7\u8005\u8054\u5408\u8d77\u6765",
+        "classic_id": "communist_manifesto",
+        "source": "mea02.pdf",
+        "pdf_page": 86,
+        "printed_page": 66,
     },
     {
         "quote": "\u5168\u4e16\u754c\u65e0\u4ea7\u8005\u8054\u5408\u8d77\u6765",
@@ -75,6 +93,27 @@ KNOWN_QUOTE_FALLBACKS = [
         "pdf_page": 136,
         "printed_page": 120,
     },
+    {
+        "quote": "\u4e16\u754c\u7684\u771f\u6b63\u7684\u7edf\u4e00\u6027\u5728\u4e8e\u5b83\u7684\u7269\u8d28\u6027",
+        "classic_id": "anti_duhring",
+        "source": "me20.pdf",
+        "pdf_page": 55,
+        "printed_page": 84,
+    },
+    {
+        "quote": "\u4e16\u754c\u7684\u771f\u6b63\u7684\u7edf\u4e00\u6027\u5728\u4e8e\u5b83\u7684\u7269\u8d28\u6027",
+        "classic_id": "anti_duhring",
+        "source": "mea09.pdf",
+        "pdf_page": 63,
+        "printed_page": 47,
+    },
+    {
+        "quote": "\u4e16\u754c\u7684\u771f\u6b63\u7684\u7edf\u4e00\u6027\u5728\u4e8e\u5b83\u7684\u7269\u8d28\u6027",
+        "classic_id": "anti_duhring",
+        "source": "mes03.pdf",
+        "pdf_page": 435,
+        "printed_page": 419,
+    },
 ]
 _PAGE_MAP_CACHE = None
 
@@ -102,6 +141,31 @@ def printed_page_for_pdf_page(source, pdf_page):
     pages = (load_page_map().get("sources") or {}).get(source, {}).get("pages") or {}
     info = pages.get(str(pdf_page)) or {}
     return info.get("printed_page")
+
+
+def requested_collection(query):
+    normalized = normalize_quote(query)
+    raw = str(query or "")
+    if "全集" in normalized or re.search(r"\bme\d{1,2}[abc]?\.pdf\b", raw, re.I):
+        return "me"
+    if "文集" in normalized or re.search(r"\bmea\d{1,2}\.pdf\b", raw, re.I):
+        return "mea"
+    if "选集" in normalized or "選集" in normalized or re.search(r"\bmes\d{1,2}\.pdf\b", raw, re.I):
+        return "mes"
+    return ""
+
+
+def source_matches_request(source, request):
+    source = str(source or "").lower()
+    if not request:
+        return True
+    if request == "me":
+        return bool(re.fullmatch(r"me\d{2}[abc]?\.pdf", source))
+    if request == "mea":
+        return source.startswith("mea")
+    if request == "mes":
+        return source.startswith("mes")
+    return True
 
 def fuzzy_quote_match(norm_quote, norm_text, threshold=0.65):
     """Check if quote appears in text, tolerating OCR garbled characters.
@@ -147,7 +211,14 @@ def extract_query_quote(query):
         if match:
             return match.group(1).strip()
 
-    query = re.sub(r"(出自哪里|出自哪|在哪一页|哪一页|哪页|页码|这句话|请给出|准确页码|原文|出处)", "", query)
+    query = re.sub(
+        r"(出自哪里|出自哪|在哪一页|哪一页|哪页|页码|这句话|请给出|准确页码|原文|出处|"
+        r"在?马克思恩格斯全集(?:中|里|的)?|在?马克思恩格斯文集(?:中|里|的)?|"
+        r"在?马克思恩格斯选集(?:中|里|的)?|在?全集(?:中|里|的)?|在?文集(?:中|里|的)?|"
+        r"在?选集(?:中|里|的)?)",
+        "",
+        query,
+    )
     query = query.strip(" ？?。，“”\"'：:")
 
     return query if len(normalize_quote(query)) >= 5 else ""
@@ -190,8 +261,17 @@ def iter_candidate_pages(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, scoped=True
     entries = classic_entries_for_query(query)
 
     if entries and scoped:
+        page_map = load_page_map().get("sources") or {}
         for entry in entries:
-            for pdf_page in range(entry["start_page"], entry["end_page"] + 1):
+            source = entry["source"]
+            source_pages = (page_map.get(source) or {}).get("pages") or {}
+            printed_to_pdf = {
+                info.get("printed_page"): info.get("pdf_page", int(pdf_page))
+                for pdf_page, info in source_pages.items()
+                if info.get("printed_page") is not None
+            }
+            for page in range(entry["start_page"], entry["end_page"] + 1):
+                pdf_page = printed_to_pdf.get(page, page)
                 yield entry, cache_path_for_page(ocr_cache_dir, entry["source"], pdf_page)
         return
 
@@ -296,9 +376,12 @@ def metadata_from_page(page, entry, path, preferred_entries=None):
     return metadata
 
 
-def known_quote_fallback_docs(normalized_quote):
+def known_quote_fallback_docs(normalized_quote, query=""):
+    request = requested_collection(query)
     docs = []
     for fallback in KNOWN_QUOTE_FALLBACKS:
+        if not source_matches_request(fallback.get("source"), request):
+            continue
         fallback_quote = fallback["quote"]
         if not (fallback_quote in normalized_quote or normalized_quote in fallback_quote):
             continue
@@ -345,6 +428,19 @@ def known_quote_fallback_docs(normalized_quote):
         }
         docs.append(Document(page_content=fallback_quote, metadata=metadata))
     return docs
+
+
+def dedupe_docs(docs):
+    seen = set()
+    result = []
+    for doc in docs:
+        metadata = doc.metadata or {}
+        key = (metadata.get("source"), metadata.get("pdf_page"), metadata.get("printed_page"))
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(doc)
+    return result
 
 
 def hit_quality_rank(page, text, normalized_quote):
@@ -477,7 +573,7 @@ def collect_hits_with_constraints(query, normalized_quote, ocr_cache_dir, constr
     return hits
 
 
-def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
+def collect_hits(query, normalized_quote, ocr_cache_dir, scoped, max_pages=None, deadline=None):
     quote = extract_query_quote(query)
     preferred_entries = classic_entries_for_query(query)
     preferred_classic_ids = {
@@ -490,7 +586,13 @@ def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
     hits = []
     seen = set()
 
+    pages_checked = 0
     for entry, path in iter_candidate_pages(query, ocr_cache_dir, scoped=scoped):
+        if deadline is not None and time.perf_counter() >= deadline:
+            break
+        if max_pages is not None and pages_checked >= max_pages:
+            break
+        pages_checked += 1
         page = load_cached_page(path)
         if page is None:
             continue
@@ -533,6 +635,7 @@ def collect_hits(query, normalized_quote, ocr_cache_dir, scoped):
 
     if preferred_classic_ids:
         hits.sort(key=lambda item: (
+            0 if item[1].metadata.get("entry_type") == "primary" else 1,
             item[1].metadata.get("entry_priority") or 99,
             item[0],
             item[1].metadata.get("source", ""),
@@ -560,19 +663,49 @@ def exact_quote_lookup(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, limit=5, cons
     if len(normalized_quote) < 5:
         return []
 
-    fallback_docs = known_quote_fallback_docs(normalized_quote)
-    if fallback_docs:
+    fallback_docs = known_quote_fallback_docs(normalized_quote, query=query)
+    fallback_docs.sort(
+        key=lambda doc: (
+            0 if doc.metadata.get("entry_type") == "primary" else 1,
+            doc.metadata.get("entry_priority") or 99,
+            doc.metadata.get("source") or "",
+        )
+    )
+    has_canonical_quote_source = any(
+        known_quote in normalized_quote or normalized_quote in known_quote
+        for known_quote in PREFERRED_CLASSIC_IDS_BY_QUOTE
+    )
+    if has_canonical_quote_source and fallback_docs and not constraints:
+        return fallback_docs[:limit]
+    if requested_collection(query) and fallback_docs and not constraints:
         return fallback_docs[:limit]
 
     # If work_catalog constraints are available, use them for scoping
     if constraints and constraints.get("entries"):
         hits = collect_hits_with_constraints(query, normalized_quote, ocr_cache_dir, constraints)
         if hits:
-            return (fallback_docs + [doc for _, doc in hits])[:limit]
+            return ([doc for _, doc in hits] + fallback_docs)[:limit]
         # If scoped search finds nothing, fall through to global search below
 
     preferred_entries = classic_entries_for_query(query)
-    hits = collect_hits(query, normalized_quote, ocr_cache_dir, scoped=True)
+    timeout_sec = float(os.getenv("EXACT_QUOTE_LOOKUP_TIMEOUT_SEC", "3.0") or "3.0")
+    deadline = time.perf_counter() + max(timeout_sec, 0.1)
+    scoped_max_pages = int(os.getenv("EXACT_QUOTE_SCOPED_MAX_PAGES", "800") or "800")
+    hits = collect_hits(
+        query,
+        normalized_quote,
+        ocr_cache_dir,
+        scoped=True,
+        max_pages=scoped_max_pages,
+        deadline=deadline,
+    )
+    if hits:
+        strong_hits = [(key, doc) for key, doc in hits if key[0] < 3]
+        if strong_hits:
+            return dedupe_docs([doc for _, doc in strong_hits] + fallback_docs)[:limit]
+        if fallback_docs:
+            return fallback_docs[:limit]
+        return dedupe_docs([doc for _, doc in hits])[:limit]
 
     # For selected classics with known noisy cross-book contamination, require
     # scoped confirmation and avoid global fallback.
@@ -582,7 +715,21 @@ def exact_quote_lookup(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, limit=5, cons
     if preferred_ids & STRICT_SCOPED_CLASSIC_IDS and not hits:
         return fallback_docs[:limit]
 
-    global_hits = collect_hits(query, normalized_quote, ocr_cache_dir, scoped=False)
+    allow_global = os.getenv("EXACT_QUOTE_GLOBAL_FALLBACK", "0").strip().lower() in {"1", "true", "yes", "on"}
+    if not allow_global:
+        return fallback_docs[:limit]
+
+    remaining = max(deadline - time.perf_counter(), 0.1)
+    global_deadline = time.perf_counter() + remaining
+    global_max_pages = int(os.getenv("EXACT_QUOTE_GLOBAL_MAX_PAGES", "1200") or "1200")
+    global_hits = collect_hits(
+        query,
+        normalized_quote,
+        ocr_cache_dir,
+        scoped=False,
+        max_pages=global_max_pages,
+        deadline=global_deadline,
+    )
 
     if global_hits:
         merged = {}
@@ -594,10 +741,11 @@ def exact_quote_lookup(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, limit=5, cons
         hits = sorted(
             merged.values(),
             key=lambda item: (
+                item[1].metadata.get("entry_priority") or 99,
                 item[0],
                 item[1].metadata.get("source", ""),
                 item[1].metadata.get("pdf_page") or 0,
             ),
         )
 
-    return (fallback_docs + [doc for _, doc in hits])[:limit]
+    return ([doc for _, doc in hits] + fallback_docs)[:limit]

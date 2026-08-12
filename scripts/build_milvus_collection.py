@@ -11,21 +11,23 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from marxos_embeddings import (
+from marxos.embeddings import (
     HuggingFaceEmbeddings,
     create_sparse_encoder,
     embedding_encode_kwargs,
     resolve_cached_model_path,
 )
+from marxos.config import get_settings
 from rag.semantic_retrieval import build_semantic_child_documents
 
 
+SETTINGS = get_settings()
 DEFAULT_COLLECTION = "marxos_me_passages"
-DEFAULT_DIM = 1024
-DEFAULT_BATCH_SIZE = 4
+DEFAULT_DIM = SETTINGS.index.milvus_dim
+DEFAULT_BATCH_SIZE = SETTINGS.index.milvus_batch_size
 DEFAULT_MAX_TEXT_CHARS = 2000
 DEFAULT_LOG_EVERY = 1000
-DEFAULT_PARAGRAPH_CACHE = ROOT_DIR / "data" / "paragraph_cache_core.jsonl"
+DEFAULT_PARAGRAPH_CACHE = ROOT_DIR / SETTINGS.index.default_milvus_paragraph_cache
 ME_SERIES_MARKERS = ("马克思恩格斯全集", "马克思恩格斯文集", "马克思恩格斯选集")
 
 
@@ -275,18 +277,18 @@ def records_for_unit(records, unit: str, child_chunk_size: int, child_chunk_over
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build Milvus collection for Marx/Engels passages.")
     parser.add_argument("--paragraph-cache", default=str(DEFAULT_PARAGRAPH_CACHE))
-    parser.add_argument("--collection", default=os.getenv("MILVUS_COLLECTION", DEFAULT_COLLECTION))
-    parser.add_argument("--uri", default=os.getenv("MILVUS_URI", "http://localhost:19530"))
+    parser.add_argument("--collection", default=SETTINGS.index.milvus_collection or DEFAULT_COLLECTION)
+    parser.add_argument("--uri", default=os.getenv("MILVUS_URI", SETTINGS.index.milvus_uri or "http://localhost:19530"))
     parser.add_argument("--token", default=os.getenv("MILVUS_TOKEN", ""))
-    parser.add_argument("--embedding-model", default=os.getenv("MARXOS_EMBEDDING_MODEL", "BAAI/bge-m3"))
-    parser.add_argument("--dim", type=int, default=int(os.getenv("MILVUS_DIM", str(DEFAULT_DIM))))
-    parser.add_argument("--batch-size", type=int, default=int(os.getenv("MILVUS_BATCH_SIZE", str(DEFAULT_BATCH_SIZE))))
-    parser.add_argument("--device", default=os.getenv("MARXOS_EMBEDDING_DEVICE", "cpu"))
-    parser.add_argument("--sparse-provider", default=os.getenv("MILVUS_SPARSE_PROVIDER", "none"))
+    parser.add_argument("--embedding-model", default=SETTINGS.models.embedding_model)
+    parser.add_argument("--dim", type=int, default=DEFAULT_DIM)
+    parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
+    parser.add_argument("--device", default=SETTINGS.models.embedding_device)
+    parser.add_argument("--sparse-provider", default=SETTINGS.index.milvus_sparse_provider)
     parser.add_argument("--max-text-chars", type=int, default=int(os.getenv("MILVUS_MAX_TEXT_CHARS", str(DEFAULT_MAX_TEXT_CHARS))))
-    parser.add_argument("--unit", choices=["paragraph", "semantic_child"], default=os.getenv("MILVUS_RETRIEVAL_UNIT", "paragraph"))
-    parser.add_argument("--child-chunk-size", type=int, default=int(os.getenv("SEMANTIC_CHILD_CHUNK_SIZE", "220")))
-    parser.add_argument("--child-chunk-overlap", type=int, default=int(os.getenv("SEMANTIC_CHILD_CHUNK_OVERLAP", "50")))
+    parser.add_argument("--unit", choices=["paragraph", "semantic_child"], default=SETTINGS.index.milvus_retrieval_unit)
+    parser.add_argument("--child-chunk-size", type=int, default=SETTINGS.retrieval.semantic_child_chunk_size)
+    parser.add_argument("--child-chunk-overlap", type=int, default=SETTINGS.retrieval.semantic_child_chunk_overlap)
     parser.add_argument("--log-every", type=int, default=int(os.getenv("MILVUS_LOG_EVERY", str(DEFAULT_LOG_EVERY))))
     parser.add_argument("--drop-existing", action="store_true")
     parser.add_argument("--limit", type=int, default=0)

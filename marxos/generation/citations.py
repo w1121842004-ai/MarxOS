@@ -286,13 +286,65 @@ def _preferred_citation_text(item):
 
 
 def _build_citation_section_lines(evidence, limit):
-    lines = ["*引文注释*"]
+    lines = ["引文注释"]
     for index, item in enumerate((evidence or [])[:limit], start=1):
         citation = _preferred_citation_text(item)
         if not citation:
             continue
         lines.append(f"{index}. {citation}")
     return lines if len(lines) > 1 else []
+
+
+def _body_has_citation_anchor(body, index):
+    superscripts = {
+        1: "¹",
+        2: "²",
+        3: "³",
+        4: "⁴",
+        5: "⁵",
+        6: "⁶",
+        7: "⁷",
+        8: "⁸",
+        9: "⁹",
+    }
+    patterns = [
+        rf"【\s*{index}\s*】",
+        rf"\[\s*{index}\s*\]",
+    ]
+    return any(re.search(pattern, body or "") for pattern in patterns) or superscripts.get(index, "") in (body or "")
+
+
+def _ensure_body_citation_anchors(body, citation_count):
+    body = (body or "").rstrip()
+    if not body or citation_count <= 0:
+        return body
+    missing = [index for index in range(1, citation_count + 1) if not _body_has_citation_anchor(body, index)]
+    if not missing:
+        return body
+    marker_text = "".join(f"【{index}】" for index in missing)
+    lines = body.splitlines()
+    for index in range(len(lines) - 1, -1, -1):
+        if lines[index].strip():
+            lines[index] = lines[index].rstrip() + marker_text
+            return "\n".join(lines).rstrip()
+    return body + marker_text
+
+
+def _strip_unsupported_inline_citations(answer, evidence, normalize_for_match):
+    evidence = evidence or []
+
+    def supported(citation):
+        return any(evidence_matches_citation(item, citation, normalize_for_match) for item in evidence)
+
+    def replace_bracketed(match):
+        citation = match.group(1).strip()
+        return match.group(0) if supported(citation) else ""
+
+    return re.sub(
+        r"[\[\uff3b]\s*见[:：]\s*(《[^》]+》[^。\]\uff3d\n]{0,160}?第\d+页。?)\s*[\]\uff3d]",
+        replace_bracketed,
+        answer or "",
+    )
 
 
 def repair_answer_citations(
@@ -306,6 +358,7 @@ def repair_answer_citations(
     evidence = evidence or []
     if not normalized.strip() or not evidence:
         return normalized
+    normalized = _strip_unsupported_inline_citations(normalized, evidence, normalize_for_match)
 
     ref_matched = evidence_by_refs(normalized, evidence)
     if ref_matched:
@@ -315,6 +368,7 @@ def repair_answer_citations(
             return normalized
         body, _had_marker = _split_answer_body_and_citations(normalized)
         if body.strip():
+            body = _ensure_body_citation_anchors(body, len(section_lines) - 1)
             return body.rstrip() + "\n\n" + "\n".join(section_lines)
         return "\n".join(section_lines)
 
@@ -345,6 +399,7 @@ def repair_answer_citations(
 
     body, _had_marker = _split_answer_body_and_citations(normalized)
     if body.strip():
+        body = _ensure_body_citation_anchors(body, len(section_lines) - 1)
         return body.rstrip() + "\n\n" + "\n".join(section_lines)
     return "\n".join(section_lines)
 

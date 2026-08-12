@@ -11,7 +11,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
-VECTORSTORE_DIR = Path(os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader_core"))
+VECTORSTORE_DIR = Path(os.getenv("VECTORSTORE_DIR", "vectorstore/marx_reader"))
 INDEX_PKL = VECTORSTORE_DIR / "index.pkl"
 
 

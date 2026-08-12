@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 
 
 EXACT_INTENTS = {"quote_lookup", "bibliographic_lookup"}
-ANALYTIC_INTENTS = {"rag_answer", "deep_analysis", "theory_analysis", "concept_explain"}
+ANALYTIC_INTENTS = {"rag_answer", "deep_analysis", "theory_analysis", "concept_explain", "comparison"}
+COMPARISON_INTENTS = {"comparison"}
 
 
 @dataclass
@@ -102,9 +103,55 @@ def build_standalone_query(query: str, history: list[dict] | None, intent: str) 
     return f"延续上一轮问题的主题和任务。上一轮问题：{context}。本轮问题：{query}", True
 
 
-def decompose_query(query: str) -> list[str]:
+def _comparison_entities(query: str) -> list[str]:
+    """Extract entities being compared from a comparison-style query.
+
+    Detects patterns like "比较 A 和 B", "A 与 B 的区别", "A vs B".
+    """
+    q = _norm(query)
+    entities: list[str] = []
+
+    # Pattern 1: 《A》...《B》 (book titles)
+    quoted = re.findall(r"《([^》]{2,40})》", q)
+    if len(quoted) >= 2:
+        entities.extend(quoted[:4])
+        return entities
+
+    # Pattern 2: Split on comparison delimiters
+    comparison_delimiters = ["和", "与", "跟", "同", "以及", "对比", "比较", "vs", "VS"]
+    for delim in comparison_delimiters:
+        if delim in q:
+            parts = q.split(delim, 1)
+            if len(parts) == 2:
+                left = _norm(parts[0])
+                right = _norm(parts[1])
+                # Remove leading comparison prefix from left
+                left = re.sub(r"^(比较|对比|请分析|分析一下|谈谈|说说)\s*", "", left)
+                # Remove trailing comparison suffix from right
+                right = re.sub(r"\s*(的区别|的异同|的差异|的不同|的关系|的比较|的对比|方面).*$", "", right)
+                if len(left) >= 2:
+                    entities.append(left)
+                if len(right) >= 2:
+                    entities.append(right)
+            break
+
+    return entities[:4]
+
+
+def decompose_query(query: str, intent: str = "") -> list[str]:
     q = _norm(query)
     pieces = []
+
+    # ── Comparison-specific decomposition (NEW) ──────────────────────
+    if intent in COMPARISON_INTENTS:
+        entities = _comparison_entities(q)
+        for entity in entities:
+            pieces.append(f"{entity} 的核心论述")
+            pieces.append(f"马克思关于{entity}的观点")
+            pieces.append(f"恩格斯关于{entity}的观点")
+        if len(entities) >= 2:
+            pieces.append(f"{entities[0]} 和 {entities[1]} 的关系")
+        return _dedupe(pieces, limit=8)
 
     quoted_titles = re.findall(r"《([^》]{2,80})》", q)
     for title in quoted_titles[:4]:
@@ -159,7 +206,7 @@ def plan_query(query: str, intent: str, history: list[dict] | None = None, enabl
             disabled_reason="exact_lookup",
         )
 
-    decomposition = decompose_query(standalone) if intent in ANALYTIC_INTENTS else []
+    decomposition = decompose_query(standalone, intent=intent) if intent in ANALYTIC_INTENTS else []
     hq = hyde_query(standalone, decomposition) if enable_hyde and intent in {"rag_answer", "deep_analysis", "theory_analysis"} else ""
     retrieval_queries = _dedupe([standalone, query] + decomposition + ([hq] if hq else []), limit=8)
     return QueryPlan(

@@ -13,7 +13,8 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from langchain_community.vectorstores import FAISS
-from marxos_embeddings import HuggingFaceEmbeddings, embedding_encode_kwargs
+from marxos.embeddings import HuggingFaceEmbeddings, embedding_encode_kwargs
+from marxos.config import get_settings
 
 from rag.paragraph_cache import paragraph_record_to_document, read_paragraph_cache  # noqa: E402
 
@@ -22,9 +23,10 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
-EMBEDDING_MODEL = os.getenv("MARXOS_EMBEDDING_MODEL", "BAAI/bge-m3")
-PARAGRAPH_CACHE_PATH = Path(os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache_core.jsonl"))
-PARAGRAPH_VECTORSTORE_DIR = Path(os.getenv("PARAGRAPH_VECTORSTORE_DIR", "vectorstore/marx_reader_paragraph"))
+SETTINGS = get_settings()
+EMBEDDING_MODEL = SETTINGS.models.embedding_model
+PARAGRAPH_CACHE_PATH = Path(os.getenv("PARAGRAPH_CACHE_PATH", SETTINGS.corpus.paragraph_cache_path))
+PARAGRAPH_VECTORSTORE_DIR = Path(SETTINGS.index.paragraph_vectorstore_dir)
 TEMP_VECTORSTORE_DIR = Path(f"{PARAGRAPH_VECTORSTORE_DIR}_tmp")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1024"))
 

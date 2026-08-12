@@ -12,18 +12,18 @@ import pickle
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from marxos.config import get_settings
 from rag.paragraph_cache import paragraph_record_to_document, read_paragraph_cache
 
 
-DEFAULT_PARAGRAPH_CACHE_PATH = Path(
-    os.getenv("PARAGRAPH_CACHE_PATH", "data/paragraph_cache_core.jsonl")
-)
+SETTINGS = get_settings()
+DEFAULT_PARAGRAPH_CACHE_PATH = Path(SETTINGS.corpus.paragraph_cache_path)
 DEFAULT_LIGHT_SPARSE_INDEX_PATH = Path(
     os.getenv("SEMANTIC_LIGHT_SPARSE_INDEX_PATH", "data/sparse_paragraph_index_light.pkl")
 )
-DEFAULT_CHILD_CHUNK_SIZE = int(os.getenv("SEMANTIC_CHILD_CHUNK_SIZE", "180"))
-DEFAULT_CHILD_CHUNK_OVERLAP = int(os.getenv("SEMANTIC_CHILD_CHUNK_OVERLAP", "40"))
-DEFAULT_PARENT_WINDOW = int(os.getenv("SEMANTIC_PARENT_WINDOW", "1"))
+DEFAULT_CHILD_CHUNK_SIZE = SETTINGS.retrieval.semantic_child_chunk_size
+DEFAULT_CHILD_CHUNK_OVERLAP = SETTINGS.retrieval.semantic_child_chunk_overlap
+DEFAULT_PARENT_WINDOW = SETTINGS.retrieval.semantic_parent_window
 SPARSE_TOP_K = int(os.getenv("SEMANTIC_SPARSE_TOP_K", "24"))
 SPARSE_RERANK_POOL = int(os.getenv("SEMANTIC_SPARSE_RERANK_POOL", "2000"))
 SPARSE_CONTENT_RERANK_POOL = int(os.getenv("SEMANTIC_SPARSE_CONTENT_RERANK_POOL", "300"))

@@ -4,8 +4,10 @@ import json
 import os
 from pathlib import Path
 
+from marxos.config import get_settings
 
-ARTICLE_MAP_PATH = Path(os.getenv("ARTICLE_MAP_PATH", "rag/article_map_core.json"))
+SETTINGS = get_settings()
+ARTICLE_MAP_PATH = Path(os.getenv("ARTICLE_MAP_PATH", SETTINGS.corpus.article_map_path))
 
 
 def load_article_map() -> dict:

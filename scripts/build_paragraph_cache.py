@@ -8,10 +8,12 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from marxos.config import get_settings
 from rag.paragraph_cache import paragraph_cache_sources, write_paragraph_cache
 
 
-DEFAULT_OUTPUT = Path("data/paragraph_cache_core.jsonl")
+SETTINGS = get_settings()
+DEFAULT_OUTPUT = Path(SETTINGS.corpus.paragraph_cache_path)
 
 
 def main() -> None:

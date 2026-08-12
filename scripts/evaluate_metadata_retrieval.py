@@ -19,8 +19,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from marxos_work_catalog import WorkCatalog, _normalize
-from marxos_runtime import RuntimeState
+from marxos.work_catalog import WorkCatalog, _normalize
+from marxos.runtime import RuntimeState
 from retrieval.constraints import constraints_from_query
 
 

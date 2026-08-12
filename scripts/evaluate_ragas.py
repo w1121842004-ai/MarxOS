@@ -50,6 +50,20 @@ def compact_text(text: Any, limit: int = 4000) -> str:
     return cleaned[:limit]
 
 
+def normalize_for_metric(text: Any) -> str:
+    return "".join(str(text or "").lower().split())
+
+
+def contains_term(text: Any, term: Any) -> bool:
+    needle = normalize_for_metric(term)
+    return bool(needle) and needle in normalize_for_metric(text)
+
+
+def split_author_terms(author: Any) -> list[str]:
+    raw = str(author or "").replace("、", " ").replace("/", " ")
+    return [part.strip() for part in raw.split() if part.strip()]
+
+
 def load_dataset(path: Path, limit: int | None = None) -> list[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as f:
         data = json.load(f)
@@ -125,6 +139,7 @@ def build_sample(case: dict[str, Any], db, top_k: int, generate_answers: bool, a
         "ground_truth": reference_from_case(case),
         "expected_work": case.get("expected_work"),
         "expected_author": case.get("expected_author"),
+        "hard_negative": case.get("hard_negative") or [],
     }
 
 
@@ -270,6 +285,63 @@ def run_ragas(samples: list[dict[str, Any]], args) -> dict[str, Any]:
     }
 
 
+def ratio(values: list[bool]) -> float | None:
+    if not values:
+        return None
+    return round(sum(1 for value in values if value) / len(values), 4)
+
+
+def compute_marxos_metrics(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    rows = []
+    for sample in samples:
+        contexts = sample.get("retrieved_contexts") or []
+        context_text = "\n".join(str(item) for item in contexts)
+        response = sample.get("response") or sample.get("answer") or ""
+        expected_work = sample.get("expected_work")
+        expected_author = sample.get("expected_author")
+        hard_negative = sample.get("hard_negative") or []
+        author_terms = split_author_terms(expected_author)
+
+        context_work_hit = contains_term(context_text, expected_work)
+        response_work_hit = contains_term(response, expected_work)
+        context_author_hit = any(contains_term(context_text, term) for term in author_terms) if author_terms else False
+        response_author_hit = any(contains_term(response, term) for term in author_terms) if author_terms else False
+        hard_negative_context_hit = any(contains_term(context_text, term) for term in hard_negative)
+        hard_negative_response_hit = any(contains_term(response, term) for term in hard_negative)
+        response_has_citation_marker = any(marker in response for marker in ("[见：", "《", "第")) and "页" in response
+
+        rows.append(
+            {
+                "id": sample.get("id"),
+                "user_input": sample.get("user_input"),
+                "expected_work": expected_work,
+                "expected_author": expected_author,
+                "context_count": len(contexts),
+                "context_expected_work_hit": context_work_hit,
+                "response_expected_work_hit": response_work_hit,
+                "context_expected_author_hit": context_author_hit,
+                "response_expected_author_hit": response_author_hit,
+                "hard_negative_context_hit": hard_negative_context_hit,
+                "hard_negative_response_hit": hard_negative_response_hit,
+                "response_has_citation_marker": response_has_citation_marker,
+                "response_chars": len(str(response)),
+            }
+        )
+
+    summary = {
+        "sample_count": len(rows),
+        "context_expected_work_hit_rate": ratio([row["context_expected_work_hit"] for row in rows]),
+        "response_expected_work_hit_rate": ratio([row["response_expected_work_hit"] for row in rows]),
+        "context_expected_author_hit_rate": ratio([row["context_expected_author_hit"] for row in rows]),
+        "response_expected_author_hit_rate": ratio([row["response_expected_author_hit"] for row in rows]),
+        "hard_negative_context_hit_rate": ratio([row["hard_negative_context_hit"] for row in rows]),
+        "hard_negative_response_hit_rate": ratio([row["hard_negative_response_hit"] for row in rows]),
+        "response_citation_marker_rate": ratio([row["response_has_citation_marker"] for row in rows]),
+        "avg_response_chars": round(sum(row["response_chars"] for row in rows) / len(rows), 1) if rows else None,
+    }
+    return {"summary": summary, "rows": rows}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run RAGAS evaluation for MarxOS RAG outputs.")
     parser.add_argument("--dataset", default=str(DEFAULT_DATASET))
@@ -281,6 +353,7 @@ def main() -> int:
     parser.add_argument("--generate-answers", action="store_true")
     parser.add_argument("--answer-mode", choices=["fast", "standard", "deep"], default="fast")
     parser.add_argument("--prepare-only", action="store_true")
+    parser.add_argument("--marxos-only", action="store_true", help="Only compute MarxOS deterministic retrieval/answer checks.")
     parser.add_argument(
         "--metrics",
         nargs="+",
@@ -300,7 +373,11 @@ def main() -> int:
     if args.prepare_only:
         return 0
 
-    report = run_ragas(samples, args)
+    marxos_metrics = compute_marxos_metrics(samples)
+    if args.marxos_only:
+        report = {"summary": {}, "rows": []}
+    else:
+        report = run_ragas(samples, args)
     report_path = Path(args.report)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(
@@ -313,8 +390,11 @@ def main() -> int:
                     "limit": args.limit,
                     "metrics": args.metrics,
                     "judge_model": args.judge_model,
+                    "marxos_only": args.marxos_only,
                 },
                 **report,
+                "marxos_summary": marxos_metrics["summary"],
+                "marxos_rows": marxos_metrics["rows"],
             },
             ensure_ascii=False,
             indent=2,

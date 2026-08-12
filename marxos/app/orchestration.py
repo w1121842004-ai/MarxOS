@@ -6,7 +6,7 @@ import time
 
 from langchain_core.documents import Document
 
-import marxos_query_planner as query_planner
+from marxos import query_planner
 
 from langchain_core.documents import Document
 
@@ -55,7 +55,7 @@ def _merge_ranked_docs(*doc_groups):
     return merged
 
 
-def assess_retrieval_quality(query_intent, docs, evidence, constraints):
+def assess_retrieval_quality(query_intent, docs, evidence, constraints, strategy=None):
     docs = docs or []
     evidence = evidence or []
     issues = []
@@ -121,6 +121,9 @@ def assess_retrieval_quality(query_intent, docs, evidence, constraints):
         threshold = 55
     elif constraints.get("strict_title") or constraints.get("topic_id"):
         threshold = 52
+    # Allow strategy to override the threshold (e.g. comparison lowers it)
+    if strategy and getattr(strategy, "crag_threshold_override", None) is not None:
+        threshold = strategy.crag_threshold_override
 
     return {
         "ok": score >= threshold and not locator_only,
@@ -156,6 +159,13 @@ def prepare_query_request(
         return {"early_answer": unsupported_answer}
 
     query_intent = classify_query(route_query)
+    if query_intent == "chitchat":
+        return {
+            "query": query,
+            "route_query": route_query,
+            "query_intent": query_intent,
+            "early_answer": answer_chitchat_query(route_query),
+        }
     if query != route_query and query_intent == "quote_lookup" and "《" not in route_query and "》" not in route_query:
         query_intent = "rag_answer"
 
@@ -164,6 +174,75 @@ def prepare_query_request(
         "route_query": route_query,
         "query_intent": query_intent,
     }
+
+
+def is_chitchat_query(query):
+    normalized = "".join(str(query or "").strip().lower().split())
+    if not normalized:
+        return False
+    greetings = {
+        "你好",
+        "您好",
+        "哈喽",
+        "嗨",
+        "hi",
+        "hello",
+        "hey",
+        "在吗",
+        "在不在",
+        "早上好",
+        "上午好",
+        "中午好",
+        "下午好",
+        "晚上好",
+    }
+    identity_queries = {
+        "你是谁",
+        "你是啥",
+        "你是什么",
+        "你能做什么",
+        "你可以做什么",
+        "你可以作甚",
+        "你能作甚",
+        "你作甚",
+        "你能干什么",
+        "你可以干什么",
+        "你能干啥",
+        "你可以干啥",
+        "你能做啥",
+        "你可以做啥",
+        "你有什么用",
+        "你有什么功能",
+        "你有哪些功能",
+        "你会什么",
+        "介绍一下你自己",
+    }
+    return normalized in greetings or normalized in identity_queries
+
+
+def answer_chitchat_query(query):
+    normalized = "".join(str(query or "").strip().lower().split())
+    if normalized in {"你是谁", "你是啥", "你是什么", "介绍一下你自己"}:
+        return "我是 MarxOS，一个面向马克思、恩格斯经典文本的本地检索问答助手。"
+    if normalized in {
+        "你能做什么",
+        "你可以做什么",
+        "你可以作甚",
+        "你能作甚",
+        "你作甚",
+        "你能干什么",
+        "你可以干什么",
+        "你能干啥",
+        "你可以干啥",
+        "你能做啥",
+        "你可以做啥",
+        "你有什么用",
+        "你有什么功能",
+        "你有哪些功能",
+        "你会什么",
+    }:
+        return "我可以帮助你查找原著出处、解释马克思主义概念、梳理文本论证，并围绕经典文献做学术分析。"
+    return "你好。我是 MarxOS，可以帮你查找原著出处、解释概念或分析马克思主义经典文本。"
 
 
 def maybe_answer_local_lookup(
@@ -223,8 +302,15 @@ def collect_retrieval_materials(
     force_corrective=False,
     query_plan=None,
     performance=None,
+    strategy=None,
 ):
     performance = performance or {}
+
+    # Apply intent strategy overrides to performance dict (NEW)
+    if strategy:
+        from marxos.config.retrieval_strategies import apply_strategy
+        performance = apply_strategy(performance, strategy)
+
     retrieval_started = time.perf_counter()
 
     def log_retrieval_phase(phase, started, **extra):
@@ -237,14 +323,19 @@ def collect_retrieval_materials(
         payload.update(extra)
         try:
             print(json.dumps(payload, ensure_ascii=False), file=sys.stderr, flush=True)
+        except BrokenPipeError:
+            pass
         except UnicodeEncodeError:
-            print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+            try:
+                print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+            except BrokenPipeError:
+                pass
 
     def retrieve_documents_for_mode(query_text, db, k):
         try:
-            return retrieve_documents(query_text, db, k=k, performance=performance)
+            return retrieve_documents(query_text, db, k=k, performance=performance, strategy=strategy)
         except TypeError as exc:
-            if "performance" not in str(exc):
+            if "performance" not in str(exc) and "strategy" not in str(exc):
                 raise
             return retrieve_documents(query_text, db, k=k)
 
@@ -329,12 +420,15 @@ def collect_retrieval_materials(
     phase_started = time.perf_counter()
     db = load_vectorstore()
     log_retrieval_phase("load_vectorstore", phase_started)
+    topic_list_query = query_intent != "deep_analysis" and is_topic_view_list_query(route_query, constraints)
     retrieve_k = int(
         performance.get(
             "rag_retrieve_k" if query_intent == "rag_answer" else "retrieve_k",
             12 if query_intent == "rag_answer" else 5,
         )
     )
+    if topic_list_query:
+        retrieve_k = max(retrieve_k, 10)
     phase_started = time.perf_counter()
     docs = retrieve_with_plan(db, retrieve_k)
     log_retrieval_phase(
@@ -345,7 +439,6 @@ def collect_retrieval_materials(
         multi_query=bool(performance.get("planner_multi_query", True)),
     )
     paragraph_docs_for_answer = []
-    topic_list_query = query_intent == "rag_answer" and is_topic_view_list_query(route_query, constraints)
     phase_started = time.perf_counter()
     paragraph_store_ready = paragraph_vectorstore_exists()
     log_retrieval_phase("paragraph_store_check", phase_started, ready=bool(paragraph_store_ready))
@@ -392,6 +485,7 @@ def collect_retrieval_materials(
             docs,
             initial_evidence_for_assess,
             constraints,
+            strategy=strategy,
         ),
         "initial",
     )
@@ -473,6 +567,7 @@ def collect_retrieval_materials(
                 merged_docs,
                 corrective_evidence_for_assess,
                 constraints,
+                strategy=strategy,
             ),
             "forced_corrective" if force_corrective else "corrective",
         )
@@ -532,10 +627,10 @@ def maybe_answer_local_view_query(
         set_last_evidence([], {"ok": True, "issues": [], "evidence_count": 0, "answer": answer})
         return answer
 
-    if query_intent == "rag_answer" and is_topic_view_list_query(route_query, constraints):
+    if query_intent != "deep_analysis" and is_topic_view_list_query(route_query, constraints):
         topic_view_answer = build_topic_view_list_answer(route_query, constraints, evidence, limit=min(10, len(evidence)))
         if topic_view_answer:
-            answer_evidence = topic_answer_evidence(evidence, constraints, limit=min(10, len(evidence)))
+            answer_evidence = evidence[: min(10, len(evidence))]
             display_evidence = filter_evidence_to_answer(
                 topic_view_answer,
                 answer_evidence,

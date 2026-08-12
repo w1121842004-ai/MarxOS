@@ -17,6 +17,7 @@ from retrieval.constraints import (
     is_me_source,
     metadata_matches_constraints,
     page_in_expected_range,
+    source_matches_collection,
     source_priority,
     topic_seed_queries,
 )
@@ -87,10 +88,11 @@ def _sparse_allowed(doc, query, constraints, ctx):
     metadata = doc.metadata or {}
     if constraints.get("sources") and not metadata_matches_constraints(metadata, constraints):
         return False
-    if collection_requested(query, ctx) == "non_me":
-        return True
+    requested = collection_requested(query, ctx)
+    if requested:
+        return source_matches_collection(_doc_source(doc), requested)
     source = _doc_source(doc)
-    return not source or is_me_source(source)
+    return bool(source)
 
 
 def _has_narrow_page_ranges(constraints, max_width=3):
@@ -230,7 +232,7 @@ def _controlled_dense_candidates(query, db, constraints, fetch_k, ctx):
 
 def _similarity_search(db, query, k, constraints=None):
     filters = {}
-    sources = (constraints or {}).get("sources") or set()
+    sources = set() if (constraints or {}).get("soft_topic") else (constraints or {}).get("sources") or set()
     if sources:
         filters["source"] = sorted(sources)
     if filters:
@@ -251,6 +253,7 @@ def strict_title_cache_documents(query, constraints, limit, ctx):
     infer_printed_page_from_ocr_cache = _helper(ctx, "infer_printed_page_from_ocr_cache")
     load_ocr_page_text = _helper(ctx, "load_ocr_page_text")
     OCR_CACHE_DIR = ctx["OCR_CACHE_DIR"]
+    strategy = ctx.get("strategy")
     CONCEPT_PREFERRED_MARKERS = ctx["CONCEPT_PREFERRED_MARKERS"]
 
     docs = []
@@ -366,7 +369,7 @@ def strict_title_cache_documents(query, constraints, limit, ctx):
     if not docs:
         return []
 
-    ranked = rerank_documents(query, docs, constraints, ctx)
+    ranked = rerank_documents(query, docs, constraints, ctx, strategy=strategy)
     return ranked[:limit]
 
 
@@ -419,6 +422,8 @@ def append_locator_backstops(docs, constraints, k, ctx):
     normalize_for_match = _helper(ctx, "normalize_for_match")
     if not constraints.get("strict_title") or not constraints.get("entries"):
         return docs
+    if any((doc.metadata or {}).get("match_type") != "locator_backstop" for doc in docs or []):
+        return (docs or [])[:k]
 
     backstops = locator_backstop_documents(constraints, limit=k)
     existing_entries = {
@@ -455,6 +460,12 @@ def topic_constrained_candidates(query, db, constraints, fetch_k, ctx):
     per_seed_k = max(24, fetch_k // max(len(seeds), 1))
     for seed in seeds:
         candidates.extend(_similarity_search(db, seed, per_seed_k, constraints))
+
+    if constraints.get("soft_topic"):
+        broad_k = max(fetch_k // 2, 36)
+        candidates.extend(_controlled_dense_candidates(query, db, {}, broad_k, ctx))
+        candidates = _hybrid_merge_candidates(query, candidates, {}, broad_k, ctx)
+        return dedupe_documents(candidates, ctx)
 
     candidates = [
         doc for doc in dedupe_documents(candidates, ctx)
@@ -501,6 +512,52 @@ def concept_constrained_candidates(query, db, constraints, fetch_k, ctx):
     return candidates
 
 
+def _sparse_only_retrieve(query, constraints, fetch_k, ctx):
+    """Run BM25 sparse retrieval standalone (without dense candidates).
+
+    Used as a fallback for ``quote_lookup`` when OCR exact-quote search
+    returns no hits — lexical (BM25) matching often finds quoted passages
+    that dense embeddings miss.
+    """
+    sparse_retrieve_docs = _helper(ctx, "sparse_retrieve_documents")
+    controlled_multi_queries = _helper(ctx, "controlled_multi_queries")
+    normalize_for_match = _helper(ctx, "normalize_for_match")
+    clean_text = _helper(ctx, "clean_text")
+
+    candidates = []
+    for variant in controlled_multi_queries(query, constraints, ctx):
+        candidates.extend(
+            sparse_retrieve_docs(variant, limit=max(fetch_k // 2, 12))
+        )
+
+    if not candidates:
+        return []
+
+    # Deduplicate by (source, page, content[:120])
+    seen = set()
+    deduped = []
+    for doc in candidates:
+        key = (
+            (doc.metadata or {}).get("source"),
+            (doc.metadata or {}).get("page"),
+            (doc.metadata or {}).get("printed_page"),
+            (doc.metadata or {}).get("citation_page"),
+            clean_text((doc.metadata or {}).get("article") or (doc.metadata or {}).get("section"), ""),
+            clean_text(doc.page_content or "", "")[:120],
+        )
+        if key not in seen:
+            seen.add(key)
+            deduped.append(doc)
+
+    # Tag match type for downstream quality assessment
+    for doc in deduped:
+        metadata = doc.metadata or {}
+        metadata.setdefault("match_type", "sparse_candidate")
+        metadata.setdefault("confidence", 0.35)
+
+    return deduped
+
+
 def retrieve_documents(query, db, k, allow_exact_quote, ctx):
     retrieve_started = time.perf_counter()
 
@@ -514,8 +571,13 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
         payload.update(extra)
         try:
             print(json.dumps(payload, ensure_ascii=False), file=sys.stderr, flush=True)
+        except BrokenPipeError:
+            pass
         except UnicodeEncodeError:
-            print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+            try:
+                print(json.dumps(payload, ensure_ascii=True), file=sys.stderr, flush=True)
+            except BrokenPipeError:
+                pass
 
     normalize_for_match = _helper(ctx, "normalize_for_match")
     active_concept_terms = _helper(ctx, "active_concept_terms")
@@ -532,13 +594,18 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
     requests_derivative_material = _helper(ctx, "requests_derivative_material")
     expand_semantic_parent_docs = _helper(ctx, "expand_semantic_parent_docs")
     score_document_quality = _helper(ctx, "score_document_quality")
+    sparse_retrieve_documents = _helper(ctx, "sparse_retrieve_documents")
+    controlled_multi_queries = _helper(ctx, "controlled_multi_queries")
+    hybrid_retrieval_enabled = _helper(ctx, "hybrid_retrieval_enabled")
+    sparse_index_ready = _helper(ctx, "sparse_index_ready")
+    strategy = ctx.get("strategy")
 
     phase_started = time.perf_counter()
     constraints = constraints_from_query(query, ctx)
     log_phase("constraints_from_query", phase_started, has_constraints=bool(constraints))
     if (
         constraints.get("sources")
-        and collection_requested(query, ctx) != "non_me"
+        and collection_requested(query, ctx) == "me"
         and not constraints.get("work_catalog_title_match")
         and not any(is_me_source(source) for source in constraints.get("sources") or [])
     ):
@@ -553,21 +620,41 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
         return locator_backstop_documents(constraints, limit=k)
 
     if allow_exact_quote and is_quote_lookup_query(query) and not is_work_location_query(query, ctx):
+        # Phase A: OCR exact quote lookup (highest precision)
+        if constraints.get("entries"):
+            exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k,
+                                            constraints=constraints)
+            if exact_docs:
+                docs = annotate_docs_with_constraints(exact_docs, constraints, ctx)
+                return append_locator_backstops(docs, constraints, k, ctx)
+            if constraints.get("strict_title"):
+                cache_docs = strict_title_cache_documents(query, constraints, k, ctx)
+                if cache_docs:
+                    cache_docs = annotate_docs_with_constraints(cache_docs, constraints, ctx)
+                    return append_locator_backstops(cache_docs, constraints, k, ctx)
+                return locator_backstop_documents(constraints, limit=k)
+
+        # Phase B (NEW): BM25 sparse retrieval fallback for quote lookup.
+        # Lexical matching often finds quoted passages that dense embeddings miss.
+        sparse_first = bool(strategy and getattr(strategy, "sparse_first", False))
+        if sparse_first:
+            fetch_k = max(120, k * 12)
+            sparse_docs = _sparse_only_retrieve(query, constraints, fetch_k, ctx)
+            if sparse_docs:
+                sparse_docs = annotate_docs_with_constraints(sparse_docs, constraints, ctx)
+                sparse_docs = expand_semantic_parent_docs(sparse_docs)
+                return append_locator_backstops(sparse_docs, constraints, k, ctx)
+
+        # Phase C: Preserve original behaviour when sparse_first is not active.
+        # Without entries → return []. With entries but no OCR hit →
+        # return [] unless sparse_first is active (which allows fall-through
+        # to dense+hybrid after BM25 is tried).
+        if not sparse_first:
+            return []
+        # With sparse_first active but BM25 also failed: fall through to
+        # standard dense+hybrid retrieval below (new behaviour for quote lookups).
         if not constraints.get("entries"):
             return []
-        # Pass work_catalog constraints to scope OCR search
-        exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k,
-                                        constraints=constraints)
-        if exact_docs:
-            docs = annotate_docs_with_constraints(exact_docs, constraints, ctx)
-            return append_locator_backstops(docs, constraints, k, ctx)
-        if constraints.get("strict_title"):
-            cache_docs = strict_title_cache_documents(query, constraints, k, ctx)
-            if cache_docs:
-                cache_docs = annotate_docs_with_constraints(cache_docs, constraints, ctx)
-                return append_locator_backstops(cache_docs, constraints, k, ctx)
-            return locator_backstop_documents(constraints, limit=k)
-        return []
 
     if constraints.get("high_precision_locator"):
         cache_docs = strict_title_cache_documents(query, constraints, k, ctx)
@@ -591,7 +678,7 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
                 if metadata_matches_constraints(doc.metadata, constraints)
             ]
 
-        if constraints.get("page_ranges"):
+        if constraints.get("page_ranges") and not constraints.get("soft_topic"):
             ranged_candidates = [
                 doc for doc in candidates
                 if page_in_expected_range(doc.metadata, constraints, ctx)
@@ -639,7 +726,7 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
                     )
                     if metadata_matches_constraints(doc.metadata, constraints)
                 ]
-            if constraints.get("page_ranges"):
+            if constraints.get("page_ranges") and not constraints.get("soft_topic"):
                 ranged_candidates = [
                     doc for doc in candidates
                     if page_in_expected_range(doc.metadata, constraints, ctx)
@@ -757,7 +844,7 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
         candidates = quality_candidates
 
     phase_started = time.perf_counter()
-    ranked_docs = rerank_documents(query, candidates, constraints, ctx)
+    ranked_docs = rerank_documents(query, candidates, constraints, ctx, strategy=strategy)
     log_phase("rerank_documents", phase_started, candidate_count=len(candidates or []), ranked_count=len(ranked_docs or []))
     phase_started = time.perf_counter()
     ranked_docs = collapse_content_near_duplicates(ranked_docs, ctx)

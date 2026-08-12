@@ -31,21 +31,21 @@ PDF
 | --- | --- | --- |
 | `app.py` | CLI 入口与总控编排。负责把 intent、retrieval、prompts、citations、answers、LLM 调用串起来。 | 所有核心模块 |
 | `web_app.py` | Web API 与前端页面，封装 `app.run_query()`。 | `app.py`、`logs/` |
-| `marxos_web_support.py` | Web 层公共辅助函数，负责 metrics、history/context 和响应 payload 拼装。 | `web_app.py` |
-| `marxos_web_followups.py` | Web 层专题 follow-up 规则，负责专题追问的改写、解释和历史证据整理。 | `web_app.py` |
-| `marxos_web_citations.py` | Web 层引文与页码 follow-up 规则，负责脚注解析、OCR 页定位和页码追问。 | `web_app.py` |
+| `marxos/web/support.py` | Web 层公共辅助函数，负责 metrics、history/context 和响应 payload 拼装。 | `web_app.py` |
+| `marxos/web/followups.py` | Web 层专题 follow-up 规则，负责专题追问的改写、解释和历史证据整理。 | `web_app.py` |
+| `marxos/web/citations.py` | Web 层引文与页码 follow-up 规则，负责脚注解析、OCR 页定位和页码追问。 | `web_app.py` |
 
 ## 3. 核心模块
 
 | 文件 | 核心功能 | 关联 |
 | --- | --- | --- |
-| `marxos_runtime.py` | 运行时状态、embedding/vectorstore 缓存、开发模式开关 | `app.py`、`web_app.py` |
-| `marxos_embeddings.py` | HuggingFace embeddings 兼容导入层，压平旧 LangChain 弃用 warning | `marxos_runtime.py`、构建与评测脚本 |
-| `marxos_query_intent.py` | query intent 分类、路由辅助 | `app.py` |
-| `marxos_citations.py` | citation 格式化、证据生成、回答引文审计 | `app.py`、`web_app.py` |
-| `marxos_answers.py` | 本地直接回答的规则分支，包括专题列表回答、拒答规则、摘录清洗 | `app.py` |
-| `marxos_prompts.py` | prompt builders 与回答风格规则 | `app.py` |
-| `marxos_trace.py` | trace 输出、TRACE_ONLY 模式辅助 | `app.py` |
+| `marxos/runtime.py` | 运行时状态、embedding/vectorstore 缓存、开发模式开关 | `app.py`、`web_app.py` |
+| `marxos/embeddings.py` | HuggingFace embeddings 兼容导入层，压平旧 LangChain 弃用 warning | `marxos/runtime.py`、构建与评测脚本 |
+| `marxos/query_intent.py` | query intent 分类、路由辅助 | `app.py` |
+| `marxos/generation/citations.py` | citation 格式化、证据生成、回答引文审计 | `app.py`、`web_app.py` |
+| `marxos/generation/answers.py` | 本地直接回答的规则分支，包括专题列表回答、拒答规则、摘录清洗 | `app.py` |
+| `marxos/generation/prompts.py` | prompt builders 与回答风格规则 | `app.py` |
+| `marxos/trace.py` | trace 输出、TRACE_ONLY 模式辅助 | `app.py` |
 
 ## 4. 检索分层
 

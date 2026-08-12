@@ -6,7 +6,7 @@ from unittest.mock import patch
 from langchain_core.documents import Document
 
 import app
-import marxos_orchestration as orchestration
+from marxos.app import orchestration
 
 
 class RunQueryRegressionTests(unittest.TestCase):
@@ -83,12 +83,21 @@ class RunQueryRegressionTests(unittest.TestCase):
     def test_run_query_rejects_unsupported_slogan_without_vector_or_llm(self):
         query = "以人民为中心是否出自马克思原著？"
 
-        with patch("app.load_vectorstore") as load_vectorstore, patch("app.OpenAI") as openai:
+        with patch("app.load_vectorstore") as load_vectorstore, patch("marxos.generation.llm_client.OpenAI") as openai:
             answer = app.run_query(query)
 
         load_vectorstore.assert_not_called()
         openai.assert_not_called()
         self.assertIn("不是马克思原著中的原文表达", answer)
+
+    def test_run_query_answers_chitchat_without_vector_or_llm(self):
+        with patch("app.load_vectorstore") as load_vectorstore, patch("app.create_deepseek_client") as openai:
+            answer = app.run_query("你好")
+
+        load_vectorstore.assert_not_called()
+        openai.assert_not_called()
+        self.assertEqual(app.classify_query("你好"), "chitchat")
+        self.assertIn("我是 MarxOS", answer)
 
     def test_run_query_can_build_topic_view_answer_without_llm(self):
         docs = [
@@ -127,7 +136,7 @@ class RunQueryRegressionTests(unittest.TestCase):
             patch("app.load_vectorstore", return_value=FakeDb()),
             patch("app.retrieve_documents", side_effect=fake_retrieve_documents),
             patch("app.paragraph_vectorstore_exists", return_value=False),
-            patch("app.OpenAI") as openai,
+            patch("marxos.generation.llm_client.OpenAI") as openai,
         ):
             answer = app.run_query("请列出马克思关于农民合作社的观点")
 
@@ -172,8 +181,9 @@ class RunQueryRegressionTests(unittest.TestCase):
 
         with (
             patch("app.load_vectorstore", return_value=FakeDb()),
+            patch("app.retrieve_documents", return_value=[doc]),
             patch("app.paragraph_vectorstore_exists", return_value=False),
-            patch("app.OpenAI", return_value=fake_client) as openai,
+            patch("marxos.generation.llm_client.OpenAI", return_value=fake_client) as openai,
         ):
             answer = app.run_query("人的本质是什么？")
 
@@ -222,7 +232,7 @@ class RunQueryRegressionTests(unittest.TestCase):
         with (
             patch("app.load_vectorstore", return_value=FakeDb()),
             patch("app.paragraph_vectorstore_exists", return_value=False),
-            patch("app.OpenAI", return_value=fake_client),
+            patch("marxos.generation.llm_client.OpenAI", return_value=fake_client),
         ):
             answer = app.run_query("人的本质是什么？")
 
@@ -258,7 +268,7 @@ class RunQueryRegressionTests(unittest.TestCase):
             patch("app.load_vectorstore", return_value=FakeDb()),
             patch("app.paragraph_vectorstore_exists", return_value=False),
             patch("sys.stderr", new_callable=io.StringIO),
-            patch("app.OpenAI") as openai,
+            patch("marxos.generation.llm_client.OpenAI") as openai,
         ):
             answer = app.run_query("测试概念说明")
 
@@ -320,7 +330,7 @@ class RunQueryRegressionTests(unittest.TestCase):
                 ),
                 patch("app.load_vectorstore", return_value=FakeDb()),
                 patch("app.paragraph_vectorstore_exists", return_value=False),
-                patch("app.OpenAI", return_value=fake_client),
+                patch("marxos.generation.llm_client.OpenAI", return_value=fake_client),
             ):
                 answer = app.run_query("Phoenix fallback test?")
         finally:

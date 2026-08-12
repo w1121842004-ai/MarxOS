@@ -135,7 +135,7 @@ MILVUS_URI=http://localhost:19530 \
 
 4. Keep FAISS enabled until Milvus search is validated.
 
-5. Add a Milvus backend behind `marxos_vector_backend.py`.
+5. Add a Milvus backend behind `marxos/vector_backend.py`.
 
 6. Switch web retrieval via environment variable:
 

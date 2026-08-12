@@ -4,16 +4,16 @@ existing sentence-transformer embedding model.
 
 **Why this approach:**
 
-- Reuses the embedding model already loaded by ``marxos_runtime.py`` (zero
+- Reuses the embedding model already loaded by ``marxos.runtime`` (zero
   additional model bytes).
 - Trains a tiny logistic-regression head (~10 KB on disk) that adds <1 ms
   inference overhead after embedding.
-- Falls back gracefully to the rule-based ``marxos_query_intent`` system when
+- Falls back gracefully to the rule-based ``marxos.query_intent`` system when
   the classifier file is absent.
 
 **Training:** ``scripts/build_intent_classifier.py``
 
-**Integration:** ``marxos_query_intent.classify_query_v2()`` auto-detects the
+**Integration:** ``marxos.query_intent.classify_query_v2()`` auto-detects the
 classifier and blends its output with rule-based scores.
 """
 
