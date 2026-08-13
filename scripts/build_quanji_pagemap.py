@@ -120,10 +120,23 @@ def collect_candidates(
         value = candidate.get("printed_page")
         if isinstance(value, int):
             add(value, str(candidate.get("region") or "unknown"), "legacy_candidate", trusted=True)
+    # 顶部带 OCR 证据（RapidOCR，当前 PDF 权威来源）：printed 为最强证据，
+    # margin（边码）仅作备用候选。
+    ocr_evidence = page.get("page_number_ocr") or {}
+    printed = ocr_evidence.get("printed") or {}
+    if isinstance(printed.get("value"), int):
+        add(printed["value"], "printed_top", "ocr_top_printed", trusted=True)
+    for number in ocr_evidence.get("numbers") or []:
+        if number.get("class") == "margin" and isinstance(number.get("value"), int):
+            add(number["value"], "header", "ocr_margin", trusted=True)
+    # 书信卷：页脚带 OCR（印刷页在页脚的概率高）。
+    for number in page.get("page_number_ocr_bottom") or []:
+        if isinstance(number.get("value"), int):
+            add(number["value"], "footer", "ocr_bottom", trusted=True)
     return candidates
 
 
-REGION_BONUS = {"footer": 0.6, "header": 0.0, "unknown": 0.2}
+REGION_BONUS = {"printed_top": 1.0, "footer": 0.6, "header": 0.0, "unknown": 0.2}
 GAP_COST = -0.6
 
 
