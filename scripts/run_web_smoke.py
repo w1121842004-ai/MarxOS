@@ -64,7 +64,7 @@ def ask(port: int, case: SmokeCase, timeout: int = 180) -> tuple[int, dict, int]
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a short real web API smoke test.")
     parser.add_argument("--report", default=str(ROOT / "logs" / "web_smoke_latest.json"))
-    parser.add_argument("--timeout", type=int, default=90)
+    parser.add_argument("--timeout", type=int, default=240)
     parser.add_argument("--only-label", default="")
     args = parser.parse_args()
     cases = [case for case in CASES if not args.only_label or case.label == args.only_label]

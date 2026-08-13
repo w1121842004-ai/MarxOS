@@ -131,6 +131,15 @@ marxos.config.settings.get_settings()
 - 新增回归测试：版本尊重、未指定版本优先级、专题追问不越界（含真实 bug 修复）。
 - 检索约束/模式优先级文档：`docs/retrieval_priority.md`。
 
+### 2026-08-13 评测收尾（95/95）
+
+- `scripts/evaluate_retrieval.py`：**95/95**（core_title 57/57、core_quote 21/21、negative 8/8、concept 9/9），此前 92/95 的三个失败全部清零：
+  - #22 核心引文「资本不是物……」（资本论第三卷）：`KNOWN_QUOTE_FALLBACKS` 新增 mea07 p922 / mes02 p644 两条确定性条目；fallback 元数据支持直接携带 `article`（classic_id 不在 core_classics 时用）。
+  - #81 概念题「资本是什么」：评测期望更新为语料真实布局（资本论第一卷 = mea05/mes02），旧期望 mea01/mea07 与语料不符（契约确认后修正，非放宽断言）。
+  - #84 概念题「唯物辩证法」：ranking 新增卷首作者说明页降权（article 为纯作者名且页码 ≤15，-90 分），「恩格斯」说明页不再压过《反杜林论》。
+  - 连带：quote_lookup 的 OCR 精确查找不再被 catalog entries 门禁挡住（无条目时同样先查 OCR，逐字命中优先于向量候选）。
+- `scripts/run_web_smoke.py` 默认超时 90s → 240s（pro 模型 deep 轮次实测 74–105s，原超时过紧）。
+
 ### 稳定化完成定义（Definition of Done）
 
 - 唯一默认 profile、启动命令、数据 manifest 和索引 manifest 已冻结并有版本号。

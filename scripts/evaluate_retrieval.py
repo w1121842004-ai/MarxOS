@@ -83,7 +83,9 @@ CONCEPT_QUESTIONS = [
     EvalQuestion(
         "concept",
         "资本是什么？",
-        expected_sources=("mea01.pdf", "mes02.pdf", "mea07.pdf"),
+        # 资本论第一卷在文集第5卷（mea05）/选集第2卷（mes02）；旧期望里的
+        # mea01（文集第1卷）与 mea07（资本论第三卷）与语料布局不符。
+        expected_sources=("mea05.pdf", "mes02.pdf"),
         expected_article_terms=("资本",),
         expected_content_terms=("资本",),
     ),

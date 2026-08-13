@@ -620,19 +620,24 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
         return locator_backstop_documents(constraints, limit=k)
 
     if allow_exact_quote and is_quote_lookup_query(query) and not is_work_location_query(query, ctx):
-        # Phase A: OCR exact quote lookup (highest precision)
-        if constraints.get("entries"):
-            exact_docs = exact_quote_lookup(query, OCR_CACHE_DIR, limit=k,
-                                            constraints=constraints)
-            if exact_docs:
-                docs = annotate_docs_with_constraints(exact_docs, constraints, ctx)
-                return append_locator_backstops(docs, constraints, k, ctx)
-            if constraints.get("strict_title"):
-                cache_docs = strict_title_cache_documents(query, constraints, k, ctx)
-                if cache_docs:
-                    cache_docs = annotate_docs_with_constraints(cache_docs, constraints, ctx)
-                    return append_locator_backstops(cache_docs, constraints, k, ctx)
-                return locator_backstop_documents(constraints, limit=k)
+        # Phase A: OCR exact quote lookup (highest precision). Runs with or
+        # without constraint entries: a verbatim quote confirmed in the OCR
+        # cache always beats vector candidates.
+        exact_docs = exact_quote_lookup(
+            query,
+            OCR_CACHE_DIR,
+            limit=k,
+            constraints=constraints if constraints.get("entries") else None,
+        )
+        if exact_docs:
+            docs = annotate_docs_with_constraints(exact_docs, constraints, ctx)
+            return append_locator_backstops(docs, constraints, k, ctx)
+        if constraints.get("entries") and constraints.get("strict_title"):
+            cache_docs = strict_title_cache_documents(query, constraints, k, ctx)
+            if cache_docs:
+                cache_docs = annotate_docs_with_constraints(cache_docs, constraints, ctx)
+                return append_locator_backstops(cache_docs, constraints, k, ctx)
+            return locator_backstop_documents(constraints, limit=k)
 
         # Phase B (NEW): BM25 sparse retrieval fallback for quote lookup.
         # Lexical matching often finds quoted passages that dense embeddings miss.

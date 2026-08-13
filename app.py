@@ -2212,6 +2212,14 @@ def score_document_quality(metadata, content):
     if article == clean_text(metadata.get("book"), "") and metadata_citation_page(metadata) is not None and metadata_citation_page(metadata) <= 10:
         score -= 100
 
+    # 卷首作者说明页：article 为纯作者名且页码很小（v2 语料中常被错标为 body）。
+    if (
+        article_norm in {"恩格斯", "马克思", "马克思恩格斯"}
+        and metadata_citation_page(metadata) is not None
+        and metadata_citation_page(metadata) <= 15
+    ):
+        score -= 90
+
     if is_noisy_article_title(article):
         score -= 60
 

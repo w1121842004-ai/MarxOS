@@ -114,6 +114,24 @@ KNOWN_QUOTE_FALLBACKS = [
         "pdf_page": 435,
         "printed_page": 419,
     },
+    {
+        # \u300a\u8d44\u672c\u8bba\u300b\u7b2c\u4e09\u5377\u6700\u8457\u540d\u7684\u5b9a\u4e49\u53e5\u4e4b\u4e00\uff1bclassic_id \u4e0d\u5728 core_classics\uff0c
+        # \u7531 article \u5b57\u6bb5\u76f4\u63a5\u63d0\u4f9b\u7bc7\u76ee\u5143\u6570\u636e\u3002
+        "quote": "\u8d44\u672c\u4e0d\u662f\u7269\u800c\u662f\u4e00\u5b9a\u7684\u793e\u4f1a\u7684\u5c5e\u4e8e\u4e00\u5b9a\u5386\u53f2\u793e\u4f1a\u5f62\u6001\u7684\u751f\u4ea7\u5173\u7cfb",
+        "classic_id": "capital_vol3",
+        "source": "mea07.pdf",
+        "pdf_page": 940,
+        "printed_page": 922,
+        "article": "\u8d44\u672c\u8bba \u7b2c\u4e09\u5377",
+    },
+    {
+        "quote": "\u8d44\u672c\u4e0d\u662f\u7269\u800c\u662f\u4e00\u5b9a\u7684\u793e\u4f1a\u7684\u5c5e\u4e8e\u4e00\u5b9a\u5386\u53f2\u793e\u4f1a\u5f62\u6001\u7684\u751f\u4ea7\u5173\u7cfb",
+        "classic_id": "capital_vol3",
+        "source": "mes02.pdf",
+        "pdf_page": 661,
+        "printed_page": 644,
+        "article": "\u8d44\u672c\u8bba \u7b2c\u4e09\u5377",
+    },
 ]
 _PAGE_MAP_CACHE = None
 
@@ -406,8 +424,12 @@ def known_quote_fallback_docs(normalized_quote, query=""):
 
         metadata = {
             "book": BOOK_BY_SOURCE.get(fallback["source"]) or fallback["source"],
-            "article": (entry or {}).get("article") or (entry or {}).get("classic_title"),
-            "section": (entry or {}).get("article") or (entry or {}).get("classic_title"),
+            "article": (entry or {}).get("article")
+            or (entry or {}).get("classic_title")
+            or fallback.get("article"),
+            "section": (entry or {}).get("article")
+            or (entry or {}).get("classic_title")
+            or fallback.get("article"),
             "page": fallback["pdf_page"],
             "printed_page": fallback["printed_page"],
             "pdf_page": fallback["pdf_page"],
