@@ -20,12 +20,23 @@ venv\Scripts\python.exe scripts\test.py app
 覆盖 `/api/ask` 的 payload、evidence 和 metrics 行为：
 
 - `test_web_api.py`
+- `test_web_smoke_runner.py`
 
 运行：
 
 ```powershell
 venv\Scripts\python.exe scripts\test.py web
 ```
+
+该分组会使用 mock 隔离 LLM、模型与索引。版本化的 20 条高频问题位于
+`tests/fixtures/web_smoke_v1.json`，可单独运行确定性契约烟测：
+
+```powershell
+venv\Scripts\python.exe scripts\run_web_smoke_ci.py --report logs\web_smoke_ci.json
+```
+
+`run_web_smoke_ci.py` 只验证 Web 请求编排和响应字段契约；真实检索、生成与性能仍由
+`scripts/run_web_smoke.py` 在部署环境中验证。
 
 ## `rag`
 

@@ -342,6 +342,9 @@ def _score_quote(query: str, struct: dict, clean_text) -> float:
     volume_refs = ["马恩全集", "马克思恩格斯全集", "文集", "选集", "哪一卷", "第几卷"]
     if not struct["has_quote"] and any(v in query for v in volume_refs):
         score -= 0.15
+    # Summarize requests are not quote lookups even when they mention 出处.
+    if struct["question_type"] == "SUMMARIZE":
+        score -= 0.50
 
     return max(0.0, min(1.0, score))
 
@@ -368,6 +371,31 @@ def _score_concept(query: str, struct: dict, clean_text) -> float:
     # Boost concept over bibliographic for this pattern
     if struct["has_book_title"] and struct["question_type"] in ("WHAT_DEFINITION", "WHAT"):
         score += 0.20  # was 0.10 — stronger boost to beat bibliographic
+
+    # Concept term + "看待/怎么看" → explaining the concept, not free analysis.
+    # "如何理解X" stays theory_analysis; "怎么看待资本逻辑" is a concept question.
+    concept_terms = (
+        "异化", "阶级", "资本", "剩余价值", "生产力", "生产关系", "意识形态",
+        "辩证法", "唯物史观", "商品拜物教", "劳动价值论", "价值规律",
+        "经济基础", "上层建筑", "拜金主义", "物化",
+    )
+    if (
+        struct["question_type"] in ("HOW", "HOW_UNDERSTAND")
+        and struct["char_length"] < 30
+        and ("看待" in query or "怎么看" in query)
+        and any(term in query for term in concept_terms)
+    ):
+        score += 0.25
+
+    # Communism inevitability questions are yes/no concept questions, not
+    # deep multi-work analysis ("共产主义是不是一定会实现？").
+    communism_patterns = (
+        "共产主义是不是", "共产主义是否", "共产主义会不会",
+        "共产主义能不能", "共产主义能否", "共产主义一定会实现",
+        "共产主义必然实现", "共产主义会实现",
+    )
+    if any(pattern in query for pattern in communism_patterns):
+        score += 0.30
 
     # Penalties
     if struct["has_analysis_verb"] and struct["question_type"] not in ("WHAT_DEFINITION", "WHAT"):
@@ -439,15 +467,10 @@ def _score_deep_analysis(query: str, struct: dict, clean_text) -> float:
     # Summarize + book title → deep analysis ("总结《资本论》X理论")
     if any(k in query for k in summarize_kw) and struct["has_book_title"]:
         score += 0.25
-
-    # Communism prediction questions
-    communism = [
-        "共产主义是不是", "共产主义是否", "共产主义会不会",
-        "共产主义能不能", "共产主义能否", "共产主义一定会实现",
-        "共产主义必然实现", "共产主义会实现",
-    ]
-    if any(p in query for p in communism):
-        score += 0.25
+    # Academic summary requests route here, not to quote_lookup even when they
+    # ask for sources to be noted ("并注明关键出处").
+    if struct["question_type"] == "SUMMARIZE" and struct["char_length"] >= 40:
+        score += 0.30
 
     return max(0.0, min(1.0, score))
 

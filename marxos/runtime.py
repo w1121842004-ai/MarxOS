@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from langchain_community.vectorstores import FAISS
-from marxos.config import get_settings
 from marxos.embeddings import HuggingFaceEmbeddings, create_sparse_encoder, embedding_encode_kwargs
 from marxos.vector_backend import MilvusVectorBackend
 
@@ -14,9 +13,6 @@ try:
     from langchain_core._api.deprecation import LangChainDeprecationWarning
 except ImportError:
     LangChainDeprecationWarning = DeprecationWarning
-
-SETTINGS = get_settings()
-
 
 @dataclass
 class RuntimeState:
@@ -31,9 +27,11 @@ class RuntimeState:
     dual_retrieval_env: str
     vector_backend_env: str = "MARXOS_VECTOR_BACKEND"
     vector_backend_default: str = "milvus"
-    milvus_uri: str = "./data/milvus_lite/marxos_bgem3_sparse.db"
-    milvus_collection: str = "marxos_me_passages"
+    milvus_uri: str = "./data/milvus_lite/marxos_text_layer_bgem3.db"
+    milvus_collection: str = "marxos_text_layer_bgem3"
     milvus_embedding_device: str = "cpu"
+    milvus_sparse_provider: str = "lexical"
+    milvus_bm25_stats_path: str = ""
     embeddings_instance: HuggingFaceEmbeddings | None = None
     vectorstore_instance: FAISS | None = None
     paragraph_vectorstore_instance: FAISS | None = None
@@ -140,6 +138,11 @@ class RuntimeState:
 
     def load_milvus_vectorstore(self) -> MilvusVectorBackend:
         if self.milvus_vectorstore_instance is None:
+            # Load tokenizers/encoders before Milvus starts gRPC worker threads.
+            # Forking from tokenizer/model initialization after gRPC is active is
+            # unsafe on macOS ARM and can terminate the process without traceback.
+            embeddings = self.load_embeddings()
+            sparse_embeddings = self.load_sparse_embeddings()
             MilvusClient = self._import_milvus_client()
 
             self.milvus_client_instance = MilvusClient(uri=self.milvus_uri)
@@ -147,8 +150,8 @@ class RuntimeState:
             self.milvus_vectorstore_instance = MilvusVectorBackend(
                 client=self.milvus_client_instance,
                 collection_name=self.milvus_collection,
-                embedding_model=self.load_embeddings(),
-                sparse_embedding_model=self.load_sparse_embeddings(),
+                embedding_model=embeddings,
+                sparse_embedding_model=sparse_embeddings,
                 collection_loaded=True,
             )
             if os.getenv("MILVUS_PREWARM_QUERY_ENCODER", "1").lower() in {"1", "true", "yes", "on"}:
@@ -159,7 +162,7 @@ class RuntimeState:
         return self.milvus_vectorstore_instance
 
     def load_sparse_embeddings(self):
-        provider = os.getenv("MILVUS_SPARSE_PROVIDER", SETTINGS.index.milvus_sparse_provider)
+        provider = os.getenv("MILVUS_SPARSE_PROVIDER", self.milvus_sparse_provider)
         if provider.strip().lower() in {"", "0", "false", "off", "none"}:
             return None
         if self.sparse_embeddings_instance is None:
@@ -167,6 +170,7 @@ class RuntimeState:
                 provider,
                 self.embedding_model,
                 device=self.milvus_embedding_device,
+                bm25_stats_path=self.milvus_bm25_stats_path or None,
             )
         return self.sparse_embeddings_instance
 

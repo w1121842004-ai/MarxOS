@@ -7,9 +7,12 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from marxos.config import get_settings
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
 SETTINGS = get_settings()
 PAGE_MAP_PATH = ROOT_DIR / os.getenv("PAGE_MAP_PATH", SETTINGS.corpus.page_map_path)
 ARTICLE_MAP_PATH = ROOT_DIR / os.getenv("ARTICLE_MAP_PATH", SETTINGS.corpus.article_map_path)

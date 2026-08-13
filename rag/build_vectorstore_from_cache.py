@@ -405,7 +405,7 @@ def infer_page_from_sequence(
                     printed_page = expected_page
                     page_source = "page_sequence"
                 elif (
-                    not trusted_page_source
+                    (not trusted_page_source or printed_page_source_is_untrusted(source))
                     and
                     printed_page != expected_page
                     and previous_run_length >= min_run_for_correction
@@ -582,6 +582,7 @@ def document_from_cache(cache_path, title_context, page_sequence_context=None):
             "title_page_pdf_page": title_page_info.get("pdf_page"),
             "author_from_title_page": title_page_info.get("author"),
             "cleaning_reasons": ",".join(cleaned_page.get("reasons") or []),
+            "text_source": cleaned_page.get("text_source") or "legacy_ocr",
         },
     )
 

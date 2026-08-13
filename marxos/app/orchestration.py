@@ -331,11 +331,18 @@ def collect_retrieval_materials(
             except BrokenPipeError:
                 pass
 
-    def retrieve_documents_for_mode(query_text, db, k):
+    def retrieve_documents_for_mode(query_text, db, k, variant_retrieval=False):
         try:
-            return retrieve_documents(query_text, db, k=k, performance=performance, strategy=strategy)
+            return retrieve_documents(
+                query_text,
+                db,
+                k=k,
+                performance=performance,
+                strategy=strategy,
+                variant_retrieval=variant_retrieval,
+            )
         except TypeError as exc:
-            if "performance" not in str(exc) and "strategy" not in str(exc):
+            if "performance" not in str(exc) and "strategy" not in str(exc) and "variant_retrieval" not in str(exc):
                 raise
             return retrieve_documents(query_text, db, k=k)
 
@@ -384,8 +391,15 @@ def collect_retrieval_materials(
 
         per_query_k = max(k, min(k * 2, 16))
         doc_lists = []
-        for variant in retrieval_queries:
-            doc_lists.append(retrieve_documents_for_mode(variant, db, per_query_k))
+        for index, variant in enumerate(retrieval_queries):
+            doc_lists.append(
+                retrieve_documents_for_mode(
+                    variant,
+                    db,
+                    per_query_k,
+                    variant_retrieval=index > 0,
+                )
+            )
         return _tag_docs(rrf_merge_doc_lists(doc_lists, limit=max(k * 2, 12)), "planner_rrf_chunk")[:k]
 
     def build_state(selected_docs, selected_paragraph_docs, report, path):

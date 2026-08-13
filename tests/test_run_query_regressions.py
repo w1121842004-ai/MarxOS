@@ -7,9 +7,10 @@ from langchain_core.documents import Document
 
 import app
 from marxos.app import orchestration
+from tests.unit_support import OfflineAppTestCase
 
 
-class RunQueryRegressionTests(unittest.TestCase):
+class RunQueryRegressionTests(OfflineAppTestCase):
     def test_collect_retrieval_materials_uses_corrective_retrieval_for_low_quality_initial_docs(self):
         weak_doc = Document(
             page_content="定位提示：请在原文范围内核对。",
@@ -343,6 +344,57 @@ class RunQueryRegressionTests(unittest.TestCase):
 
         self.assertTrue(answer)
         self.assertIn("Phoenix", answer)
+
+    # ── P2 高频回归：版本尊重与专题越界 ─────────────────────────────
+
+    def test_explicit_edition_request_respects_collection(self):
+        wenji = app.constraints_from_query("《雇佣劳动与资本》收录在文集中哪一卷？")
+        xuanji = app.constraints_from_query("《雇佣劳动与资本》收录在选集中哪一卷？")
+
+        self.assertEqual(wenji.get("sources"), {"mea01.pdf"})
+        self.assertEqual(xuanji.get("sources"), {"mes01.pdf"})
+
+    def test_unversioned_query_prefers_configured_edition_order(self):
+        constraints = app.constraints_from_query("《雇佣劳动与资本》收录在哪一卷？")
+
+        # 全集 > 文集 > 选集（配置优先级 MARXOS_PREFERRED_EDITIONS）
+        self.assertEqual(constraints.get("entries", [{}])[0].get("source"), "me06.pdf")
+        self.assertEqual(
+            constraints.get("sources"),
+            {"me06.pdf", "mea01.pdf", "mes01.pdf"},
+        )
+
+    def test_topic_followup_does_not_leak_into_unrelated_question(self):
+        from marxos.web import support as web_support
+        from web_app import MarxOSHandler
+
+        history = [
+            {
+                "role": "bot",
+                "text": "马克思关于农民问题的论述……",
+                "topic": {"topic_id": "peasant_cooperative", "topic_label": "农民问题与土地问题"},
+            },
+        ]
+        unrelated = "如何理解剩余价值这个概念？"
+        self.assertEqual(
+            web_support.topic_scoped_query(
+                unrelated,
+                history,
+                web_support.is_contextual_followup,
+                MarxOSHandler._names_explicit_subject,
+            ),
+            unrelated,
+        )
+        contextual = "再展开说说小农的具体处境"
+        self.assertEqual(
+            web_support.topic_scoped_query(
+                contextual,
+                history,
+                web_support.is_contextual_followup,
+                MarxOSHandler._names_explicit_subject,
+            ),
+            "农民问题与土地问题：再展开说说小农的具体处境",
+        )
 
 
 if __name__ == "__main__":

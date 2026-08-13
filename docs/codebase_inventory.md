@@ -21,6 +21,10 @@ PDF
 
 - `app.py`
 - `web_app.py`
+- `marxos/config/settings.py`
+- `marxos/runtime.py`
+- `marxos/vector_backend.py`
+- `retrieval/`
 - `rag/`
 - `scripts/check.py`
 - `tests/*.py`
@@ -39,7 +43,9 @@ PDF
 
 | 文件 | 核心功能 | 关联 |
 | --- | --- | --- |
+| `marxos/config/settings.py` | corpus、retrieval、index、answer、web profile 与环境变量收口 | `app.py`、`marxos/runtime.py`、构建脚本 |
 | `marxos/runtime.py` | 运行时状态、embedding/vectorstore 缓存、开发模式开关 | `app.py`、`web_app.py` |
+| `marxos/vector_backend.py` | MilvusVectorBackend 适配层，负责 dense/hybrid search、query vector cache 和 Milvus filter | `marxos/runtime.py`、检索链路 |
 | `marxos/embeddings.py` | HuggingFace embeddings 兼容导入层，压平旧 LangChain 弃用 warning | `marxos/runtime.py`、构建与评测脚本 |
 | `marxos/query_intent.py` | query intent 分类、路由辅助 | `app.py` |
 | `marxos/generation/citations.py` | citation 格式化、证据生成、回答引文审计 | `app.py`、`web_app.py` |
@@ -86,6 +92,8 @@ PDF
 | `rag/topic_catalog.json` | 专题检索目录 | `app.py`、`retrieval/` |
 | `eval_dataset.json` | 端到端评测集 | `scripts/evaluate_eval_dataset.py` |
 | `data/page_map.json` | PDF 页与印刷页映射 | `app.py` |
+| `data/paragraph_cache.jsonl` | 默认 paragraph cache；不存在时配置层可回退到 core cache | `marxos/config/settings.py`、构建/检索脚本 |
+| `data/milvus_lite/marxos_bgem3_sparse.db` | 默认 Milvus Lite 数据库路径 | `marxos/runtime.py`、`marxos/vector_backend.py` |
 
 ## 7. 构建、评测与审计脚本
 
@@ -102,6 +110,7 @@ PDF
 | `scripts/build_paragraph_cache.py` | 构建 paragraph cache | 构建脚本 |
 | `scripts/build_semantic_child_vectorstore.py` | 从 paragraph cache 构建 semantic child 向量库 | 构建脚本 |
 | `scripts/build_paragraph_vectorstore.py` | 构建 paragraph vectorstore | 构建脚本 |
+| `scripts/build_milvus_collection.py` | 从 paragraph/semantic parent cache 构建 Milvus Lite 或 Standalone collection | 构建脚本 |
 
 ### 7.2 审计与诊断
 
@@ -128,8 +137,12 @@ PDF
 | `tests/test_web_api.py` | `/api/ask` evidence / metrics 回归 |
 | `tests/test_app_local_paths.py` | 本地路径、离线路径、引文路径大套件 |
 | `tests/test_core_bibliography.py` | 核心书目逻辑 |
+| `tests/test_intent_strategies.py` | intent-specific retrieval strategy 配置与合并逻辑 |
 | `tests/test_page_metadata_inference.py` | 页码 metadata 推断 |
 | `tests/test_paragraph_cache.py` | paragraph cache 逻辑 |
+| `tests/test_phoenix_status.py` | Phoenix 可观测状态输出 |
+| `tests/test_retrieval_front_matter.py` | 目录、前言等非正文噪声排序回归 |
+| `tests/test_retrieval_ranking.py` | ranking 维度与策略调节回归 |
 
 ## 9. 已经清掉的历史残留
 
@@ -172,9 +185,11 @@ PDF
 
 如果继续做下一轮整理，建议顺序是：
 
-1. 继续压薄 `app.py`（消除 retrieval 薄 wrapper）
-2. 视需要整理 `docs/dev_logs/`
-3. 最后再考虑更大规模的目录重组
+1. 按 `task.md` 先完成稳定化修复，不在高风险链路未收敛前扩展新能力。
+2. 固化数据构建合同：paragraph cache、Milvus collection、页码映射、证据字段必须可校验。
+3. 补齐 Web/API、多轮 follow-up、检索/引用页码的回归测试。
+4. 继续压薄 `app.py`（消除 retrieval 薄 wrapper），但只在测试护栏齐备后进行。
+5. 最后再考虑更大规模的目录重组和部署形态扩展。
 
 ## 12. 一句话总结
 

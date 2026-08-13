@@ -1,5 +1,7 @@
 # MarxOS 系统全景架构
 
+> 状态说明（2026-08-12）：本文的全景图保留用于快速理解系统，但其中部分数量、FAISS 维度和历史数据规模属于旧快照，不应作为当前运行契约。当前可执行架构与默认配置以 [architecture.md](./architecture.md)、[milvus_migration_plan.md](./milvus_migration_plan.md) 和根目录 [task.md](../task.md) 为准。当前阶段以稳定化修复为主。
+
 ```
 ═══════════════════════════════════════════════════════════════════════════════════════════════════
                                       MarxOS — 马克思经典文本智能问答系统
@@ -59,7 +61,7 @@
 │   │    Milvus (V3 主引擎)     │  │    FAISS (V2 / 离线)     │  │    BM25 (稀疏检索)            │ │
 │   │                          │  │                          │  │                              │ │
 │   │  Collection:              │  │  vectorstore/             │  │  paragraph_cache_core.jsonl  │ │
-│   │   marxos_me_passages      │  │   marx_reader_core/       │  │                              │ │
+│   │   marxos_text_layer_bgem3 │  │   marx_reader_core/       │  │                              │ │
 │   │                          │  │                          │  │  关键词匹配 + 得分            │ │
 │   │  Index: HNSW              │  │  Index: IVF              │  │  top_k = 24                  │ │
 │   │  Metric: COSINE           │  │  Metric: L2              │  │                              │ │

@@ -13,6 +13,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from rag.core_classics import classic_entries_for_query, load_core_classics
 from rag.exact_quote_lookup import exact_quote_lookup
+import app
 from app import load_vectorstore as app_load_vectorstore
 from app import retrieve_documents
 
@@ -307,7 +308,7 @@ def format_metadata(metadata: dict) -> str:
 
 
 def load_vectorstore():
-    if not VECTORSTORE_DIR.exists():
+    if app.RUNTIME.vector_backend() == "faiss" and not VECTORSTORE_DIR.exists():
         raise FileNotFoundError(
             f"Vectorstore not found: {VECTORSTORE_DIR}. Build it before running evaluation."
         )

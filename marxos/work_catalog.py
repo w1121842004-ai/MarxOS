@@ -272,6 +272,22 @@ class WorkCatalog:
 
         return best_match
 
+    def has_explicit_title_mention(self, query, normalize_fn=None) -> bool:
+        """True when a full work title (not merely an alias) appears in *query*.
+
+        Alias matches such as "农民问题" → 《法德农民问题》 are deliberately
+        excluded: a topic list query ("列出十段马克思关于农民合作社的观点")
+        contains alias words but no work title, and must stay a topic query.
+        """
+        norm_fn = normalize_fn or _normalize
+        qn = norm_fn(query)
+        if not qn:
+            return False
+        return any(
+            norm_title and len(norm_title) >= 4 and norm_title in qn
+            for norm_title in self._title_index
+        )
+
     def match_by_concepts(self, query, normalize_fn=None):
         """Find works whose concepts appear in the query.
 

@@ -645,16 +645,10 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
                 sparse_docs = expand_semantic_parent_docs(sparse_docs)
                 return append_locator_backstops(sparse_docs, constraints, k, ctx)
 
-        # Phase C: Preserve original behaviour when sparse_first is not active.
-        # Without entries → return []. With entries but no OCR hit →
-        # return [] unless sparse_first is active (which allows fall-through
-        # to dense+hybrid after BM25 is tried).
-        if not sparse_first:
-            return []
-        # With sparse_first active but BM25 also failed: fall through to
-        # standard dense+hybrid retrieval below (new behaviour for quote lookups).
-        if not constraints.get("entries"):
-            return []
+        # Phase C: no exact-quote hit → fall through to standard dense+hybrid
+        # retrieval. Candidates are marked as unconfirmed downstream
+        # (match_type "vector_candidate", confidence 0.0) and the prompt warns
+        # the LLM that no exact quote match was found.
 
     if constraints.get("high_precision_locator"):
         cache_docs = strict_title_cache_documents(query, constraints, k, ctx)

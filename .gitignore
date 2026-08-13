@@ -5,9 +5,9 @@ venv/
 __pycache__/
 *.py[cod]
 
-data/
-vectorstore/
-logs/
+/data/
+/vectorstore/
+/logs/
 *.log
 temp_*.png
 page_*.png

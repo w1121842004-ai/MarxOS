@@ -12,9 +12,11 @@
 
 ```text
 用户问题
+-> Web 本地 follow-up 判断
 -> query intent 判断
+-> query planner
 -> retrieval constraints
--> chunk / paragraph 检索
+-> Milvus/FAISS/BM25 检索
 -> rerank / citation refine
 -> evidence cards
 -> prompt builder
@@ -45,6 +47,7 @@
 - [web_app.py](../web_app.py)
   - Web API / UI 入口
   - 调用 `app.run_query(...)`
+  - 在进入主 RAG 前会先处理部分本地 follow-up，例如上一轮证据页码、专题条目解释、引文原页摘录
 
 - [marxos/web/support.py](../marxos/web/support.py)
   - Web 层公共辅助函数
@@ -67,8 +70,9 @@
 ### 运行时与依赖
 
 - [marxos/runtime.py](../marxos/runtime.py)
-  - vectorstore / paragraph vectorstore 加载
+  - Milvus / FAISS vectorstore 与 paragraph vectorstore 加载
   - dev/trace/dual retrieval 开关
+  - Milvus Lite collection 加载、embedding 与 sparse encoder 复用、可选预热
 
 - [marxos/embeddings.py](../marxos/embeddings.py)
   - 统一 embedding 导入和兼容层
@@ -97,7 +101,11 @@
   - rerank、diversify、dedup、topic selection
 
 - [retrieval/modes.py](../retrieval/modes.py)
-  - hybrid (dense+BM25) retrieval、strict-title backstop、paragraph/dual retrieval、citation refinement
+  - exact quote、sparse-first、dense/hybrid retrieval、strict-title backstop、paragraph/dual retrieval、citation refinement
+
+- [marxos/vector_backend.py](../marxos/vector_backend.py)
+  - `MilvusVectorBackend`
+  - 封装 Milvus dense search / hybrid search / filter / query vector cache
 
 - [marxos/generation/citations.py](../marxos/generation/citations.py)
   - 引文格式
@@ -114,6 +122,12 @@
 - `data/ocr_cache/`
   - OCR 后的文本缓存
 
+- `data/milvus_lite/marxos_text_layer_bgem3.db`
+  - 当前默认 Milvus Lite 数据库
+  - collection 默认是 `marxos_text_layer_bgem3`
+  - 默认 embedding 是 `BAAI/bge-m3`
+  - 默认 sparse provider 是 `lexical`
+
 - [rag/ocr_to_cache.py](../rag/ocr_to_cache.py)
   - PDF 文本层提取和扫描页 OCR
 
@@ -125,6 +139,30 @@
 
 - [scripts/build_paragraph_vectorstore.py](../scripts/build_paragraph_vectorstore.py)
   - 段落级向量库
+
+- [scripts/build_milvus_collection.py](../scripts/build_milvus_collection.py)
+  - 从 paragraph cache 或 semantic parent cache 构建 Milvus collection
+
+## 3.1 当前默认运行基线
+
+当前默认配置来自 [marxos/config/settings.py](../marxos/config/settings.py)：
+
+```text
+MARXOS_CORPUS_PROFILE=me_full_v2
+MARXOS_RETRIEVAL_PROFILE=milvus_bgem3_v2
+MARXOS_ANSWER_PROFILE=deepseek_default
+MILVUS_URI=./data/milvus_lite/marxos_corpus_v2.db
+MILVUS_COLLECTION=marxos_passages_v2
+MARXOS_EMBEDDING_MODEL=BAAI/bge-m3
+MILVUS_SPARSE_PROVIDER=bm25
+MARXOS_BM25_STATS_PATH=data/artifacts/corpus_v2/bm25_stats_v2_1.json
+MILVUS_HYBRID_SEARCH=1
+OMP_NUM_THREADS=1
+```
+
+回滚入口（旧 P0 基线）：`MARXOS_CORPUS_PROFILE=me_full` + `MARXOS_RETRIEVAL_PROFILE=milvus_bgem3_stable` + 对应旧 `MILVUS_URI`/`MILVUS_COLLECTION`/`PARAGRAPH_CACHE_PATH`（见 `.env.example` 注释）。
+
+Milvus Lite 是本地内嵌数据库，不需要单独部署 Milvus server；但每个 Python 进程启动后仍需要打开 `.db`、加载 collection、加载 embedding/sparse encoder，并可按 `MILVUS_PREWARM_QUERY_ENCODER` 做预热。macOS ARM 上必须保持 `OMP_NUM_THREADS=1`（torch 与 Milvus Lite 的 FAISS 索引共用 libomp，多线程检索段错误）。
 
 ## 4. 三类脚本
 
@@ -172,6 +210,12 @@ venv\Scripts\python.exe scripts\check.py --mode full
 venv\Scripts\python.exe scripts\check.py --mode quick
 ```
 
+如果改动涉及 `web_app.py` 的多轮追问、payload、前端显示，还必须额外跑：
+
+```powershell
+venv\Scripts\python.exe scripts\test.py web
+```
+
 ### OCR / 数据侧
 
 - OCR 清洗
@@ -194,6 +238,7 @@ venv\Scripts\python.exe scripts\audit.py list
 4. [docs/eval_questions.md](./eval_questions.md)
 5. [app.py](../app.py)
 6. `marxos_*` 主线模块
+7. [task.md](../task.md)
 ## 7. Retrieval Package Status
 
 retrieval 层已经开始从顶层平铺模块收口到 `retrieval/` 包：

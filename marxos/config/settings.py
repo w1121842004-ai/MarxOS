@@ -8,6 +8,10 @@ from pathlib import Path
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 
+DEFAULT_CORPUS_PROFILE = "me_full_v2"
+DEFAULT_RETRIEVAL_PROFILE = "milvus_bgem3_v2"
+DEFAULT_ANSWER_PROFILE = "deepseek_default"
+
 
 def env_flag(name: str, default: str = "0") -> bool:
     return os.getenv(name, default).lower() in TRUE_VALUES
@@ -57,6 +61,19 @@ CORPUS_PROFILES = {
         "page_map_path": "data/page_map.json",
         "preferred_editions": ("me", "wenji", "xuanji"),
     },
+    "me_full_v2": {
+        # Corpus-v2 bypass rebuild (文集10卷 + 选集4卷): authoritative paragraph
+        # artifacts under data/artifacts/corpus_v2 feed both parent expansion
+        # and the Milvus corpus_v2 collection.
+        "article_map_path": "rag/article_map.json",
+        "article_map_extra_paths": "rag/article_map_core.json",
+        "topic_catalog_path": "rag/topic_catalog.json",
+        "paragraph_cache_path": "data/artifacts/corpus_v2/paragraph_records_enriched_v2_1.jsonl",
+        "semantic_parent_cache_path": "data/artifacts/corpus_v2/paragraph_records_enriched_v2_1.jsonl",
+        "ocr_cache_dir": "data/ocr_cache_text_layer",
+        "page_map_path": "data/page_map.json",
+        "preferred_editions": ("me", "wenji", "xuanji"),
+    },
     "core_test": {
         "article_map_path": "rag/article_map_core.json",
         "article_map_extra_paths": "",
@@ -71,6 +88,19 @@ CORPUS_PROFILES = {
 
 
 RETRIEVAL_PROFILES = {
+    "milvus_bgem3_stable": {
+        "vector_backend_default": "milvus",
+        "milvus_hybrid_search": True,
+        "milvus_sparse_provider": "lexical",
+        "semantic_parent_window": 1,
+        "semantic_child_parent_window": 0,
+        "semantic_child_chunk_size": 180,
+        "semantic_child_chunk_overlap": 40,
+        "milvus_retrieval_unit": "paragraph",
+        "milvus_uri": "./data/milvus_lite/marxos_text_layer_bgem3.db",
+        "milvus_collection": "marxos_text_layer_bgem3",
+        "bm25_stats_path": "",
+    },
     "milvus_bgem3_fast": {
         "vector_backend_default": "milvus",
         "milvus_hybrid_search": False,
@@ -80,6 +110,9 @@ RETRIEVAL_PROFILES = {
         "semantic_child_chunk_size": 180,
         "semantic_child_chunk_overlap": 40,
         "milvus_retrieval_unit": "paragraph",
+        "milvus_uri": "./data/milvus_lite/marxos_text_layer_bgem3.db",
+        "milvus_collection": "marxos_text_layer_bgem3",
+        "bm25_stats_path": "",
     },
     "milvus_bgem3_hybrid": {
         "vector_backend_default": "milvus",
@@ -90,6 +123,9 @@ RETRIEVAL_PROFILES = {
         "semantic_child_chunk_size": 180,
         "semantic_child_chunk_overlap": 40,
         "milvus_retrieval_unit": "semantic_child",
+        "milvus_uri": "./data/milvus_lite/marxos_text_layer_bgem3.db",
+        "milvus_collection": "marxos_text_layer_bgem3",
+        "bm25_stats_path": "",
     },
     "faiss_semantic": {
         "vector_backend_default": "faiss",
@@ -100,26 +136,46 @@ RETRIEVAL_PROFILES = {
         "semantic_child_chunk_size": 180,
         "semantic_child_chunk_overlap": 40,
         "milvus_retrieval_unit": "semantic_child",
+        "milvus_uri": "./data/milvus_lite/marxos_text_layer_bgem3.db",
+        "milvus_collection": "marxos_text_layer_bgem3",
+        "bm25_stats_path": "",
+    },
+    "milvus_bgem3_v2": {
+        # Promoted corpus-v2 baseline: side-by-side collection built from
+        # semantic child chunks (320/64) with corpus-fitted BM25 sparse.
+        "vector_backend_default": "milvus",
+        "milvus_hybrid_search": True,
+        "milvus_sparse_provider": "bm25",
+        "semantic_parent_window": 1,
+        "semantic_child_parent_window": 0,
+        "semantic_child_chunk_size": 320,
+        "semantic_child_chunk_overlap": 64,
+        "milvus_retrieval_unit": "semantic_child",
+        "milvus_uri": "./data/milvus_lite/marxos_corpus_v2.db",
+        "milvus_collection": "marxos_passages_v2",
+        "bm25_stats_path": "data/artifacts/corpus_v2/bm25_stats_v2_1.json",
     },
 }
 
 
 ANSWER_PROFILES = {
+    # deepseek-v4-pro: 深度分析/学术问答（deep 模式）。
+    # deepseek-v4-flash: 快速/标准问答与辅助任务（定位、验证、域外问答）。
     "deepseek_default": {
         "deepseek_base_url": "https://api.deepseek.com",
-        "deepseek_model": "deepseek-chat",
+        "deepseek_model": "deepseek-v4-pro",
         "default_performance_mode": "deep",
         "citation_audit_enabled": True,
     },
     "deepseek_fast": {
         "deepseek_base_url": "https://api.deepseek.com",
-        "deepseek_model": "deepseek-chat",
+        "deepseek_model": "deepseek-v4-flash",
         "default_performance_mode": "fast",
         "citation_audit_enabled": True,
     },
     "deepseek_standard": {
         "deepseek_base_url": "https://api.deepseek.com",
-        "deepseek_model": "deepseek-chat",
+        "deepseek_model": "deepseek-v4-flash",
         "default_performance_mode": "standard",
         "citation_audit_enabled": True,
     },
@@ -162,6 +218,7 @@ class ModelSettings:
     embedding_device: str
     deepseek_base_url: str
     deepseek_model: str
+    deepseek_flash_model: str = "deepseek-v4-flash"
 
 
 @dataclass(frozen=True)
@@ -176,6 +233,7 @@ class IndexSettings:
     milvus_hybrid_search: bool
     default_milvus_paragraph_cache: str
     milvus_retrieval_unit: str
+    milvus_bm25_stats_path: str = ""
 
 
 @dataclass(frozen=True)
@@ -225,9 +283,9 @@ class AppSettings:
 
 
 def build_corpus_settings(profile_name: str) -> CorpusSettings:
-    profile = profile_data(CORPUS_PROFILES, profile_name, "me_full")
+    profile = profile_data(CORPUS_PROFILES, profile_name, DEFAULT_CORPUS_PROFILE)
     return CorpusSettings(
-        profile_name=profile_name if profile_name in CORPUS_PROFILES else "me_full",
+        profile_name=profile_name if profile_name in CORPUS_PROFILES else DEFAULT_CORPUS_PROFILE,
         article_map_path=env_str("ARTICLE_MAP_PATH", profile["article_map_path"]),
         article_map_extra_paths=env_str("ARTICLE_MAP_EXTRA_PATHS", profile["article_map_extra_paths"]),
         topic_catalog_path=env_str("TOPIC_CATALOG_PATH", profile["topic_catalog_path"]),
@@ -240,9 +298,9 @@ def build_corpus_settings(profile_name: str) -> CorpusSettings:
 
 
 def build_retrieval_settings(profile_name: str) -> RetrievalSettings:
-    profile = profile_data(RETRIEVAL_PROFILES, profile_name, "milvus_bgem3_hybrid")
+    profile = profile_data(RETRIEVAL_PROFILES, profile_name, DEFAULT_RETRIEVAL_PROFILE)
     return RetrievalSettings(
-        profile_name=profile_name if profile_name in RETRIEVAL_PROFILES else "milvus_bgem3_hybrid",
+        profile_name=profile_name if profile_name in RETRIEVAL_PROFILES else DEFAULT_RETRIEVAL_PROFILE,
         semantic_parent_window=env_int("SEMANTIC_PARENT_WINDOW", profile["semantic_parent_window"]),
         semantic_child_parent_window=env_int("SEMANTIC_CHILD_PARENT_WINDOW", profile["semantic_child_parent_window"]),
         semantic_child_chunk_size=env_int("SEMANTIC_CHILD_CHUNK_SIZE", profile["semantic_child_chunk_size"]),
@@ -271,24 +329,26 @@ def build_model_settings(answer: AnswerSettings) -> ModelSettings:
         embedding_device=env_str("MARXOS_EMBEDDING_DEVICE", "cpu"),
         deepseek_base_url=answer.deepseek_base_url,
         deepseek_model=answer.deepseek_model,
+        deepseek_flash_model=env_str("DEEPSEEK_FLASH_MODEL", "deepseek-v4-flash"),
     )
 
 
 def build_index_settings(corpus: CorpusSettings, retrieval: RetrievalSettings) -> IndexSettings:
+    profile = profile_data(RETRIEVAL_PROFILES, retrieval.profile_name, DEFAULT_RETRIEVAL_PROFILE)
     return IndexSettings(
         vectorstore_dir=env_str(
             "VECTORSTORE_DIR",
             existing_path_or_fallback("vectorstore/marx_reader", "vectorstore/marx_reader_core"),
         ),
         paragraph_vectorstore_dir=env_str("PARAGRAPH_VECTORSTORE_DIR", "vectorstore/marx_reader_paragraph"),
-        milvus_uri=env_str("MILVUS_URI", "./data/milvus_lite/marxos_bgem3_sparse.db"),
-        milvus_collection=env_str("MILVUS_COLLECTION", "marxos_me_passages"),
+        milvus_uri=env_str("MILVUS_URI", profile["milvus_uri"]),
+        milvus_collection=env_str("MILVUS_COLLECTION", profile["milvus_collection"]),
         milvus_dim=env_int("MILVUS_DIM", 1024),
         milvus_batch_size=env_int("MILVUS_BATCH_SIZE", 4),
-        milvus_sparse_provider=env_str("MILVUS_SPARSE_PROVIDER", profile_data(RETRIEVAL_PROFILES, retrieval.profile_name, "milvus_bgem3_hybrid")["milvus_sparse_provider"]),
+        milvus_sparse_provider=env_str("MILVUS_SPARSE_PROVIDER", profile["milvus_sparse_provider"]),
         milvus_hybrid_search=env_flag(
             "MILVUS_HYBRID_SEARCH",
-            "1" if profile_data(RETRIEVAL_PROFILES, retrieval.profile_name, "milvus_bgem3_hybrid")["milvus_hybrid_search"] else "0",
+            "1" if profile["milvus_hybrid_search"] else "0",
         ),
         default_milvus_paragraph_cache=first_existing_path(
             corpus.semantic_parent_cache_path,
@@ -298,8 +358,9 @@ def build_index_settings(corpus: CorpusSettings, retrieval: RetrievalSettings) -
         ),
         milvus_retrieval_unit=env_str(
             "MILVUS_RETRIEVAL_UNIT",
-            profile_data(RETRIEVAL_PROFILES, retrieval.profile_name, "milvus_bgem3_hybrid")["milvus_retrieval_unit"],
+            profile["milvus_retrieval_unit"],
         ),
+        milvus_bm25_stats_path=env_str("MARXOS_BM25_STATS_PATH", profile.get("bm25_stats_path", "")),
     )
 
 
@@ -313,9 +374,9 @@ def build_web_settings() -> WebSettings:
 
 @lru_cache(maxsize=1)
 def get_settings() -> AppSettings:
-    active_corpus = active_profile_name("MARXOS_CORPUS_PROFILE", "me_full")
-    active_retrieval = active_profile_name("MARXOS_RETRIEVAL_PROFILE", "milvus_bgem3_hybrid")
-    active_answer = active_profile_name("MARXOS_ANSWER_PROFILE", "deepseek_default")
+    active_corpus = active_profile_name("MARXOS_CORPUS_PROFILE", DEFAULT_CORPUS_PROFILE)
+    active_retrieval = active_profile_name("MARXOS_RETRIEVAL_PROFILE", DEFAULT_RETRIEVAL_PROFILE)
+    active_answer = active_profile_name("MARXOS_ANSWER_PROFILE", DEFAULT_ANSWER_PROFILE)
 
     profiles = ProfileSettings(
         active_corpus_profile=active_corpus,
@@ -338,4 +399,3 @@ def get_settings() -> AppSettings:
         answer=answer,
         web=web,
     )
-

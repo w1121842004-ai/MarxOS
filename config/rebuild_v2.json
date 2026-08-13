@@ -1,0 +1,71 @@
+{
+  "schema_version": "marxos-rebuild/v2",
+  "status": "preflight",
+  "scope": {
+    "name": "marx_engels_editions_v2",
+    "sources": [
+      "mea01.pdf", "mea02.pdf", "mea03.pdf", "mea04.pdf", "mea05.pdf",
+      "mea06.pdf", "mea07.pdf", "mea08.pdf", "mea09.pdf", "mea10.pdf",
+      "mes01.pdf", "mes02.pdf", "mes03.pdf", "mes04.pdf"
+    ],
+    "expand_corpus_during_rebuild": false
+  },
+  "inputs": {
+    "pdf_dir": "data/marx_engels全集",
+    "page_cache": "data/ocr_cache_text_layer",
+    "article_map": "rag/article_map.json",
+    "work_catalog": "rag/work_catalog.json",
+    "page_map": "data/page_map.json"
+  },
+  "outputs": {
+    "artifact_dir": "data/artifacts/corpus_v2",
+    "page_records": "data/artifacts/corpus_v2/page_records.jsonl",
+    "paragraph_records": "data/artifacts/corpus_v2/paragraph_records.jsonl",
+    "enriched_paragraph_records": "data/artifacts/corpus_v2/paragraph_records_enriched_v2.jsonl",
+    "semantic_parent_records": "data/artifacts/corpus_v2/semantic_parent_records.jsonl",
+    "semantic_child_records": "data/artifacts/corpus_v2/semantic_child_records.jsonl",
+    "retrieval_build_summary": "data/artifacts/corpus_v2/retrieval_build_summary.json",
+    "bm25_stats": "data/artifacts/corpus_v2/bm25_stats_v2.json",
+    "audit_report": "data/artifacts/corpus_v2/audit_report.json",
+    "manifest": "data/artifacts/corpus_v2/manifest.json",
+    "milvus_uri": "data/milvus_lite/marxos_corpus_v2.db",
+    "milvus_collection": "marxos_passages_v2"
+  },
+  "contracts": {
+    "document_record": "document-record/v2",
+    "audit": "document-audit/v1",
+    "immutable_outputs": true,
+    "overwrite_existing": false
+  },
+  "bibliography": {
+    "policy": "exact_source_page_title/v2",
+    "edition_metadata_required": true,
+    "unknown_work_id_allowed": true,
+    "never_guess_work_id": true
+  },
+  "probe": {
+    "chunk_candidates": [
+      {"size": 180, "overlap": 40},
+      {"size": 256, "overlap": 48},
+      {"size": 320, "overlap": 64}
+    ],
+    "sparse_candidates": ["lexical", "bm25"],
+    "full_build_requires_probe_winner": true
+  },
+  "selected_retrieval": {
+    "retrieval_unit": "semantic_child",
+    "chunk_size": 320,
+    "chunk_overlap": 64,
+    "sparse_provider": "bm25",
+    "selection_report": "data/artifacts/corpus_v2/bm25_chunk_eval_v2.json",
+    "hard_negative_guard_required": true
+  },
+  "promotion": {
+    "required_data_errors": 0,
+    "allow_front_matter_in_default_retrieval": false,
+    "require_lineage_round_trip": true,
+    "require_old_index_rollback": true,
+    "required_startup_runs": 10,
+    "required_web_smoke_passes": 20
+  }
+}

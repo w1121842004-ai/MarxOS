@@ -12,6 +12,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       PYTHONUTF8: "1"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      MARXOS_DEV_MODE: "1"
+      MARXOS_TRACE_ONLY: "1"
+      MARXOS_LLM_DISABLED: "1"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -28,6 +33,12 @@ jobs:
 
       - name: Run quick validation
         run: python scripts/check.py --mode quick
+
+      - name: Run isolated Web tests
+        run: python scripts/test.py web
+
+      - name: Run versioned offline Web smoke
+        run: python scripts/run_web_smoke_ci.py --report logs/web_smoke_ci.json
 
   metadata-eval:
     strategy:

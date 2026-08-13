@@ -25,6 +25,59 @@ class VectorBackend(Protocol):
         ...
 
 
+DEFAULT_OUTPUT_FIELDS = [
+    # Legacy scalar fields (marxos_text_layer_* collections).
+    "id",
+    "corpus",
+    "author",
+    "series",
+    "book",
+    "volume",
+    "article",
+    "section",
+    "source",
+    "source_file",
+    "paragraph_id",
+    "parent_paragraph_id",
+    "chunk_id",
+    "retrieval_unit",
+    "pdf_page_start",
+    "pdf_page_end",
+    "printed_page_start",
+    "printed_page_end",
+    "citation_page_start",
+    "citation_page_end",
+    "citation_page_type",
+    "page_type",
+    "is_letter",
+    "citation_mode",
+    "child_chunk_index",
+    "child_chunk_total",
+    "child_char_start",
+    "child_char_end",
+    "child_chunk_size",
+    "text_hash",
+    # Corpus-v2 contract fields (marxos_passages_v2 collection).
+    "work_id",
+    "edition_id",
+    "publisher",
+    "publication_year",
+    "record_id",
+    "document_record_version",
+    "retrieval_record_version",
+    "metadata_schema_version",
+    "build_id",
+    "content_class",
+    "quality_status",
+    "text_source",
+    "source_text_hash",
+    "indexed_text_hash",
+    "text_was_clipped",
+    "retrievable",
+    "text",
+]
+
+
 def milvus_filter_expr(filters: dict[str, Any] | None) -> str:
     """Convert simple equality/list filters to a Milvus boolean expression."""
     filters = filters or {}
@@ -91,44 +144,37 @@ class MilvusVectorBackend:
             ).lower()
             in {"1", "true", "yes", "on"}
         )
-        self.output_fields = output_fields or [
-            "id",
-            "corpus",
-            "author",
-            "series",
-            "book",
-            "volume",
-            "article",
-            "section",
-            "source",
-            "source_file",
-            "paragraph_id",
-            "parent_paragraph_id",
-            "chunk_id",
-            "retrieval_unit",
-            "pdf_page_start",
-            "pdf_page_end",
-            "printed_page_start",
-            "printed_page_end",
-            "citation_page_start",
-            "citation_page_end",
-            "citation_page_type",
-            "page_type",
-            "is_letter",
-            "citation_mode",
-            "child_chunk_index",
-            "child_chunk_total",
-            "child_char_start",
-            "child_char_end",
-            "child_chunk_size",
-            "text_hash",
-            "text",
-        ]
+        self.output_fields = output_fields or DEFAULT_OUTPUT_FIELDS
+        self._output_fields_reconciled = bool(output_fields)
+
+    def _reconcile_output_fields(self) -> list[str]:
+        """Drop output fields the target collection does not define.
+
+        The v2 corpus collection replaces ``text_hash`` with dual source/index
+        hashes and adds bibliography fields; the legacy collection has none of
+        those. Requesting a missing field makes Milvus reject the whole search,
+        so reconcile once against the live schema.
+        """
+        if self._output_fields_reconciled:
+            return self.output_fields
+        try:
+            description = self.client.describe_collection(self.collection_name)
+            fields = description.get("fields", []) if isinstance(description, dict) else []
+            actual = {field.get("name") for field in fields if isinstance(field, dict) and field.get("name")}
+            if actual:
+                kept = [field for field in self.output_fields if field in actual]
+                if kept:
+                    self.output_fields = kept
+        except Exception:
+            pass
+        self._output_fields_reconciled = True
+        return self.output_fields
 
     def search(self, query: str, k: int = 5, filters: dict[str, Any] | None = None) -> list[VectorSearchResult]:
         if not self._loaded:
             self.client.load_collection(self.collection_name)
             self._loaded = True
+        self._reconcile_output_fields()
         search_limit = max(k, min(max(k * self.overfetch_factor, k + 12), 500))
         hybrid_capable = self._can_hybrid_search()
         if hybrid_capable:

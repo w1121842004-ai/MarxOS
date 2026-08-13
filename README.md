@@ -9,6 +9,14 @@ MarxOS 是一个面向马克思主义经典文本的本地检索问答项目。�
 - 优先支持本地语料、本地向量库和离线式工作流
 - 把检索质量、引文质量和回答质量都纳入回归检查
 
+## 当前开发基调
+
+当前阶段以“修复和稳定化”为主，不优先继续扩大功能面。目标是把文档数据切分、索引构建、检索、生成、Web 展示和部署入口固定成可重复验证的工程链路，减少每次测试暴露不同错误的情况。
+
+阶段计划见：
+
+- [`task.md`](./task.md)
+
 ## 核心流程
 
 ```text
@@ -26,7 +34,7 @@ PDF
 ## 环境要求
 
 - Python 3.10
-- Windows PowerShell
+- macOS / Linux shell 或 Windows PowerShell
 - 已安装 `requirements.txt` 中依赖
 - 如需完整 OCR，需本地 PaddleOCR / PaddlePaddle 环境可用
 
@@ -34,16 +42,32 @@ PDF
 
 1. 创建并激活虚拟环境
 
+macOS / Linux：
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Windows PowerShell：
+
 ```powershell
-python -m venv venv
-venv\Scripts\activate
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
 2. 配置 `.env`
 
+```bash
+# macOS / Linux
+cp .env.example .env
+```
+
 ```powershell
-copy .env.example .env
+# Windows
+Copy-Item .env.example .env
 ```
 
 最少需要配置：
@@ -52,16 +76,46 @@ copy .env.example .env
 DEEPSEEK_API_KEY=your_deepseek_api_key_here
 ```
 
+DeepSeek V4 模型分层（默认，无需额外配置）：
+
+| 用途 | 模型 |
+| --- | --- |
+| 深度分析（deep 模式） | `deepseek-v4-pro` |
+| 快速/标准问答（fast/standard 模式） | `deepseek-v4-flash` |
+| 著作定位（BookLocator）、引文验证、域外问答 | `deepseek-v4-flash` |
+
+模型由 `MARXOS_ANSWER_PROFILE` 决定，可用 `DEEPSEEK_MODEL` / `DEEPSEEK_FLASH_MODEL` 整体覆盖。所有 V4 调用默认关闭思考模式（`thinking: disabled`，检索锚定回答不需要推理 token）；需要开启时设 `MARXOS_DEEPSEEK_THINKING=1`。
+
+`.env.example` 已冻结当前默认基线（P1 晋级后）：`me_full_v2` 语料、`milvus_bgem3_v2` 检索 profile、`marxos_corpus_v2.db` / `marxos_passages_v2` collection、BGE-M3 dense + corpus-aware BM25 sparse hybrid（semantic child 320/64）、CPU 设备。这套配置同时适用于直接启动和快捷启动脚本；需要调整时只修改 `.env` 或进程环境变量。切回旧 P0 基线的回滚入口见 `.env.example` 底部注释。
+
+该基线对应的可审计数据与索引信息记录在 `config/index_manifest_v1.json`。重建语料或 collection 后必须同步更新记录数、构建参数和 checksum，不能继续沿用旧 manifest。
+
+文档元数据契约和三类检索单元的继承规则见 `docs/document_data_contract.md`。可用 `python scripts/audit.py document-pipeline --input <paragraph-cache.jsonl>` 离线检查页码、目录泄漏和篇名缺失。
+
 3. 启动命令行问答
 
+```bash
+# macOS / Linux
+.venv/bin/python app.py
+```
+
 ```powershell
-venv\Scripts\python.exe app.py
+# Windows
+.venv\Scripts\python.exe app.py
 ```
 
 4. 启动网页端
 
+可直接双击 `启动MarxOS网页端.command` (macOS) 或 `启动MarxOS网页端.bat` (Windows)；脚本会从自身所在目录启动，不依赖某台机器的绝对路径。也可在终端直接运行：
+
+```bash
+# macOS / Linux
+.venv/bin/python web_app.py
+```
+
 ```powershell
-venv\Scripts\python.exe web_app.py
+# Windows
+.venv\Scripts\python.exe web_app.py
 ```
 
 默认地址：
@@ -74,8 +128,10 @@ http://127.0.0.1:7860
 
 ```powershell
 $env:MARXOS_WEB_PORT="7861"
-venv\Scripts\python.exe web_app.py
+.venv\Scripts\python.exe web_app.py
 ```
+
+macOS / Linux 可用 `MARXOS_WEB_PORT=7861 .venv/bin/python web_app.py`。进程环境变量的优先级高于 `.env`。
 
 ## 开发调试
 
@@ -133,6 +189,10 @@ venv\Scripts\python.exe scripts\build_paragraph_cache.py
 
 > ⚠️ **V1 构建脚本 (`rag/build_vectorstore_from_cache.py`) 已废弃。** 它产生的 chunk 缺少 `parent_paragraph_id`，无法通过 `expand_semantic_parent_docs()` 扩展为段落窗口，丧失"小块检索/大块召回"能力。该文件的工具函数仍被其他模块使用。
 
+Milvus Lite 主链路由 `marxos/config/settings.py` 默认配置为 `milvus_bgem3_v2`，运行时通过 `marxos/runtime.py` 加载 `data/milvus_lite/marxos_corpus_v2.db` 中的 `marxos_passages_v2` collection（corpus-v2 旁路重建：文集 10 卷 + 选集 4 卷，semantic child 320/64，45,875 行）。当前基线使用 BGE-M3 dense 与 corpus-aware BM25 sparse hybrid，避免同一进程重复加载 dense 和 FlagEmbedding sparse 模型。Milvus Lite 不需要单独部署服务，但每次 Python 进程启动仍会打开本地库、加载 collection 和 embedding 模型，并可按环境变量执行预热。
+
+> ⚠️ macOS ARM：torch 与 Milvus Lite（HNSW 索引由 FAISS 实现）共用 libomp，多线程检索会段错误。app.py 入口、启动脚本和 `.env.example` 已内置 `OMP_NUM_THREADS=1` 兜底；如自建启动方式，请在启动前 `export OMP_NUM_THREADS=1`。
+
 ## 本地验证
 
 快速回归：
@@ -147,8 +207,9 @@ venv\Scripts\python.exe scripts\check.py --mode quick
 
 `quick` 当前包含：
 
+- `scripts/validate_maps.py`
 - `scripts/regression_smoke.py`
-- `tests/test_run_query_regressions.py`
+- `scripts/test.py app`
 
 完整检查：
 
@@ -221,8 +282,10 @@ RAG / OCR：
 
 ## 重要数据路径
 
-- `data/ocr_cache/`: OCR 缓存
-- `data/milvus_lite/marxos_bgem3_sparse.db`: 默认 Milvus Lite 向量库
+- `data/ocr_cache_text_layer/`: 默认 OCR 缓存
+- `data/artifacts/corpus_v2/`: corpus-v2 权威数据产物（page/paragraph/enriched/child JSONL、BM25 stats、manifest、checkpoint）
+- `data/milvus_lite/marxos_corpus_v2.db`: 默认 Milvus Lite 向量库（collection `marxos_passages_v2`）
+- `data/milvus_lite/marxos_text_layer_bgem3.db`: 旧 P0 向量库（回滚入口，collection `marxos_text_layer_bgem3`）
 - `vectorstore/marx_reader_core/`: FAISS fallback 子块向量库
 - `vectorstore/marx_reader_paragraph/`: FAISS fallback 段落向量库
 - `rag/article_map_core.json`: 核心篇目映射
@@ -246,16 +309,46 @@ RAG / OCR：
 
 - 第三方依赖 `faiss` / `setuptools` 仍会输出少量弃用 warning，这不是项目主逻辑错误
 - OCR、页码推断和 article map 仍然决定最终引文质量，语料侧问题不会被 LLM 自动修复
+- 当前默认检索后端是 Milvus Lite + BGE-M3，进程启动时会加载本地 collection、embedding 模型和可选 sparse 编码器；这不等同于重建数据库
+- Web 端多轮追问包含本地 follow-up 分支；涉及“上一条/第几条/证据页码”的修复必须同时覆盖 `web` 测试组
 - `data/`、`vectorstore/`、本地日志体积较大，清理和备份应单独管理
+
+## 当前开发阶段：稳定化优先
+
+当前阶段不再优先扩功能，而是先把“文档数据切分、检索、生成、前端显示、测试验证、初步部署”打稳。后续开发计划统一记录在：
+
+- [task.md](./task.md)
+
+本阶段的基本原则：
+
+- 先修复高频错误，再做体验优化
+- 先固定数据与索引基线，再比较检索策略
+- 每个线上可见问题都要补对应回归测试
+- Web、检索、引文、数据构建分别使用对应验证入口，不只依赖手工提问
+
+## 部署
+
+单机/局域网单进程部署：资产拷贝 + `pip install` + `.env` 后直接启动，详见 [docs/deployment_guide.md](./docs/deployment_guide.md)（包清单、步骤、故障定位表、回滚）。
+
+部署 smoke（6 项：health/readiness + 书目/引文/概念/follow-up 四题）：
+
+```bash
+.venv/bin/python scripts/deployment_smoke.py
+```
 
 ## 推荐阅读
 
-- [docs/codebase_inventory.md](C:/Users/Administrator/Desktop/MarxOS/docs/codebase_inventory.md)
-- [docs/architecture.md](C:/Users/Administrator/Desktop/MarxOS/docs/architecture.md)
-- [docs/maintenance_guide.md](C:/Users/Administrator/Desktop/MarxOS/docs/maintenance_guide.md)
-- [docs/eval_questions.md](C:/Users/Administrator/Desktop/MarxOS/docs/eval_questions.md)
-- [docs/dev_logs/README.md](C:/Users/Administrator/Desktop/MarxOS/docs/dev_logs/README.md)
-- [scripts/README.md](C:/Users/Administrator/Desktop/MarxOS/scripts/README.md)
+- [task.md](./task.md)
+- [docs/codebase_inventory.md](./docs/codebase_inventory.md)
+- [docs/architecture.md](./docs/architecture.md)
+- [docs/maintenance_guide.md](./docs/maintenance_guide.md)
+- [docs/testing_guide.md](./docs/testing_guide.md)
+- [docs/deployment_guide.md](./docs/deployment_guide.md)
+- [docs/retrieval_priority.md](./docs/retrieval_priority.md)
+- [docs/web_api_schema.md](./docs/web_api_schema.md)
+- [docs/eval_questions.md](./docs/eval_questions.md)
+- [docs/dev_logs/README.md](./docs/dev_logs/README.md)
+- [scripts/README.md](./scripts/README.md)
 
 ## PowerShell 编码
 
@@ -278,7 +371,7 @@ venv\Scripts\python.exe scripts\test.py rag
 venv\Scripts\python.exe scripts\test.py all
 ```
 
-See also: [docs/testing_guide.md](C:/Users/Administrator/Desktop/MarxOS/docs/testing_guide.md)
+See also: [docs/testing_guide.md](./docs/testing_guide.md)
 
 ## Optional Arize Phoenix Tracing
 

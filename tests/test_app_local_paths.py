@@ -9,9 +9,10 @@ import app
 import web_app
 from rag.exact_quote_lookup import exact_quote_lookup
 from rag import semantic_retrieval
+from tests.unit_support import OfflineAppTestCase
 
 
-class AppLocalPathTests(unittest.TestCase):
+class AppLocalPathTests(OfflineAppTestCase):
     def test_app_import_is_side_effect_free(self):
         self.assertTrue(callable(app.run_query))
         self.assertTrue(callable(app.main))
@@ -25,7 +26,7 @@ class AppLocalPathTests(unittest.TestCase):
     def test_bibliographic_query_returns_without_vectorstore_or_api(self):
         query = "\u300a\u5171\u4ea7\u515a\u5ba3\u8a00\u300b\u6536\u5f55\u5728\u54ea\u91cc\uff1f"
 
-        with patch("app.load_vectorstore") as load_vectorstore, patch("app.OpenAI") as openai:
+        with patch("app.load_vectorstore") as load_vectorstore, patch("marxos.generation.llm_client.OpenAI") as openai:
             answer = app.run_query(query)
 
         load_vectorstore.assert_not_called()
@@ -34,7 +35,7 @@ class AppLocalPathTests(unittest.TestCase):
         self.assertIn("376-435", answer)
 
     def test_unreadable_cli_query_does_not_call_vectorstore_or_api(self):
-        with patch("app.load_vectorstore") as load_vectorstore, patch("app.OpenAI") as openai:
+        with patch("app.load_vectorstore") as load_vectorstore, patch("marxos.generation.llm_client.OpenAI") as openai:
             answer = app.run_query("?????????????")
 
         load_vectorstore.assert_not_called()
@@ -44,7 +45,7 @@ class AppLocalPathTests(unittest.TestCase):
     def test_unknown_bibliographic_title_returns_no_trusted_answer_locally(self):
         query = "\u300a\u4e00\u4e2a\u4e0d\u5b58\u5728\u7684\u9a6c\u514b\u601d\u8457\u4f5c\u6807\u9898\u300b\u6536\u5f55\u5728\u54ea\u91cc\uff1f"
 
-        with patch("app.load_vectorstore") as load_vectorstore, patch("app.OpenAI") as openai:
+        with patch("app.load_vectorstore") as load_vectorstore, patch("marxos.generation.llm_client.OpenAI") as openai:
             answer = app.run_query(query)
 
         load_vectorstore.assert_not_called()
@@ -68,7 +69,7 @@ class AppLocalPathTests(unittest.TestCase):
     def test_exact_quote_query_returns_deterministic_answer_without_vectorstore_or_api(self):
         query = "\u4e00\u4e2a\u5e7d\u7075\uff0c\u5171\u4ea7\u4e3b\u4e49\u7684\u5e7d\u7075\uff0c\u5728\u6b27\u6d32\u6e38\u8361\u3002\u51fa\u81ea\u54ea\u91cc\uff1f"
 
-        with patch("app.load_vectorstore") as load_vectorstore, patch("app.OpenAI") as openai:
+        with patch("app.load_vectorstore") as load_vectorstore, patch("marxos.generation.llm_client.OpenAI") as openai:
             answer = app.run_query(query)
 
         load_vectorstore.assert_not_called()
@@ -118,7 +119,7 @@ class AppLocalPathTests(unittest.TestCase):
     def test_unconfirmed_quote_query_returns_no_trusted_answer_without_vectorstore_or_api(self):
         query = "\u8bf7\u7ed9\u51fa\u201c\u8fd9\u662f\u4e00\u53e5\u968f\u4fbf\u7f16\u9020\u7684\u5f15\u6587\u201d\u7684\u51c6\u786e\u9875\u7801\u3002"
 
-        with patch("app.load_vectorstore") as load_vectorstore, patch("app.OpenAI") as openai:
+        with patch("app.load_vectorstore") as load_vectorstore, patch("marxos.generation.llm_client.OpenAI") as openai:
             answer = app.run_query(query)
 
         load_vectorstore.assert_not_called()
@@ -289,6 +290,8 @@ class AppLocalPathTests(unittest.TestCase):
                 return [dense_doc]
 
         with (
+            patch("app.hybrid_retrieval_enabled", return_value=True),
+            patch("app.sparse_index_ready", return_value=True),
             patch("app.sparse_retrieve_documents", return_value=[sparse_doc]) as sparse,
             patch("app.expand_semantic_parent_docs", side_effect=lambda docs: docs),
         ):
@@ -845,7 +848,7 @@ class AppLocalPathTests(unittest.TestCase):
             patch.dict("os.environ", {"MARXOS_DEV_MODE": "1", "MARXOS_TRACE_ONLY": "1"}, clear=False),
             patch("app.load_vectorstore", return_value=FakeDb()) as load_vectorstore,
             patch("app.paragraph_vectorstore_exists", return_value=False),
-            patch("app.OpenAI") as openai,
+            patch("marxos.generation.llm_client.OpenAI") as openai,
             patch("sys.stderr", new_callable=io.StringIO),
         ):
             answer = app.run_query("\u4eba\u7684\u672c\u8d28\u662f\u4ec0\u4e48\uff1f")
@@ -1067,14 +1070,20 @@ class AppLocalPathTests(unittest.TestCase):
         with (
             patch("app.load_vectorstore", return_value=FakeDb()),
             patch("app.paragraph_vectorstore_exists", return_value=False),
-            patch("app.OpenAI", return_value=fake_client) as openai,
+            patch("marxos.generation.llm_client.OpenAI", return_value=fake_client) as openai,
         ):
             answer = app.run_query("请概括共产党宣言关于阶级斗争的观点")
 
+        # Contract: strict-title list queries answer locally from evidence
+        # with backend-rendered citations; the LLM must not be called at all
+        # (test name: "can answer without openai"; P0 offline isolation).
         self.assertIn("《共产党宣言》", answer)
         self.assertIn("阶级斗争", answer)
-        openai.assert_called_once()
-        self.assertIn("引文注释", answer)
+        openai.assert_not_called()
+        # Evidence-based citations: the retrieved 选集 doc (printed page 376)
+        # must appear with a proper volume/page rendering.
+        self.assertIn("《马克思恩格斯选集》第1卷", answer)
+        self.assertIn("第376页", answer)
 
     def test_filter_evidence_keeps_only_matched_items_when_citations_match(self):
         answer = (
@@ -1203,6 +1212,43 @@ class AppLocalPathTests(unittest.TestCase):
 
         self.assertFalse(audit["ok"])
         self.assertIn("inline_citation_not_in_evidence", [issue["type"] for issue in audit["issues"]])
+
+    def test_audit_answer_citations_flags_fabricated_prose_page(self):
+        answer = "\u5728\u7b2c999\u9875\u9a6c\u514b\u601d\u5199\u9053\uff0c\u52b3\u52a8\u662f\u4ef7\u503c\u7684\u552f\u4e00\u6e90\u6cc9\u3002"
+        evidence = [{"citation": "\u300a\u8d44\u672c\u8bba\u300b\uff0c\u7b2c401\u9875\u3002", "printed_page": 401, "citation_page": 401}]
+
+        audit = app.audit_answer_citations(answer, evidence)
+
+        self.assertFalse(audit["ok"])
+        self.assertIn("page_number_not_in_evidence", [issue["type"] for issue in audit["issues"]])
+
+    def test_audit_answer_citations_accepts_evidence_backed_prose_page(self):
+        answer = "\u5728\u7b2c401\u9875\u9a6c\u514b\u601d\u5199\u9053\uff0c\u52b3\u52a8\u662f\u4ef7\u503c\u7684\u552f\u4e00\u6e90\u6cc9\u3002"
+        evidence = [{"citation": "\u300a\u8d44\u672c\u8bba\u300b\uff0c\u7b2c401\u9875\u3002", "printed_page": 401, "citation_page": 401}]
+
+        audit = app.audit_answer_citations(answer, evidence)
+
+        self.assertTrue(audit["ok"])
+
+    def test_empty_retrieval_refuses_without_calling_llm(self):
+        class EmptyDb:
+            def similarity_search(self, _query, k):
+                return []
+
+        with (
+            patch("app.load_vectorstore", return_value=EmptyDb()),
+            patch("app.paragraph_vectorstore_exists", return_value=False),
+            # Isolate from the machine's real OCR cache and locator backstops.
+            patch("retrieval.modes.strict_title_cache_documents", return_value=[]),
+            patch("retrieval.modes.locator_backstop_documents", return_value=[]),
+            patch("app.exact_quote_lookup", return_value=[]),
+            patch("marxos.generation.llm_client.OpenAI", side_effect=AssertionError("empty retrieval must not call the LLM")),
+        ):
+            answer = app.run_query("\u5269\u4f59\u4ef7\u503c\u7387\u5982\u4f55\u5f71\u54cd\u5229\u6da6\u7387\uff1f")
+
+        self.assertIn("\u5f53\u524d\u8bed\u6599\u5e93\u672a\u68c0\u7d22\u5230", answer)
+        self.assertEqual(app.LAST_ANSWER_PATH, "refusal")
+        self.assertEqual(app.LAST_CITATION_AUDIT.get("evidence_count"), 0)
 
     def test_performance_settings_use_lightweight_audit_outside_deep_mode(self):
         fast = app.performance_settings("fast")

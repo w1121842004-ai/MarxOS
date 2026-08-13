@@ -424,6 +424,21 @@ def audit_answer_citations(answer, evidence, normalize_final_answer, normalize_f
         if ref < 1 or ref > len(evidence or []):
             issues.append({"type": "evidence_ref_out_of_range", "ref": f"E{ref}"})
 
+    # Every page number mentioned anywhere in the answer must trace back to an
+    # evidence page; this catches prose fabrication that never forms a formal
+    # citation line ("在第999页马克思写道……").
+    mentioned_pages = {int(match.group(1)) for match in re.finditer(r"第(\d+)页", normalized)}
+    evidence_pages: set[int] = set()
+    for item in evidence or []:
+        for key in ("printed_page", "citation_page", "pdf_page", "page"):
+            value = item.get(key)
+            if isinstance(value, int):
+                evidence_pages.add(value)
+            elif isinstance(value, str) and value.isdigit():
+                evidence_pages.add(int(value))
+    for page in sorted(mentioned_pages - evidence_pages):
+        issues.append({"type": "page_number_not_in_evidence", "page": page})
+
     if citation_lines and not evidence_citations:
         issues.append({"type": "citation_without_verified_evidence"})
 

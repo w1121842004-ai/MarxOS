@@ -3,6 +3,8 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from marxos.query_intent import analyse_query_structure
+
 
 def _helper(ctx, name):
     return ctx[name]
@@ -544,12 +546,24 @@ def article_locator_constraints_from_query(query, title, ctx):
         for entry in entries
     }
     ambiguous_locator = len(entries) > 1 and len(entry_locations) > 1 and len(entry_title_norms) <= 2
+    # Merge core-classic page ranges so candidates from other editions pass
+    # per-source filtering: the article locator often covers only the 全集
+    # edition, while the 文集/选集 classic entries carry their own ranges.
+    range_entries = list(entries)
+    range_sources = {entry["source"] for entry in entries}
+    if title:
+        classic_entries_fn = _helper(ctx, "classic_entries_for_query")
+        enrich_core_classic_entries_fn = _helper(ctx, "enrich_core_classic_entries")
+        core_entries = enrich_core_classic_entries_fn(classic_entries_fn(title))
+        if core_entries:
+            range_entries = range_entries + core_entries
+            range_sources.update(entry.get("source") for entry in core_entries if entry.get("source"))
     return {
         "title": result_title,
         "strict_title": True,
         "entries": entries,
-        "sources": {entry["source"] for entry in entries},
-        "page_ranges": build_page_ranges(entries),
+        "sources": range_sources,
+        "page_ranges": build_page_ranges(range_entries),
         "page_tolerance": 2,
         "article_locator": True,
         "ambiguous_locator": ambiguous_locator,
@@ -779,9 +793,12 @@ def concept_constraints_from_query(query, ctx):
         return {}
 
     title = entries[0].get("classic_title")
+    # Concept constraints are a ranking focus, not a strict lock: "资本是什么？"
+    # must still retrieve concept-relevant candidates from other volumes instead
+    # of being pinned to the classic entry's cache pages.
     return {
         "title": title,
-        "strict_title": True,
+        "strict_title": False,
         "entries": entries,
         "sources": {entry["source"] for entry in entries},
         "page_ranges": build_page_ranges(entries),
@@ -796,25 +813,44 @@ def constraints_from_query(query, ctx):
     find_toc_entries = _helper(ctx, "find_toc_entries")
     work_catalog_entries_for_query = _helper(ctx, "work_catalog_entries_for_query")
     work_catalog_title_entries_for_query = _helper(ctx, "work_catalog_title_entries_for_query")
+    active_concept_terms_fn = _helper(ctx, "active_concept_terms")
     title = extract_bibliographic_title(query)
     normalize_for_match = _helper(ctx, "normalize_for_match")
     query_norm = normalize_for_match(query)
 
     if not title and is_broad_topic_query(query, ctx):
-        broad_topic_constraints = narrow_topic_constraints_by_query(query, topic_entries_for_query(query, ctx), ctx)
-        if broad_topic_constraints:
-            broad_topic_constraints = dict(broad_topic_constraints)
-            broad_topic_constraints["soft_topic"] = True
-            broad_topic_constraints["strict_title"] = False
-            return broad_topic_constraints
+        # A verbatim work title beats a broad topic: "请概括共产党宣言关于
+        # 阶级斗争的观点" must stay strict-title on 共产党宣言. Alias-only
+        # matches (农民问题 → 法德农民问题) do NOT count, so topic list
+        # queries keep their multi-work topic expansion.
+        work_title_mentioned = _helper(ctx, "work_catalog_title_mentioned")
+        if not work_title_mentioned(query):
+            broad_topic_constraints = narrow_topic_constraints_by_query(query, topic_entries_for_query(query, ctx), ctx)
+            if broad_topic_constraints:
+                broad_topic_constraints = dict(broad_topic_constraints)
+                broad_topic_constraints["soft_topic"] = True
+                broad_topic_constraints["strict_title"] = False
+                return broad_topic_constraints
 
-    high_precision_constraints = high_precision_locator_constraints_from_query(query, ctx)
-    if high_precision_constraints:
-        return high_precision_constraints
+    # Definition-style concept questions ("劳动过程是什么？") must retrieve via
+    # concept constraints, not be pinned to locator/cache pages: locators only
+    # know the 全集 edition of the section title and would lock out 文集/选集
+    # candidates. Explicit book titles ("《1844年经济学哲学手稿》是什么") keep
+    # the locator path.
+    definition_concept_query = (
+        analyse_query_structure(query).get("question_type") == "WHAT_DEFINITION"
+        and not title
+        and bool(active_concept_terms_fn(query))
+    )
 
-    article_locator_constraints = article_locator_constraints_from_query(query, title, ctx)
-    if article_locator_constraints:
-        return article_locator_constraints
+    if not definition_concept_query:
+        high_precision_constraints = high_precision_locator_constraints_from_query(query, ctx)
+        if high_precision_constraints:
+            return high_precision_constraints
+
+        article_locator_constraints = article_locator_constraints_from_query(query, title, ctx)
+        if article_locator_constraints:
+            return article_locator_constraints
 
     explicit_constraints = explicit_volume_constraints_from_query(query, ctx)
     if explicit_constraints:
@@ -890,7 +926,10 @@ def constraints_from_query(query, ctx):
                 first_title = first_title[1] if len(first_title) > 1 else first_title[0]
             return constraints_result(display_title or first_title, hinted_entries, query, ctx)
 
-    title_catalog_entries = prefer_sources_for_query(work_catalog_title_entries_for_query(query), query, ctx)
+    if definition_concept_query:
+        title_catalog_entries = []
+    else:
+        title_catalog_entries = prefer_sources_for_query(work_catalog_title_entries_for_query(query), query, ctx)
     if title_catalog_entries:
         title_catalog_title = (
             title_catalog_entries[0].get("classic_title")
@@ -952,7 +991,10 @@ def constraints_from_query(query, ctx):
         return concept_constraints
     if catalog_entries:
         title = catalog_title
-        return constraints_result(title, catalog_entries, query, ctx)
+        # Concept-based catalog matches on definition questions ("什么是历史
+        # 唯物主义？") are a ranking focus, not a strict lock — same rule as
+        # concept_constraints_from_query.
+        return constraints_result(title, catalog_entries, query, ctx, strict_title=not definition_concept_query)
 
     locator_entries = prefer_sources_for_query(locator_entries_for_query(query), query, ctx)
     if locator_entries:
@@ -983,10 +1025,13 @@ def constraints_from_query(query, ctx):
 
     if not title:
         # ── BookLocator fallback: LLM-driven work identification ──
-        book_locator_constraints_fn = _helper(ctx, "book_locator_constraints")
-        locator_result = book_locator_constraints_fn(query)
-        if locator_result and locator_result.get("entries"):
-            return locator_result
+        # Skipped for planner variant retrievals: the parent query already went
+        # through constraint building, and variants are title-less expansions.
+        if not ctx.get("variant_retrieval"):
+            book_locator_constraints_fn = _helper(ctx, "book_locator_constraints")
+            locator_result = book_locator_constraints_fn(query)
+            if locator_result and locator_result.get("entries"):
+                return locator_result
         return {}
 
     entries = prefer_sources_for_query(find_toc_entries(title), query, ctx)
@@ -1017,7 +1062,11 @@ def topic_seed_queries(query, constraints, ctx):
     entries = constraints.get("entries") or []
     entry_limit = 8 if constraints.get("soft_topic") else 4
     for entry in entries[:entry_limit]:
+        # TOC-derived article fields may carry a leading sentence punctuation
+        # ("。德国农民战争"); strip it so seeds stay clean work titles.
         title = str(entry.get("article") or entry.get("classic_title") or "").strip()
+        title = title.lstrip("。，,、;；·•　")
+        title = title.strip()
         if title:
             seeds.append(title)
 

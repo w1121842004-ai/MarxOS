@@ -155,12 +155,17 @@ def last_bot_topic(history):
     return topic
 
 
-def topic_scoped_query(query, history, is_contextual_followup_fn):
+def topic_scoped_query(query, history, is_contextual_followup_fn, is_explicit_subject_fn=None):
     topic = last_bot_topic(history)
     topic_label = (topic.get("topic_label") or "").strip()
     if not topic_label:
         return query
     if topic_label in (query or ""):
+        return query
+    # "这个概念" names a concept in the SAME query ("剩余价值这个概念"),
+    # not the previous answer; an explicitly named new subject never inherits
+    # the previous topic scope.
+    if is_explicit_subject_fn is not None and is_explicit_subject_fn(query):
         return query
     if not is_contextual_followup_fn(query):
         return query

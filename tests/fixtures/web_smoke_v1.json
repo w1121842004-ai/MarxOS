@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "description": "P0 高频 Web 问题离线契约烟测；不评估真实检索质量。",
+  "cases": [
+    {"label": "concept_surplus_value", "query": "什么是剩余价值？", "mode": "fast"},
+    {"label": "concept_labor", "query": "什么是劳动价值论？", "mode": "fast"},
+    {"label": "concept_alienation", "query": "什么是异化劳动？", "mode": "fast"},
+    {"label": "concept_historical_materialism", "query": "什么是唯物史观？", "mode": "fast"},
+    {"label": "concept_class_struggle", "query": "如何理解阶级斗争？", "mode": "standard"},
+    {"label": "quote_religion", "query": "宗教是人民的鸦片出自哪里？", "mode": "fast"},
+    {"label": "quote_workers", "query": "全世界无产者联合起来出自哪里？", "mode": "fast"},
+    {"label": "work_gotha_page", "query": "哥达纲领批判在马恩选集哪页？", "mode": "precise"},
+    {"label": "work_capital_volume", "query": "资本论第一卷讲了什么？", "mode": "standard"},
+    {"label": "work_manifesto", "query": "共产党宣言的核心观点是什么？", "mode": "standard"},
+    {"label": "topic_crisis", "query": "资本主义经济危机的根源是什么？", "mode": "standard"},
+    {"label": "topic_commodity", "query": "商品的二因素是什么？", "mode": "fast"},
+    {"label": "topic_money", "query": "马克思如何分析货币？", "mode": "standard"},
+    {"label": "topic_state", "query": "马克思恩格斯如何理解国家？", "mode": "standard"},
+    {"label": "topic_peasant", "query": "马克思如何分析农民问题？", "mode": "standard"},
+    {"label": "compare_versions", "query": "马恩选集和马恩文集中的版本有什么区别？", "mode": "standard"},
+    {"label": "locator_volume", "query": "1844年经济学哲学手稿在马恩选集第几卷？", "mode": "precise"},
+    {"label": "deep_surplus_value", "query": "请系统分析剩余价值理论的基本结构。", "mode": "deep"},
+    {"label": "deep_historical_materialism", "query": "请深入分析唯物史观的方法论意义。", "mode": "deep"},
+    {"label": "negative_unknown", "query": "材料不足时应该如何回答一个无法核实的引文？", "mode": "fast"}
+  ]
+}

@@ -48,7 +48,7 @@ def build_verifier_prompt(claimed_quote, ocr_text, citation_info):
 class CitationVerifier:
     """LLM-driven citation content verification."""
 
-    def __init__(self, client, ocr_cache_dir, model="deepseek-chat"):
+    def __init__(self, client, ocr_cache_dir, model="deepseek-v4-flash"):
         self.client = client
         self.ocr_cache_dir = Path(ocr_cache_dir)
         self.model = model
@@ -109,6 +109,8 @@ class CitationVerifier:
             }
 
         try:
+            from marxos.generation.llm_client import deepseek_extra_body
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -118,6 +120,7 @@ class CitationVerifier:
                 ],
                 temperature=0.0,
                 max_tokens=200,
+                extra_body=deepseek_extra_body(),
             )
             raw = response.choices[0].message.content.strip()
             if raw.startswith("```"):

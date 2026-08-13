@@ -1,0 +1,56 @@
+{
+  "manifest_version": 1,
+  "corpus": {
+    "name": "me_editions_v2",
+    "version": "corpus-v2-efa06171f7698079",
+    "paragraph_cache": "data/artifacts/corpus_v2/paragraph_records_enriched_v2_1.jsonl",
+    "paragraph_cache_sha256": "8a8c60b213a4b3ebccb0865cf861c0fd725479e12b340073160cf1fe49eaa9ef"
+  },
+  "build": {
+    "completed_at": "2026-08-13T09:52:00+08:00",
+    "script": "scripts/build_milvus_v2.py",
+    "script_sha256": "2962e91dab8a703424dc20c7bd2240842120568b54c4a3368637a1f8e62a3d43",
+    "retrieval_unit": "semantic_child",
+    "child_chunk_size": 320,
+    "child_chunk_overlap": 64,
+    "max_text_chars": 320
+  },
+  "embedding": {
+    "model": "BAAI/bge-m3",
+    "dimension": 1024,
+    "device_policy": "cpu",
+    "sparse_provider": "bm25"
+  },
+  "index": {
+    "backend": "milvus_lite",
+    "uri": "data/milvus_lite/marxos_corpus_v2.db",
+    "collection": "marxos_passages_v2",
+    "row_count": 45875,
+    "directory_sha256": "ca145596b2482f8b98464bb42d074f3b627b429e790acd9d0f2d548fa727c44d",
+    "checksum_method": "sha256(sorted sha256 of every file except LOCK, using paths relative to the DB directory)"
+  },
+  "schema": {
+    "dynamic_fields": false,
+    "primary_key": "id",
+    "dense_field": "embedding",
+    "sparse_field": "sparse_embedding",
+    "required_metadata": [
+      "source",
+      "book",
+      "volume",
+      "article",
+      "work_id",
+      "paragraph_id",
+      "parent_paragraph_id",
+      "retrieval_unit",
+      "pdf_page_start",
+      "pdf_page_end",
+      "printed_page_start",
+      "printed_page_end",
+      "citation_page_start",
+      "citation_page_end",
+      "source_text_hash",
+      "indexed_text_hash"
+    ]
+  }
+}

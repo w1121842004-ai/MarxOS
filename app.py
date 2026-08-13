@@ -4,6 +4,13 @@ from langchain_core.documents import Document
 from dotenv import load_dotenv
 import json
 import os
+
+# macOS ARM: torch and Milvus Lite (whose HNSW index is FAISS-backed) share the
+# same libomp runtime. Spawning OpenMP worker threads in that combination
+# segfaults at search time (__kmp_suspend_initialize_thread). Pin to one thread
+# BEFORE any faiss/torch import so libomp initializes in single-thread mode.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import re
 import sys
 import time
@@ -21,7 +28,13 @@ from marxos.generation import answers as answer_utils
 from marxos.generation import citations
 from marxos.generation import prompts
 from marxos.generation.citation_audit import CitationVerifier
-from marxos.generation.llm_client import create_deepseek_client, deepseek_model
+from marxos.generation.llm_client import (
+    create_deepseek_client,
+    deepseek_extra_body,
+    deepseek_flash_model,
+    deepseek_model,
+    generation_model,
+)
 from marxos.app import orchestration
 from marxos.app.runtime import RuntimeState
 from marxos.work_catalog import WorkCatalog
@@ -59,6 +72,9 @@ LAST_CITATION_AUDIT = {}
 LAST_TOPIC_INFO = {}
 LAST_CRAG_REPORT = {}
 LAST_TIMING = {}
+# Answer class for the current turn: local_lookup / local_view / refusal /
+# llm / out_of_domain / ambiguous_locator / trace_only.
+LAST_ANSWER_PATH = ""
 ARTICLE_MAP_PATH = SETTINGS.corpus.article_map_path
 ARTICLE_MAP_EXTRA_PATHS = SETTINGS.corpus.article_map_extra_paths
 TOPIC_CATALOG_PATH = SETTINGS.corpus.topic_catalog_path
@@ -86,6 +102,8 @@ RUNTIME = RuntimeState(
     milvus_uri=MILVUS_URI,
     milvus_collection=MILVUS_COLLECTION,
     milvus_embedding_device=MILVUS_EMBEDDING_DEVICE,
+    milvus_sparse_provider=SETTINGS.index.milvus_sparse_provider,
+    milvus_bm25_stats_path=SETTINGS.index.milvus_bm25_stats_path,
 )
 VOLUME_PUBLICATION_YEARS = {
     "me46a": "1979年",
@@ -438,6 +456,11 @@ def work_catalog_title_entries_for_query(query):
     return catalog.get_entries(work)
 
 
+def work_catalog_title_mentioned(query):
+    """True when a full work title (not just an alias) appears verbatim."""
+    return _get_work_catalog().has_explicit_title_mention(query, normalize_fn=normalize_for_match)
+
+
 # ── Book Locator Agent ────────────────────────────────────────────
 
 _book_locator = None
@@ -447,7 +470,7 @@ def _get_book_locator():
     if _book_locator is None:
         client = create_deepseek_client(max_retries=2, timeout=30.0)
         catalog = _get_work_catalog()
-        _book_locator = BookLocator(client, catalog)
+        _book_locator = BookLocator(client, catalog, model=deepseek_flash_model())
     return _book_locator
 
 
@@ -468,7 +491,7 @@ def _get_citation_verifier():
     global _citation_verifier
     if _citation_verifier is None:
         client = create_deepseek_client(max_retries=2, timeout=30.0)
-        _citation_verifier = CitationVerifier(client, OCR_CACHE_DIR)
+        _citation_verifier = CitationVerifier(client, OCR_CACHE_DIR, model=deepseek_flash_model())
     return _citation_verifier
 
 
@@ -501,6 +524,7 @@ def _retrieval_ctx():
         "extract_bibliographic_title": extract_bibliographic_title,
         "work_catalog_entries_for_query": work_catalog_entries_for_query,
         "work_catalog_title_entries_for_query": work_catalog_title_entries_for_query,
+        "work_catalog_title_mentioned": work_catalog_title_mentioned,
         "book_locator_constraints": book_locator_constraints,
         "locator_entries_for_query": locator_entries_for_query,
         "classic_entries_for_query": classic_entries_for_query,
@@ -2304,14 +2328,18 @@ def concept_constrained_candidates(query, db, constraints, fetch_k):
     )
 
 
-def retrieve_documents(query, db, k=5, allow_exact_quote=True, performance=None, strategy=None):
+def retrieve_documents(query, db, k=5, allow_exact_quote=True, performance=None, strategy=None, variant_retrieval=False):
     ctx = _retrieval_ctx()
-    if performance is not None or strategy is not None:
+    if performance is not None or strategy is not None or variant_retrieval:
         ctx = dict(ctx)
     if performance is not None:
         ctx["hybrid_retrieval"] = bool(performance.get("hybrid_retrieval", True))
     if strategy is not None:
         ctx["strategy"] = strategy
+    if variant_retrieval:
+        # Planner variants are expansions of a query that already went through
+        # constraint building; do not spend an LLM call re-locating works.
+        ctx["variant_retrieval"] = True
     return retrieval_utils.retrieve_documents(
         query,
         db,
@@ -2909,6 +2937,8 @@ def performance_settings(mode=None):
 
 
 def run_query(query, route_query=None, force_intent=None, history=None, performance=None):
+    global LAST_ANSWER_PATH
+    LAST_ANSWER_PATH = ""
     with phoenix.trace_manager.start_as_current_span("marxos.run_query") as root_span:
         try:
             run_started = time.perf_counter()
@@ -3045,14 +3075,17 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                         max_retries=3,
                         timeout=float(perf.get("llm_timeout") or 120.0),
                     )
+                    # deep 模式走 pro；fast/standard 走 flash（日常问答降本）。
+                    model = generation_model(perf.get("mode"))
                     request_kwargs = {
-                        "model": deepseek_model(),
+                        "model": model,
                         "messages": [
                             {
                                 "role": "user",
                                 "content": prompt,
                             }
                         ],
+                        "extra_body": deepseek_extra_body(),
                     }
                     if perf.get("max_tokens"):
                         request_kwargs["max_tokens"] = int(perf["max_tokens"])
@@ -3071,7 +3104,7 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                         {
                             "llm.vendor": "deepseek",
                             "llm.api_style": "openai_compatible",
-                            "llm.model": deepseek_model(),
+                            "llm.model": model,
                             "llm.output_length": len(raw_answer or ""),
                             "llm.max_tokens": int(perf["max_tokens"] or 0),
                         },
@@ -3174,6 +3207,7 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                             "answer.length": len(local_answer),
                         },
                     )
+                    LAST_ANSWER_PATH = "local_lookup"
                     return local_answer
 
             # Local and malformed-input paths must resolve before the general
@@ -3188,15 +3222,16 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                 with phoenix.trace_manager.start_as_current_span("marxos.llm_generate_out_of_domain") as span:
                     client = create_deepseek_client(max_retries=2, timeout=30.0)
                     response = client.chat.completions.create(
-                        model=deepseek_model(),
+                        model=deepseek_flash_model(),
                         messages=[{"role": "user", "content": prompt}],
+                        extra_body=deepseek_extra_body(),
                     )
                     raw_answer = response.choices[0].message.content or ""
                     phoenix.set_attributes(
                         span,
                         {
                             "llm.vendor": "deepseek",
-                            "llm.model": deepseek_model(),
+                            "llm.model": deepseek_flash_model(),
                             "llm.output_length": len(raw_answer),
                         },
                     )
@@ -3213,6 +3248,7 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                 timings["intent"] = "out_of_domain"
                 set_last_timing(timings)
                 set_last_evidence([], {"ok": True, "issues": [], "evidence_count": 0})
+                LAST_ANSWER_PATH = "out_of_domain"
                 return raw_answer
 
             constraints = constraints_from_query(route_query)
@@ -3290,6 +3326,7 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                         "answer.length": len(ambiguous_answer),
                     },
                 )
+                LAST_ANSWER_PATH = "ambiguous_locator"
                 return ambiguous_answer
 
             with phoenix.trace_manager.start_as_current_span("marxos.local_view_answer") as span:
@@ -3325,7 +3362,29 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                             "answer.length": len(local_view_answer),
                         },
                     )
+                    # A local view answer with no retrieved docs is a refusal,
+                    # not a structured list answer.
+                    LAST_ANSWER_PATH = "refusal" if not docs else "local_view"
                     return local_view_answer
+
+            if not docs:
+                # No retrieved documents → deterministic refusal. The LLM must
+                # never see an empty context: without evidence cards nothing is
+                # verifiable, and prose fabrication would slip past the
+                # citation-line audit.
+                refusal = answer_utils.answer_insufficient_material(route_query, constraints)
+                set_last_evidence([], {"ok": True, "issues": [], "evidence_count": 0, "answer": refusal})
+                timings["total"] = int((time.perf_counter() - run_started) * 1000)
+                timings["mode"] = perf.get("mode")
+                timings["intent"] = query_intent
+                set_last_timing(timings)
+                LAST_ANSWER_PATH = "refusal"
+                _mark_event("run_query_done", {"total_ms": timings["total"], "mode": perf.get("mode"), "path": "refusal"})
+                phoenix.set_attributes(
+                    root_span,
+                    {"answer.path": "refusal", "answer.length": len(refusal)},
+                )
+                return refusal
 
             set_last_evidence([])
             prompt = _build_prompt_for_docs(docs, "marxos.prompt_build")
@@ -3344,6 +3403,7 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                         "answer.length": len(answer),
                     },
                 )
+                LAST_ANSWER_PATH = "trace_only"
                 return answer
 
             raw_answer = _generate_raw_answer(prompt, "marxos.llm_generate")
@@ -3388,6 +3448,16 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                     new_evidence = recovery_state["evidence"]
                     new_crag = recovery_state.get("crag_report") or {}
                     new_para = recovery_state["paragraph_docs"] if dual_retrieval else []
+                    if not new_docs:
+                        # Recovery re-retrieved nothing: refuse deterministically
+                        # instead of regenerating against an empty context.
+                        refusal = answer_utils.answer_insufficient_material(route_query, constraints)
+                        return (
+                            {"ok": True, "issues": [], "evidence_count": 0,
+                             "answer": refusal, "mode": perf.get("citation_audit_mode") or "lightweight",
+                             "crag_report": dict(new_crag or {}), "crag_recovery_used": True},
+                            new_docs, new_evidence, new_para, new_crag, "", [],
+                        )
                     new_prompt = _build_prompt_for_docs(new_docs, f"marxos.prompt_build_recovery_{recovery_round}")
                     new_raw = _generate_raw_answer(new_prompt, f"marxos.llm_generate_recovery_{recovery_round}")
                     new_audit, new_display = _finalize_answer(
@@ -3432,6 +3502,7 @@ def run_query(query, route_query=None, force_intent=None, history=None, performa
                     "crag.recovery_used": bool(audit.get("crag_recovery_used", False)),
                 },
             )
+            LAST_ANSWER_PATH = "llm"
             return audit["answer"]
         except Exception as exc:
             root_span.record_exception(exc)

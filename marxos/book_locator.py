@@ -96,7 +96,7 @@ def build_locate_prompt(query, catalog_summary):
 class BookLocator:
     """LLM-driven work locator. Uses DeepSeek to map queries → work_ids."""
 
-    def __init__(self, client, catalog, model="deepseek-chat"):
+    def __init__(self, client, catalog, model="deepseek-v4-flash"):
         self.client = client
         self.catalog = catalog
         self.model = model
@@ -115,6 +115,8 @@ class BookLocator:
         Returns None on failure.
         """
         try:
+            from marxos.generation.llm_client import deepseek_extra_body
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -123,6 +125,7 @@ class BookLocator:
                 ],
                 temperature=0.0,
                 max_tokens=300,
+                extra_body=deepseek_extra_body(),
             )
             raw = response.choices[0].message.content.strip()
 

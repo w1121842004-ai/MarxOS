@@ -433,7 +433,7 @@ def build_semantic_child_documents(
             metadata = dict(parent_doc.metadata)
             metadata.update(
                 {
-                    "retrieval_unit": "paragraph_child",
+                    "retrieval_unit": "semantic_child",
                     "parent_paragraph_id": record.get("paragraph_id"),
                     "child_chunk_index": index,
                     "child_chunk_total": total,

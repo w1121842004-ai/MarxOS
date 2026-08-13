@@ -8,9 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 QUICK_STEPS = [
+    ("validate_index_manifest", python_command(ROOT / "scripts" / "validate_index_manifest.py")),
     ("validate_maps", python_command(ROOT / "scripts" / "validate_maps.py")),
     ("regression_smoke", python_command(ROOT / "scripts" / "regression_smoke.py")),
-    ("tests_app", python_command(ROOT / "scripts" / "test.py", "app")),
+    ("tests_p0", python_command(ROOT / "scripts" / "test.py", "p0")),
 ]
 
 FULL_EXTRA_STEPS = [

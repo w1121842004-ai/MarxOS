@@ -61,14 +61,20 @@
 适用场景：
 
 - 调整 `/api/ask` 返回 payload
+- 调整 `/api/ask_stream` 流式状态与最终 payload
 - 改 topic follow-up、多轮历史整理
 - 改 citation/page follow-up
 - 改 metrics 记录与 evidence 展示
+- 改前端聊天气泡、证据卡、状态 badge、错误显示
 
 ### OCR / 语料 / 向量库
 
 优先看：
 
+- `marxos/config/settings.py`
+- `marxos/runtime.py`
+- `marxos/vector_backend.py`
+- `scripts/build_milvus_collection.py`
 - `rag/ocr_to_cache.py`
 - `rag/clean_ocr_text.py`
 - `rag/page_number_detection.py`
@@ -81,6 +87,7 @@
 - printed page / pdf page 映射异常
 - chunk 或 paragraph cache 构建异常
 - 向量库 metadata 缺失或不稳定
+- Milvus Lite 启动、collection 加载、BGE-M3 dense/sparse 检索异常
 
 ## 2. 常见修改任务对照表
 
@@ -134,6 +141,12 @@
 建议验证：
 
 - `venv\Scripts\python.exe -m unittest discover -s tests -p test_web_api.py`
+- `venv\Scripts\python.exe scripts\test.py web`
+
+注意：
+
+- `scripts\check.py --mode quick` 当前不包含 Web 测试。
+- 多轮追问不要只看上一轮 evidence，当前问题如果明确命中新著作，应重新进入 `app.run_query()`。
 
 ### 想改“页码、原页摘录、引文定位”
 
@@ -157,6 +170,13 @@
 2. 优先改对应职责模块，只把必要的 glue code 留在入口层。
 3. 至少补一条能覆盖该行为的测试或回归脚本验证。
 4. 如果改动影响检索或引文质量，再跑专项评测或审计脚本。
+
+当前稳定化阶段额外遵循：
+
+1. 先修复已暴露的不稳定行为，再推进新功能或目录重组。
+2. 任何涉及数据切分、页码、索引 schema、检索融合、引用注释、Web payload 的改动，都必须同步更新对应测试或审计入口。
+3. 新增规则不得只依赖一次人工问答验证；需要沉淀成 `tests/`、`scripts/check.py`、`scripts/audit.py` 或 `scripts/run_web_*` 中的可重复门禁。
+4. 部署前默认不接受“本机刚才能跑一次”作为通过标准，必须能用固定命令复现启动、问答、证据展示和指标记录。
 
 ## 4. 最小验证建议
 
@@ -184,9 +204,29 @@ venv\Scripts\python.exe scripts\check.py --mode full
 venv\Scripts\python.exe scripts\audit.py list
 ```
 
+### 当前阶段发布前门禁
+
+进入初步部署前，至少需要形成并跑通下面四类检查：
+
+```powershell
+venv\Scripts\python.exe scripts\test.py all
+venv\Scripts\python.exe scripts\check.py --mode quick
+venv\Scripts\python.exe scripts\run_web_smoke.py
+venv\Scripts\python.exe scripts\run_web_expert_eval.py --turns 20
+```
+
+如果改动涉及 Milvus collection 或检索策略，还要补跑检索/页码专项评测：
+
+```powershell
+venv\Scripts\python.exe scripts\check.py --mode full
+venv\Scripts\python.exe scripts\audit.py page-metadata
+venv\Scripts\python.exe scripts\audit.py paragraph-cache
+```
+
 ## 5. 维护时的几个边界
 
 - `app.py` 和 `web_app.py` 现在已经更偏“入口层”，后续尽量不要把大段业务逻辑重新塞回去。
 - `retrieval/__init__.py` 是 facade；新的检索细节优先落到 `retrieval/constraints / ranking / modes` 子模块。
 - 语料、OCR、页码问题通常不是 LLM 能自动补救的，涉及引用质量时优先先查 `rag/` 和 `data/`。
 - 历史 `docs/dev_logs/` 更适合追溯背景，不适合作为当前行为规范；当前规范以 `README.md`、`docs/architecture.md`、本文件为准。
+- 当前阶段的开发计划以仓库根目录 [task.md](../task.md) 为准；新增修复项先放入计划，再决定是否进入代码改动。

@@ -183,7 +183,12 @@ class LexicalSparseEncoder:
         return (int.from_bytes(digest, "big") % ((1 << 32) - 2)) + 1
 
 
-def create_sparse_encoder(provider: str, model_name: str, device: str = "cpu"):
+def create_sparse_encoder(
+    provider: str,
+    model_name: str,
+    device: str = "cpu",
+    bm25_stats_path: str | None = None,
+):
     provider = (provider or "none").strip().lower().replace("_", "-")
     if provider in {"", "0", "false", "off", "none"}:
         return None
@@ -191,6 +196,12 @@ def create_sparse_encoder(provider: str, model_name: str, device: str = "cpu"):
         return BGEM3SparseEncoder(model_name=model_name, device=device)
     if provider in {"lexical", "light", "bm25-lite"}:
         return LexicalSparseEncoder()
+    if provider == "bm25":
+        if not bm25_stats_path:
+            raise ValueError("bm25 sparse provider requires a fitted BM25 stats path")
+        from marxos.indexing.bm25_sparse_v2 import BM25SparseEncoderV2
+
+        return BM25SparseEncoderV2.load(bm25_stats_path)
     raise ValueError(f"Unknown sparse provider: {provider}")
 
 

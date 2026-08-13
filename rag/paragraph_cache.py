@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from langchain_core.documents import Document
+from marxos.data.document_contract import normalize_document_record, stable_paragraph_id
 
 from rag.build_vectorstore_from_cache import (
     OCR_CACHE_DIR,
@@ -176,7 +177,8 @@ def paragraph_record(source: str, doc, text: str, index_on_page: int, char_start
     pdf_page = metadata.get("pdf_page")
     citation_page = metadata.get("citation_page")
 
-    return {
+    page_id = f"{source}#pdf{pdf_page}" if pdf_page is not None else None
+    return normalize_document_record({
         "source": source,
         "book": metadata.get("book"),
         "article": metadata.get("article"),
@@ -196,8 +198,19 @@ def paragraph_record(source: str, doc, text: str, index_on_page: int, char_start
         "citation_page_end": citation_page,
         "citation_page_type": metadata.get("citation_page_type"),
         "page_span": [pdf_page],
+        "spans": [{
+            "page_id": page_id,
+            "pdf_page": pdf_page,
+            "char_start": char_start,
+            "char_end": char_end,
+            "line_start": line_start,
+            "line_end": line_end,
+        }],
         "page_type": metadata.get("page_type"),
-    }
+        "text_source": metadata.get("text_source"),
+        "page_number_source": metadata.get("page_number_source"),
+        "cleaning_reasons": metadata.get("cleaning_reasons"),
+    }, retrieval_unit="paragraph")
 
 
 def merge_records(left: dict, right: dict) -> dict:
@@ -208,6 +221,14 @@ def merge_records(left: dict, right: dict) -> dict:
     merged["printed_page_end"] = right.get("printed_page_end")
     merged["citation_page_end"] = right.get("citation_page_end")
     merged["page_span"] = list(dict.fromkeys((left.get("page_span") or []) + (right.get("page_span") or [])))
+    merged["spans"] = [dict(span) for span in (left.get("spans") or []) + (right.get("spans") or [])]
+    merged["source_page_ids"] = list(
+        dict.fromkeys(
+            span.get("page_id")
+            for span in merged["spans"]
+            if span.get("page_id")
+        )
+    )
     merged["char_end"] = right.get("char_end")
     merged["line_end"] = right.get("line_end")
     merged["cross_page"] = True
@@ -223,6 +244,10 @@ def build_paragraph_records_for_source(source: str, ocr_cache_dir: str | Path = 
     for cache_path in iter_source_cache_files(source, ocr_cache_dir):
         doc = document_from_cache(str(cache_path), title_context, page_sequence_context)
         if doc is None:
+            if pending:
+                pending["cross_page"] = False
+                records.append(pending)
+                pending = None
             continue
         cleaning_reasons = str(doc.metadata.get("cleaning_reasons") or "")
         if "many_line_end_pages" in cleaning_reasons and doc.metadata.get("printed_page") is None:
@@ -263,7 +288,8 @@ def build_paragraph_records_for_source(source: str, ocr_cache_dir: str | Path = 
 
     for index, record in enumerate(records, start=1):
         record["paragraph_index"] = index
-        record["paragraph_id"] = f"{source}#p{index:06d}"
+        record["paragraph_id"] = stable_paragraph_id(record)
+        record["parent_paragraph_id"] = record["paragraph_id"]
 
     return records
 

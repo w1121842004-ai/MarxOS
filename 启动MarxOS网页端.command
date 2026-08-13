@@ -1,16 +1,19 @@
 #!/bin/zsh
 cd "$(dirname "$0")"
-export MARXOS_VECTOR_BACKEND=milvus
-export MARXOS_EMBEDDING_MODEL=BAAI/bge-m3
-export MARXOS_EMBEDDING_DEVICE=mps
-export MILVUS_URI=./data/milvus_lite/marxos_text_layer_bgem3.db
-export MILVUS_COLLECTION=marxos_text_layer_bgem3
-export MILVUS_SPARSE_PROVIDER=lexical
-export MARXOS_MILVUS_HYBRID=1
-export BGE_M3_MAX_LENGTH=512
-export EXACT_QUOTE_LOOKUP_TIMEOUT_SEC=3
-export EXACT_QUOTE_GLOBAL_FALLBACK=0
-export OCR_CACHE_DIR=data/ocr_cache_text_layer
-export PARAGRAPH_CACHE_PATH=data/paragraph_cache_text_layer.jsonl
-export SEMANTIC_LIGHT_SPARSE_INDEX_PATH=data/sparse_paragraph_index_text_layer.pkl
-exec .venv/bin/python web_app.py
+
+# macOS ARM: torch + Milvus Lite (FAISS-backed HNSW) 共用 libomp，多线程会在
+# 检索时段错误；启动前固定单线程，app.py 内部也会兜底设置。
+export OMP_NUM_THREADS=1
+
+if [[ -x ".venv/bin/python" ]]; then
+  PYTHON=".venv/bin/python"
+elif [[ -x "venv/bin/python" ]]; then
+  PYTHON="venv/bin/python"
+else
+  print -u2 "MarxOS 启动失败：未找到 .venv/bin/python 或 venv/bin/python。"
+  print -u2 "请先创建虚拟环境并安装 requirements.txt。"
+  exit 1
+fi
+
+# web_app.py 会加载 .env，未配置项统一使用 marxos/config/settings.py 的默认值。
+exec "$PYTHON" web_app.py

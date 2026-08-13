@@ -9,6 +9,25 @@ def answer_unsupported_claim(query, rules, normalize_for_match):
     return ""
 
 
+def answer_insufficient_material(query, constraints=None):
+    """Deterministic refusal when retrieval produced no documents at all.
+
+    The LLM must never see an empty context: without evidence cards there is
+    nothing verifiable to answer from, and prose fabrication would slip past
+    the citation-line audit.
+    """
+    title = ((constraints or {}).get("title") or "").strip()
+    if title:
+        return (
+            f"当前语料库未检索到《{title}》的相关正文页段，因此本轮不输出跨篇替代性引文。"
+            "请先确认该篇目在本地库中的页段映射或OCR文本，或换一种问法。"
+        )
+    return (
+        "当前语料库未检索到与该问题直接相关的原文材料，无法提供有出处的回答。"
+        "建议换一种问法，或指定具体著作、篇目后再提问。"
+    )
+
+
 def is_view_list_query(query, normalize_for_match):
     normalized = normalize_for_match(query)
     if not normalized:

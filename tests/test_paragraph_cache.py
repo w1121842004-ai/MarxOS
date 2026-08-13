@@ -3,15 +3,32 @@ import unittest
 from langchain_core.documents import Document
 
 from rag.paragraph_cache import (
+    build_paragraph_records_for_source,
     is_incomplete_paragraph,
     merge_records,
     paragraph_record,
     paragraph_record_to_document,
     split_page_paragraphs,
 )
+from unittest.mock import patch
 
 
 class ParagraphCacheTests(unittest.TestCase):
+    def test_skipped_page_breaks_pending_cross_page_merge(self):
+        first = Document(page_content="未完待续", metadata={"pdf_page": 1, "page_type": "body"})
+        third = Document(page_content="新的正文。", metadata={"pdf_page": 3, "page_type": "body"})
+
+        with (
+            patch("rag.paragraph_cache.iter_source_cache_files", return_value=["p1", "p2", "p3"]),
+            patch("rag.paragraph_cache.document_from_cache", side_effect=[first, None, third]),
+        ):
+            records = build_paragraph_records_for_source("x.pdf")
+
+        self.assertEqual(
+            [record["paragraph_text"] for record in records],
+            ["未完待续", "新的正文。"],
+        )
+        self.assertFalse(records[0]["cross_page"])
     def test_split_page_paragraphs_joins_visual_lines_and_filters_repeated_title(self):
         metadata = {
             "article": "家庭、私有制和国家的起源",
@@ -55,6 +72,13 @@ class ParagraphCacheTests(unittest.TestCase):
         self.assertEqual(merged["pdf_page_start"], 10)
         self.assertEqual(merged["pdf_page_end"], 11)
         self.assertTrue(merged["cross_page"])
+        self.assertEqual(
+            merged["spans"],
+            [
+                {"page_id": "test.pdf#pdf10", "pdf_page": 10, "char_start": None, "char_end": None, "line_start": None, "line_end": None},
+                {"page_id": "test.pdf#pdf11", "pdf_page": 11, "char_start": None, "char_end": None, "line_start": None, "line_end": None},
+            ],
+        )
 
     def test_paragraph_record_to_document_adds_retrieval_metadata(self):
         record = {
