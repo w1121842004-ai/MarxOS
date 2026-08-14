@@ -92,7 +92,9 @@ def main() -> int:
                 page_json = json.loads(path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 continue
-            if "page_number_ocr" in page_json:
+            if "page_number_ocr" in page_json and (
+                not args.also_bottom or "page_number_ocr_bottom" in page_json
+            ):
                 skipped += 1
                 continue
             if cache_page - 1 >= len(doc):

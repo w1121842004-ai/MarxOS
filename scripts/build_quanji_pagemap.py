@@ -79,18 +79,16 @@ def collect_candidates(
 ) -> list[dict]:
     """region 分类的多候选提取。
 
-    use_layout_fields=False（全集卷）：只用旧 OCR cleaner 的 region 分离候选——
-    text_layer 缓存的 footer_text 混入了边码/书信编号，不可信。
-    use_layout_fields=True（文集/选集直通卷）：v1 布局字段本身可信。
+    全集卷只信两个可信源：legacy cleaner 的 region 分离候选与当前 PDF 的
+    顶部带 OCR 证据。v1 候选与 text_layer 布局字段混入边码/旧版 PDF 噪声，
+    仅文集/选集直通卷保留（它们在到达这里之前已直通，实际不用）。
     """
     candidates: list[dict] = []
     seen: set[tuple[int, str]] = set()
 
     def add(value: int, region: str, reason: str, line: str = "", trusted: bool = False):
-        # 信任分级：legacy cleaner 的 region 分离候选用全局界（分卷偏移大），
-        # text_layer/v1 候选只用 pdf 相对窗口（混入边码噪声）。
         if trusted:
-            if bounds is None or not (bounds[0] - 5 <= value <= bounds[1] + 5):
+            if bounds is not None and not (bounds[0] - 5 <= value <= bounds[1] + 5):
                 return
         else:
             if not plausible(value, pdf_page, None):
@@ -228,7 +226,9 @@ def build_anchors(candidates_by_page: list[list[dict]]) -> list[tuple[int, int, 
         delta_pages = j - i
         for item_i in items_i:
             for item_j in items_j:
-                if abs((item_j["printed_page"] - item_i["printed_page"]) - delta_pages) <= 2:
+                delta_value = item_j["printed_page"] - item_i["printed_page"]
+                # 只接受前向一致（Δv ∈ {Δp, Δp+1}），拒绝平链与回退。
+                if 0 <= delta_value - delta_pages <= 1:
                     consistent[i] = True
                     consistent[j] = True
                     break
@@ -366,7 +366,7 @@ def main() -> int:
                 page,
                 page.get("page_num") or index,
                 bounds,
-                use_layout_fields=True,
+                use_layout_fields=False,
             )
             for index, page in enumerate(pages)
         ]
@@ -419,17 +419,46 @@ def main() -> int:
                 if final[i] is None:
                     final[i] = interpolate_page(segment_anchors, i)
 
-        # 校验：单调性 + article_map 范围
-        values = [(i, item["printed_page"]) for i, item in enumerate(final) if item]
+        # 离群修复：单页数字误读（v[i] 夹在 v[i-1] 与 v[i-1]+2 之间却不连续）。
+        # 只在前后锚点都明确时修复，方法标注 repaired，不静默改写。
+        for start, end in spans:
+            for i in range(start + 1, end):
+                if final[i] is None or final[i - 1] is None or final[i + 1] is None:
+                    continue
+                prev_v = final[i - 1]["printed_page"]
+                next_v = final[i + 1]["printed_page"]
+                cur_v = final[i]["printed_page"]
+                if next_v == prev_v + 2 and cur_v not in (prev_v + 1, prev_v + 2):
+                    final[i] = {
+                        "printed_page": prev_v + 1,
+                        "confidence": 0.9,
+                        "method": "repaired_outlier",
+                        "region": final[i].get("region", "footer"),
+                    }
+
+        # 校验：段内单调性 + article_map 范围（段边界跳变是合法结构）。
+        segment_values = [
+            [item["printed_page"] for item in final[start:end + 1] if item]
+            for start, end in spans
+        ]
         monotonic_breaks = sum(
-            1 for index in range(1, len(values))
-            if values[index][1] <= values[index - 1][1]
+            sum(
+                1 for index in range(1, len(values))
+                if values[index] <= values[index - 1]
+            )
+            for values in segment_values
         )
         in_bounds = True
-        if bounds and values:
-            in_bounds = bounds[0] - 3 <= values[0][1] and values[-1][1] <= bounds[1] + 3
+        if bounds:
+            for values in segment_values:
+                if not values:
+                    continue
+                if values[0] < bounds[0] - 3 or values[-1] > bounds[1] + 3:
+                    in_bounds = False
+                    break
 
-        coverage = len(values) / len(pages) if pages else 0.0
+        covered = sum(1 for item in final if item)
+        coverage = covered / len(pages) if pages else 0.0
         anchor_count = len(anchors)
         stats = {
             "source": source,
@@ -443,7 +472,7 @@ def main() -> int:
         }
         is_letter_volume = bool(re.match(r"^me2[7-9][ab]?$|^me3[0-9][ab]?$", source))
         coverage_ok = coverage >= (0.25 if is_letter_volume else 0.80)
-        passed = in_bounds and coverage_ok and (not values or monotonic_breaks <= max(2, len(pages) // 200))
+        passed = in_bounds and coverage_ok and (covered == 0 or monotonic_breaks <= max(2, len(pages) // 200))
         if is_letter_volume and passed and coverage < 0.80:
             stats["letters_partial"] = True
         stats["passed"] = passed
