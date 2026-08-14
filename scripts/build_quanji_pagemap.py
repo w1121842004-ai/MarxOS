@@ -77,6 +77,7 @@ def collect_candidates(
     bounds: tuple[int, int] | None = None,
     use_layout_fields: bool = False,
     skip_top_printed: bool = False,
+    include_digit_runs: bool = False,
 ) -> list[dict]:
     """region 分类的多候选提取。
 
@@ -133,6 +134,28 @@ def collect_candidates(
     for number in page.get("page_number_ocr_bottom") or []:
         if isinstance(number.get("value"), int):
             add(number["value"], "footer", "ocr_bottom", trusted=True)
+    # 低证据卷：文本层把页码逐位拆行（'３' '８'），合并连续纯数字行。
+    if include_digit_runs:
+        raw_lines = [line.strip() for line in (page.get("raw_text") or "").splitlines()]
+        index = 0
+        while index < len(raw_lines):
+            line = raw_lines[index]
+            if line and all(char in "0123456789０１２３４５６７８９" for char in line):
+                merged = line
+                next_index = index + 1
+                while (
+                    next_index < len(raw_lines)
+                    and raw_lines[next_index]
+                    and all(char in "0123456789０１２３４５６７８９" for char in raw_lines[next_index])
+                ):
+                    merged += raw_lines[next_index]
+                    next_index += 1
+                value = normalize_digits(merged)
+                if value.isdigit() and 1 <= int(value) <= 9999:
+                    add(int(value), "printed_top", "raw_digit_run", trusted=True)
+                index = next_index
+            else:
+                index += 1
     return candidates
 
 
@@ -197,12 +220,16 @@ def select_chain(candidates_by_page: list[list[dict]]) -> list[dict | None]:
     return selection
 
 
-def build_anchors(candidates_by_page: list[list[dict]]) -> list[tuple[int, int, str]]:
+def build_anchors(
+    candidates_by_page: list[list[dict]],
+    relaxed: bool = False,
+) -> list[tuple[int, int, str]]:
     """稀疏锚点：候选页两两一致性校验。
 
-    候选页 (i, v_i) 与下一个候选页 (j, v_j) 一致 ⇔ |v_j - v_i - (j - i)| <= 2。
+    候选页 (i, v_i) 与下一个候选页 (j, v_j) 一致 ⇔ Δv-Δp 在容忍带内
+    （严格：0..1 前向；relaxed：-1..2，用于无 OCR 证据的 legacy-only 卷）。
     与相邻候选页都一致的页面成为锚点；每页在一致约束下选择 region 加权
-    最优的候选值。
+    最优的候选值。相邻段在边界连续（段间页为插页）时合并为一段。
     """
     candidate_pages = [(i, items) for i, items in enumerate(candidates_by_page) if items]
     if not candidate_pages:
@@ -229,8 +256,10 @@ def build_anchors(candidates_by_page: list[list[dict]]) -> list[tuple[int, int, 
         for item_i in items_i:
             for item_j in items_j:
                 delta_value = item_j["printed_page"] - item_i["printed_page"]
-                # 只接受前向一致（Δv ∈ {Δp, Δp+1}），拒绝平链与回退。
-                if 0 <= delta_value - delta_pages <= 1:
+                # 严格：只接受前向一致（Δv ∈ {Δp, Δp+1}），拒绝平链与回退；
+                # relaxed：容忍 legacy OCR 个位数噪声（Δv-Δp ∈ [-1, 2]）。
+                tolerance = (-1, 2) if relaxed else (0, 1)
+                if tolerance[0] <= delta_value - delta_pages <= tolerance[1]:
                     consistent[i] = True
                     consistent[j] = True
                     break
@@ -264,7 +293,8 @@ def build_anchors(candidates_by_page: list[list[dict]]) -> list[tuple[int, int, 
         if current:
             prev_i, prev_v, _ = current[-1]
             i, value, _kind = anchor
-            if abs((value - prev_v) - (i - prev_i)) <= 2:
+            tolerance = (-1, 2) if relaxed else (0, 1)
+            if tolerance[0] <= (value - prev_v) - (i - prev_i) <= tolerance[1]:
                 current.append(anchor)
             else:
                 if len(current) >= 3:
@@ -274,6 +304,20 @@ def build_anchors(candidates_by_page: list[list[dict]]) -> list[tuple[int, int, 
             current = [anchor]
     if len(current) >= 3:
         segments.append(current)
+    # 相邻段边界连续（段间页为插页/插图）时合并：链被短噪声段打断后复原。
+    merged: list[list[tuple[int, int, str]]] = []
+    for segment in segments:
+        if merged:
+            prev = merged[-1]
+            end_i, end_v = prev[-1][0], prev[-1][1]
+            start_i, start_v = segment[0][0], segment[0][1]
+            gap = start_i - end_i
+            tolerance = (-1, 2) if relaxed else (0, 1)
+            if tolerance[0] <= (start_v - end_v) - gap <= tolerance[1]:
+                merged[-1] = prev + segment
+                continue
+        merged.append(segment)
+    segments = merged
     flattened = [anchor for segment in segments for anchor in segment]
     spans = [(segment[0][0], segment[-1][0]) for segment in segments]
     return flattened, spans
@@ -363,13 +407,21 @@ def main() -> int:
             print(f"[{source}] skipped (doc volume)", flush=True)
             continue
 
+        # 低证据模式：扫描内无页码的卷（me03 类）补充 v1 布局候选，
+        # 容忍个位数 OCR 噪声，覆盖门槛放宽到 0.60。
+        ocr_printed_pages = sum(
+            1 for page in pages
+            if isinstance(((page.get("page_number_ocr") or {}).get("printed") or {}).get("value"), int)
+        )
+        low_evidence = ocr_printed_pages < len(pages) * 0.05
+
         candidates_by_page = [
             collect_candidates(
                 page,
                 page.get("page_num") or index,
                 bounds,
-                use_layout_fields=False,
-                
+                use_layout_fields=low_evidence,
+                include_digit_runs=low_evidence,
             )
             for index, page in enumerate(pages)
         ]
@@ -400,7 +452,7 @@ def main() -> int:
             print(f"[{source}] v1 passthrough (coverage={v1_coverage:.2f} breaks={v1_breaks})", flush=True)
             continue
 
-        anchors, spans = build_anchors(candidates_by_page)
+        anchors, spans = build_anchors(candidates_by_page, relaxed=low_evidence)
         anchors_by_segment = []
         for start, end in spans:
             anchors_by_segment.append([
@@ -474,7 +526,8 @@ def main() -> int:
             "in_bounds": in_bounds,
         }
         is_letter_volume = bool(re.match(r"^me2[7-9][ab]?$|^me3[0-9][ab]?$", source))
-        coverage_ok = coverage >= (0.25 if is_letter_volume else 0.80)
+        coverage_bar = 0.60 if low_evidence else (0.25 if is_letter_volume else 0.80)
+        coverage_ok = coverage >= coverage_bar
         passed = in_bounds and coverage_ok and (covered == 0 or monotonic_breaks <= max(2, len(pages) // 200))
         if is_letter_volume and passed and coverage < 0.80:
             stats["letters_partial"] = True
