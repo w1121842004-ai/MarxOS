@@ -1,0 +1,15 @@
+# AutoDL 构建环境最小依赖（不含 faiss/paddle/opencv，构建阶段用不到）
+openai==2.36.0
+python-dotenv==1.2.2
+jieba==0.42.1
+langchain==0.1.20
+langchain-community==0.0.38
+langchain-core==0.1.52
+langchain-text-splitters==0.0.2
+sentence-transformers==2.7.0
+pymilvus==3.0.0
+milvus-lite==3.0
+PyMuPDF==1.27.2.3
+numpy>=1.26,<2
+requests==2.33.1
+tqdm==4.67.3

@@ -37,7 +37,18 @@ if [ ! -d ".venv" ]; then
 fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
-pip install -q -r requirements.txt
+
+# torch：按驱动 CUDA 版本选 wheel 索引（GPU 必需）
+CUDA_VER="$(nvidia-smi 2>/dev/null | grep -oP 'CUDA Version: \K[0-9.]+' | head -1 | cut -d. -f1-2)"
+case "$CUDA_VER" in
+  12.*) TORCH_INDEX="cu121" ;;
+  11.*) TORCH_INDEX="cu118" ;;
+  *) TORCH_INDEX="cu121" ;;
+esac
+echo "== CUDA 驱动版本: ${CUDA_VER:-未知} -> torch 索引 ${TORCH_INDEX} =="
+pip install -q torch --index-url "https://download.pytorch.org/whl/${TORCH_INDEX}"
+
+pip install -q -r requirements-autodl.txt
 
 # 1. preflight
 python scripts/rebuild_corpus_v2.py preflight --config "$CONFIG"
