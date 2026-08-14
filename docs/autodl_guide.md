@@ -27,6 +27,9 @@ AutoDL：租卡 → 上传缓存 → clone → 跑脚本 → 回传产物
 
 数据盘路径是 **`/root/autodl-tmp`**（系统盘关机清空，数据盘保留——所有数据放这里）。
 
+**`<端口>` 和 `<区域>` 怎么填**：AutoDL 控制台 →「容器实例」→ 实例详情里直接给出完整 SSH 指令
+（`ssh -p 23456 root@connect.westb.seetacloud.com`）——端口 = `-p` 后的数字，区域 = 域名中间段（westa/westb/east 等），照抄即可；scp 的端口参数是**大写 -P**。
+
 ```bash
 # 在 AutoDL 上先建目录（SSH 上去执行一次）
 ssh -p <端口> root@connect.<区域>.autodl.com "mkdir -p /root/autodl-tmp/MarxOS/data /root/autodl-tmp/MarxOS/rag"
