@@ -66,13 +66,28 @@ def build(args: argparse.Namespace) -> dict:
                 excluded_count += 1
             yield record
 
+    duplicate_skipped = 0
+    seen_ids: set[str] = set()
+
+    def deduped_children(records):
+        nonlocal duplicate_skipped
+        for child in build_semantic_child_records(
+            records,
+            chunk_size=args.chunk_size,
+            chunk_overlap=args.chunk_overlap,
+        ):
+            child_id = str(child.get("retrieval_id") or child.get("id") or "")
+            if child_id and child_id in seen_ids:
+                # 确定性 ID 下重复子块是无损重复（上游段落记录出现重页），跳过。
+                duplicate_skipped += 1
+                continue
+            if child_id:
+                seen_ids.add(child_id)
+            yield child
+
     try:
         with args.output.open("x", encoding="utf-8") as output:
-            for record in build_semantic_child_records(
-                counted_records(),
-                chunk_size=args.chunk_size,
-                chunk_overlap=args.chunk_overlap,
-            ):
+            for record in deduped_children(counted_records()):
                 encoded = (json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")
                 output.write(encoded.decode("utf-8"))
                 output_hash.update(encoded)
@@ -88,6 +103,7 @@ def build(args: argparse.Namespace) -> dict:
         "paragraph_records_read": input_count,
         "paragraph_records_excluded": excluded_count,
         "semantic_child_records_written": output_count,
+        "semantic_child_records_duplicates_skipped": duplicate_skipped,
         "chunk_size": args.chunk_size,
         "chunk_overlap": args.chunk_overlap,
         "output_sha256": output_hash.hexdigest(),
