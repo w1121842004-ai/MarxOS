@@ -4,7 +4,7 @@
   "scope": {
     "name": "marx_engels_editions_v2_2_quanji",
     "sources": [
-      "me01.pdf", "me01a.pdf", "me01b.pdf", "me02.pdf", "me04.pdf", "me05.pdf",
+      "me01.pdf", "me01a.pdf", "me01b.pdf", "me02.pdf", "me03.pdf", "me04.pdf", "me05.pdf",
       "me06.pdf", "me07.pdf", "me08.pdf", "me09.pdf", "me10.pdf", "me11.pdf",
       "me12.pdf", "me13.pdf", "me14a.pdf", "me14b.pdf", "me15.pdf", "me16.pdf",
       "me17.pdf", "me18.pdf", "me19.pdf", "me20.pdf", "me21.pdf", "me22.pdf",
@@ -19,7 +19,7 @@
       "mes01.pdf", "mes02.pdf", "mes03.pdf", "mes04.pdf"
     ],
     "expand_corpus_during_rebuild": false,
-    "excluded_notes": "me03 扫描内无页码（page_number_v2 未写），书信卷 letter01-04 与索引卷未缓存，均不入库"
+    "excluded_notes": "书信卷 letter01-04 与索引卷未缓存，不入库；me03 已换未裁边 PDF 并补齐页码（2026-08-14）"
   },
   "inputs": {
     "pdf_dir": "data/marx_engels全集",

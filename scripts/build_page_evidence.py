@@ -50,6 +50,7 @@ def main() -> int:
     parser.add_argument("--pdf-dir", type=Path, default=ROOT / "data/marx_engels全集")
     parser.add_argument("--band-bottom", type=float, default=0.22)
     parser.add_argument("--also-bottom", action="store_true", help="书信卷：追加页脚带扫描（0.75-0.98）")
+    parser.add_argument("--force", action="store_true", help="重跑已有 page_number_ocr 的页（如更换 PDF 后）")
     parser.add_argument("--dpi", type=int, default=216)
     parser.add_argument("--report", type=Path, default=ROOT / "logs/quanji_page_evidence.json")
     args = parser.parse_args()
@@ -92,7 +93,7 @@ def main() -> int:
                 page_json = json.loads(path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 continue
-            if "page_number_ocr" in page_json and (
+            if not args.force and "page_number_ocr" in page_json and (
                 not args.also_bottom or "page_number_ocr_bottom" in page_json
             ):
                 skipped += 1
