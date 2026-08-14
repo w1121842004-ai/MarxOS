@@ -139,7 +139,7 @@ def audit_source(cache_dir: Path, source: str, limit: int | None) -> dict:
 
 
 LETTER_SOURCE_PATTERN = re.compile(r"^(me2[7-9][ab]?|me3[0-9][ab]?|letter\d+)$")
-DOC_SOURCE_PATTERN = re.compile(r"^(mega1-mega2|meid|.*index.*|20210302c)$")
+DOC_SOURCE_PATTERN = re.compile(r"^(mega1-mega2|meid|.*index.*)$")
 
 
 def tier_of(source: str, metrics: dict, thresholds: dict) -> str:
