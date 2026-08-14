@@ -63,6 +63,10 @@ echo "== pip 镜像: ${PIP_INDEX_URL} =="
 pip install -q -r requirements-autodl.txt -i "$PIP_INDEX_URL" \
   || pip install -q -r requirements-autodl.txt
 
+# HuggingFace 直连超时，走 hf-mirror 国内镜像；可用 HF_ENDPOINT 覆盖。
+export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
+echo "== HF 镜像: ${HF_ENDPOINT} =="
+
 # 1. preflight
 python scripts/rebuild_corpus_v2.py preflight --config "$CONFIG"
 
