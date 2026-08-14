@@ -246,6 +246,11 @@ def run_build(
     elif options.resume:
         raise FileNotFoundError(f"resume checkpoint does not exist: {options.checkpoint_path}")
 
+    # 本地 DB 的父目录不存在时 MilvusClient 会直接失败，先建目录。
+    local_database = _local_database_path(options.uri)
+    if local_database is not None:
+        local_database.parent.mkdir(parents=True, exist_ok=True)
+
     # Load the native embedding model before starting embedded Milvus Lite.
     embeddings = (embeddings_factory or _default_embeddings_factory)(options)
     kwargs = {"uri": options.uri}
