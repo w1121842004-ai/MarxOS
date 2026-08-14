@@ -16,11 +16,12 @@ set -euo pipefail
 
 DEVICE="cuda"
 BATCH=128
-for arg in "$@"; do
-  case "$arg" in
-    --cpu) DEVICE="cpu" ;;
-    --cuda) DEVICE="cuda" ;;
-    --batch) shift; BATCH="$1" ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --cpu) DEVICE="cpu"; shift ;;
+    --cuda) DEVICE="cuda"; shift ;;
+    --batch) BATCH="$2"; shift 2 ;;
+    *) shift ;;
   esac
 done
 
