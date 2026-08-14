@@ -1,15 +1,15 @@
 {
-  "manifest_version": 1,
+  "manifest_version": 2,
   "corpus": {
-    "name": "me_editions_v2",
-    "version": "corpus-v2-efa06171f7698079",
-    "paragraph_cache": "data/artifacts/corpus_v2/paragraph_records_enriched_v2_1.jsonl",
-    "paragraph_cache_sha256": "8a8c60b213a4b3ebccb0865cf861c0fd725479e12b340073160cf1fe49eaa9ef"
+    "name": "me_full_v2_2",
+    "version": "2026-08-15",
+    "paragraph_cache": "data/artifacts/corpus_v2_2/paragraph_records_enriched.jsonl",
+    "paragraph_cache_sha256": "8a6fa9cf05d37992fc40dabda218cbf83ada432ed345f11747aec44ce1faf6af"
   },
   "build": {
-    "completed_at": "2026-08-13T09:52:00+08:00",
+    "completed_at": "2026-08-15T05:30:00+08:00",
     "script": "scripts/build_milvus_v2.py",
-    "script_sha256": "2962e91dab8a703424dc20c7bd2240842120568b54c4a3368637a1f8e62a3d43",
+    "script_sha256": "d5a2ab74635bbaf7d72cd50a7dd3ce416657c2f09010bd848129bec3ff6e239d",
     "retrieval_unit": "semantic_child",
     "child_chunk_size": 320,
     "child_chunk_overlap": 64,
@@ -18,15 +18,15 @@
   "embedding": {
     "model": "BAAI/bge-m3",
     "dimension": 1024,
-    "device_policy": "cpu",
+    "device_policy": "mps",
     "sparse_provider": "bm25"
   },
   "index": {
     "backend": "milvus_lite",
-    "uri": "data/milvus_lite/marxos_corpus_v2.db",
-    "collection": "marxos_passages_v2",
-    "row_count": 45875,
-    "directory_sha256": "ca145596b2482f8b98464bb42d074f3b627b429e790acd9d0f2d548fa727c44d",
+    "uri": "data/milvus_lite/marxos_corpus_v2_2.db",
+    "collection": "marxos_passages_v2_2",
+    "row_count": 191792,
+    "directory_sha256": "44b9b9227ec397c9c08d222fca6d19f8892b501c270f83e13b2998149606a746",
     "checksum_method": "sha256(sorted sha256 of every file except LOCK, using paths relative to the DB directory)"
   },
   "schema": {
@@ -39,7 +39,6 @@
       "book",
       "volume",
       "article",
-      "work_id",
       "paragraph_id",
       "parent_paragraph_id",
       "retrieval_unit",

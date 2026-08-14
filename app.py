@@ -1892,6 +1892,8 @@ CONCEPT_TITLE_FALLBACK_TO_CLASSIC = {
     "\u56fd\u5bb6\u7684\u4ea7\u751f",
     "\u79c1\u6709\u5236",
     "\u5bb6\u5ead",
+    "\u552f\u7269\u8fa9\u8bc1\u6cd5",
+    "\u8fa9\u8bc1\u6cd5",
 }
 
 
@@ -2011,6 +2013,17 @@ def enrich_concept_metadata(query, docs):
 
         match = canonical_concept_entry_for_metadata(query, doc.metadata)
         if not match:
+            # 全集文档不在经典条目里，但有确定性书目富化的 work_id：
+            # 用著作标题补强弱 article（如「九、经济的自然规律。地租」→《反杜林论》）。
+            work_id = str(doc.metadata.get("work_id") or "")
+            if work_id:
+                work = _get_work_catalog().lookup_by_id(work_id)
+                title = (work or {}).get("title") or ""
+                if title and concept_article_title_is_weak(query, doc.metadata):
+                    doc.metadata.setdefault("raw_article", doc.metadata.get("article"))
+                    doc.metadata.setdefault("raw_section", doc.metadata.get("section"))
+                    doc.metadata["article"] = title
+                    doc.metadata["section"] = title
             continue
 
         _term, classic, entry = match

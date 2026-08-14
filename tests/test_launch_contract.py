@@ -8,19 +8,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 CANONICAL_DEFAULTS = {
-    "MARXOS_CORPUS_PROFILE": "me_full_v2",
-    "MARXOS_RETRIEVAL_PROFILE": "milvus_bgem3_v2",
+    "MARXOS_CORPUS_PROFILE": "me_full_v2_2",
+    "MARXOS_RETRIEVAL_PROFILE": "milvus_bgem3_v2_2",
     "MARXOS_ANSWER_PROFILE": "deepseek_default",
     "MARXOS_VECTOR_BACKEND": "milvus",
     "MARXOS_EMBEDDING_MODEL": "BAAI/bge-m3",
     "MARXOS_EMBEDDING_DEVICE": "cpu",
-    "MILVUS_URI": "./data/milvus_lite/marxos_corpus_v2.db",
-    "MILVUS_COLLECTION": "marxos_passages_v2",
+    "MILVUS_URI": "./data/milvus_lite/marxos_corpus_v2_2.db",
+    "MILVUS_COLLECTION": "marxos_passages_v2_2",
     "MILVUS_SPARSE_PROVIDER": "bm25",
-    "MARXOS_BM25_STATS_PATH": "data/artifacts/corpus_v2/bm25_stats_v2_1.json",
+    "MARXOS_BM25_STATS_PATH": "data/artifacts/corpus_v2_2/bm25_stats.json",
     "MILVUS_HYBRID_SEARCH": "1",
     "OCR_CACHE_DIR": "data/ocr_cache_text_layer",
-    "PARAGRAPH_CACHE_PATH": "data/artifacts/corpus_v2/paragraph_records_enriched_v2_1.jsonl",
+    "PARAGRAPH_CACHE_PATH": "data/artifacts/corpus_v2_2/paragraph_records_enriched.jsonl",
     "SEMANTIC_LIGHT_SPARSE_INDEX_PATH": "data/sparse_paragraph_index_text_layer.pkl",
 }
 

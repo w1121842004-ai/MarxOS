@@ -19,7 +19,7 @@ class RuntimeHealthTests(unittest.TestCase):
             get_settings.cache_clear()
             settings = get_settings()
 
-        self.assertEqual(settings.profiles.active_retrieval_profile, "milvus_bgem3_v2")
+        self.assertEqual(settings.profiles.active_retrieval_profile, "milvus_bgem3_v2_2")
         self.assertEqual(settings.index.milvus_sparse_provider, "bm25")
         self.assertTrue(settings.index.milvus_hybrid_search)
 

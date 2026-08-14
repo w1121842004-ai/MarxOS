@@ -8,8 +8,8 @@ from pathlib import Path
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 
-DEFAULT_CORPUS_PROFILE = "me_full_v2"
-DEFAULT_RETRIEVAL_PROFILE = "milvus_bgem3_v2"
+DEFAULT_CORPUS_PROFILE = "me_full_v2_2"
+DEFAULT_RETRIEVAL_PROFILE = "milvus_bgem3_v2_2"
 DEFAULT_ANSWER_PROFILE = "deepseek_default"
 
 
@@ -70,6 +70,18 @@ CORPUS_PROFILES = {
         "topic_catalog_path": "rag/topic_catalog.json",
         "paragraph_cache_path": "data/artifacts/corpus_v2/paragraph_records_enriched_v2_1.jsonl",
         "semantic_parent_cache_path": "data/artifacts/corpus_v2/paragraph_records_enriched_v2_1.jsonl",
+        "ocr_cache_dir": "data/ocr_cache_text_layer",
+        "page_map_path": "data/page_map.json",
+        "preferred_editions": ("me", "wenji", "xuanji"),
+    },
+    "me_full_v2_2": {
+        # Corpus v2.2 (全集75卷 + 文集10卷 + 选集4卷)：全集页码 V2 已写回缓存，
+        # 权威段落产物在 data/artifacts/corpus_v2_2，父段落扩展与检索同源。
+        "article_map_path": "rag/article_map.json",
+        "article_map_extra_paths": "rag/article_map_core.json",
+        "topic_catalog_path": "rag/topic_catalog.json",
+        "paragraph_cache_path": "data/artifacts/corpus_v2_2/paragraph_records_enriched.jsonl",
+        "semantic_parent_cache_path": "data/artifacts/corpus_v2_2/paragraph_records_enriched.jsonl",
         "ocr_cache_dir": "data/ocr_cache_text_layer",
         "page_map_path": "data/page_map.json",
         "preferred_editions": ("me", "wenji", "xuanji"),
@@ -154,6 +166,20 @@ RETRIEVAL_PROFILES = {
         "milvus_uri": "./data/milvus_lite/marxos_corpus_v2.db",
         "milvus_collection": "marxos_passages_v2",
         "bm25_stats_path": "data/artifacts/corpus_v2/bm25_stats_v2_1.json",
+    },
+    "milvus_bgem3_v2_2": {
+        # Corpus v2.2（全集 75 卷并入）：191,792 semantic child rows。
+        "vector_backend_default": "milvus",
+        "milvus_hybrid_search": True,
+        "milvus_sparse_provider": "bm25",
+        "semantic_parent_window": 1,
+        "semantic_child_parent_window": 0,
+        "semantic_child_chunk_size": 320,
+        "semantic_child_chunk_overlap": 64,
+        "milvus_retrieval_unit": "semantic_child",
+        "milvus_uri": "./data/milvus_lite/marxos_corpus_v2_2.db",
+        "milvus_collection": "marxos_passages_v2_2",
+        "bm25_stats_path": "data/artifacts/corpus_v2_2/bm25_stats.json",
     },
 }
 

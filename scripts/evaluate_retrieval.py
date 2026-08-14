@@ -106,13 +106,13 @@ CONCEPT_QUESTIONS = [
     EvalQuestion(
         "concept",
         "唯物辩证法应该查哪些原文？",
-        expected_sources=("mes03.pdf", "mea09.pdf"),
+        expected_sources=("mes03.pdf", "mea09.pdf", "me20.pdf"),  # 全集第20卷=反杜林论+自然辩证法
         expected_article_terms=("反杜林论", "自然辩证法"),
     ),
     EvalQuestion(
         "concept",
         "阶级斗争是什么意思？",
-        expected_sources=("mes01.pdf", "mea02.pdf"),
+        expected_sources=("mes01.pdf", "mea02.pdf", "me04.pdf"),  # 全集第4卷=共产党宣言
         expected_content_terms=("阶级", "斗争"),
     ),
     EvalQuestion(
@@ -130,14 +130,14 @@ CONCEPT_QUESTIONS = [
     EvalQuestion(
         "concept",
         "异化劳动是什么？",
-        expected_sources=("mea01.pdf", "mes01.pdf"),
+        expected_sources=("mea01.pdf", "mes01.pdf", "me03.pdf"),  # 全集第3卷=1844年手稿
         expected_article_terms=("异化劳动", "外化劳动"),
         expected_content_terms=("异化", "劳动"),
     ),
     EvalQuestion(
         "concept",
         "费尔巴哈提纲讲实践吗？",
-        expected_sources=("mes01.pdf", "mea01.pdf"),
+        expected_sources=("mes01.pdf", "mea01.pdf", "me03.pdf"),  # 全集第3卷=1844年手稿
         expected_content_terms=("实践",),
     ),
 ]

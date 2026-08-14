@@ -384,7 +384,7 @@ Milvus / 检索专项：
 .venv/bin/python scripts/audit.py exact-quote-top1
 ```
 
-## 5.5 全集页码识别 V2（2026-08-13/14，自动部分收口）
+## 5.5 全集页码识别与 corpus-v2.2 晋级（2026-08-15，完成）
 
 全集（me01-50）页码是引文体系的命门。已完成：
 
@@ -392,6 +392,15 @@ Milvus / 检索专项：
 - **证据提取**（`scripts/build_page_evidence.py`）：RapidOCR（onnxruntime，替代残缺 paddlepaddle-tiny，0.5s/页 vs 45s+）顶部带逐页提取 + checkpoint；全量 ~48K 页完成，printed_rate 0.94–1.00。
 - **链算法**（`scripts/build_quanji_pagemap.py`）：多候选提取 → 前向一致锚点链（拒绝平链/回退）→ 段内插值（段间不拼接）→ 离群修复 → article_map 全局界校验 → 严格门禁写回（v2 结果重排 candidates + `page_number_v2` 字段）。
 - **结果**：74/77 源通过并已写回（覆盖 0.95–0.99、段内 0 断点）。me27/me39a 通过相邻段连续性合并消歧（0 断点）；me03 换未裁边 PDF 后补齐：证据 0.93、链 0.94 覆盖 0 断点，已写回。全集 75/75 全部完成（2 个 DOC 卷按设计只做 locator）。
+
+### corpus-v2.2 晋级（2026-08-15）
+
+- 全集 75 卷 + 文集/选集 14 卷全部入库：段落 212,470 条（注释/索引隔离 57,203）、semantic child 191,792 条（确定性去重 1 条）、Milvus 新库 marxos_corpus_v2_2.db / marxos_passages_v2_2。
+- 本机构建（AutoDL 环境问题弃用）：MPS + OMP_NUM_THREADS=1 根除 macOS libomp 段错误（CPU 多线程在 1 万条处崩溃两次后切换，约 10 条/s 跑完 19.2 万条）。
+- 验收全过：检索评测 95/95（4 处期望更新为全集等价卷 me03/me04/me20）；Web smoke 20/20 + 5/5；启动稳定性 10/10；回滚验收通过。
+- 概念富化修复：父段落扩展重建文档会丢弃富化字段，富化移到扩展之后；work_id 到著作标题的补强让全集章节标题正确显示为著作名；唯物辩证法类概念词不再被用作标题。
+- 默认 profile 切换：me_full_v2_2 + milvus_bgem3_v2_2；旧 v2/v1 基线保留为回滚入口。index manifest v2 校验通过。
+- 已知遗留：me01 繁体卷按决策保留繁体；me26c/mega1-mega2/meid 只做 locator 不切块；索引卷未入库。
 
 ## 6. 暂不做的事
 

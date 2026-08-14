@@ -863,7 +863,10 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
     else:
         docs = ranked_docs[:k]
 
-    if classify_query(query) == "concept_explain":
+    # 概念富化不限于 concept_explain 意图：「应该查哪些原文」会被路由到
+    # quote_lookup，但命中概念词时同样需要 work_id → 著作标题的弱标题补强
+    # （全集章节标题不带著作名）。
+    if classify_query(query) == "concept_explain" or active_concept_terms(query):
         docs = enrich_concept_metadata(query, docs)
 
     if allow_exact_quote and is_quote_lookup_query(query) and not is_work_location_query(query, ctx):
@@ -877,6 +880,10 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
     phase_started = time.perf_counter()
     docs = expand_semantic_parent_docs(docs)
     log_phase("expand_semantic_parent_docs", phase_started, doc_count=len(docs or []))
+    # 父段落扩展会重建文档对象，概念富化必须在扩展之后再做，
+    # 否则 classic/article 补强会随子块一起被替换掉。
+    if classify_query(query) == "concept_explain" or active_concept_terms(query):
+        docs = enrich_concept_metadata(query, docs)
     phase_started = time.perf_counter()
     docs = append_locator_backstops(docs, constraints, k, ctx)
     log_phase("append_locator_backstops", phase_started, doc_count=len(docs or []))
