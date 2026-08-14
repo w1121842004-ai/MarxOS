@@ -47,10 +47,10 @@ case "$CUDA_VER" in
   *) TORCH_INDEX="cu121" ;;
 esac
 echo "== CUDA 驱动版本: ${CUDA_VER:-未知} -> torch 索引 ${TORCH_INDEX} =="
-TORCH_INDEX_URL="${TORCH_INDEX_URL:-https://mirrors.aliyun.com/pytorch-wheels/${TORCH_INDEX}}"
-echo "== torch 镜像: ${TORCH_INDEX_URL} =="
-pip install -q torch --index-url "$TORCH_INDEX_URL" \
-  || pip install -q torch --index-url "https://download.pytorch.org/whl/${TORCH_INDEX}"
+# 官方源走 Cloudflare CDN，国内实例通常不慢；阿里云只作 find-links 备选。
+echo "== 安装 torch（显示进度，约 2.5GB）=="
+pip install torch --index-url "https://download.pytorch.org/whl/${TORCH_INDEX}" \
+  || pip install torch -f "https://mirrors.aliyun.com/pytorch-wheels/${TORCH_INDEX}/"
 
 # 国内实例直连 PyPI 易超时，默认走清华镜像；可用 PIP_INDEX_URL 覆盖。
 PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
