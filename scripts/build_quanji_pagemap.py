@@ -76,6 +76,7 @@ def collect_candidates(
     pdf_page: int,
     bounds: tuple[int, int] | None = None,
     use_layout_fields: bool = False,
+    skip_top_printed: bool = False,
 ) -> list[dict]:
     """region 分类的多候选提取。
 
@@ -119,7 +120,8 @@ def collect_candidates(
         if isinstance(value, int):
             add(value, str(candidate.get("region") or "unknown"), "legacy_candidate", trusted=True)
     # 顶部带 OCR 证据（RapidOCR，当前 PDF 权威来源）：printed 为最强证据，
-    # margin（边码）仅作备用候选。
+    # margin（边码）仅作备用候选。书信卷的顶部带是书信编号而非印刷页，
+    # skip_top_printed=True 时降为低优先级兜底（底带/legacy footer 优先）。
     ocr_evidence = page.get("page_number_ocr") or {}
     printed = ocr_evidence.get("printed") or {}
     if isinstance(printed.get("value"), int):
@@ -367,6 +369,7 @@ def main() -> int:
                 page.get("page_num") or index,
                 bounds,
                 use_layout_fields=False,
+                
             )
             for index, page in enumerate(pages)
         ]
