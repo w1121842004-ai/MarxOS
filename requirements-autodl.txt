@@ -7,6 +7,8 @@ langchain-community==0.0.38
 langchain-core==0.1.52
 langchain-text-splitters==0.0.2
 sentence-transformers==2.7.0
+# 新版 transformers 强制 torch>=2.6（cu121 索引最高 2.5.1），锁 4.46.3 规避
+transformers==4.46.3
 pymilvus==3.0.0
 milvus-lite==3.0
 PyMuPDF==1.27.2.3

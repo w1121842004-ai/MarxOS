@@ -49,14 +49,14 @@ esac
 echo "== CUDA 驱动版本: ${CUDA_VER:-未知} -> torch 索引 ${TORCH_INDEX} =="
 # macOS 的 OMP 修复与 Linux 无关，且会让 libgomp 报错，直接清除。
 unset OMP_NUM_THREADS 2>/dev/null || true
-# torch 固定 2.6.0（cu121 构建，兼容 CUDA 12.x 驱动；transformers 安全限制要求 ≥2.6）。
-# 官方源走 Cloudflare CDN；阿里云只作 find-links 备选。版本达标则跳过。
-if python -c "import torch; assert torch.__version__ >= '2.6'; print(torch.__version__)" 2>/dev/null; then
-  echo "== torch 版本达标，跳过 =="
+# torch 2.5.1 是 cu121 索引的最新版（2.6+ 只发 cu124/cu126，需更新驱动）；
+# transformers 锁 4.46.3 规避 torch>=2.6 安全限制。已装则跳过。
+if python -c "import torch; print(torch.__version__)" 2>/dev/null; then
+  echo "== torch 已安装，跳过 =="
 else
-  echo "== 安装 torch 2.6.0（显示进度，约 2.5GB）=="
-  pip install "torch==2.6.0" --index-url "https://download.pytorch.org/whl/${TORCH_INDEX}" \
-    || pip install "torch==2.6.0" -f "https://mirrors.aliyun.com/pytorch-wheels/${TORCH_INDEX}/"
+  echo "== 安装 torch 2.5.1（显示进度，约 2.5GB）=="
+  pip install "torch==2.5.1" --index-url "https://download.pytorch.org/whl/${TORCH_INDEX}" \
+    || pip install "torch==2.5.1" -f "https://mirrors.aliyun.com/pytorch-wheels/${TORCH_INDEX}/"
 fi
 
 # 国内实例直连 PyPI 易超时，默认走清华镜像；可用 PIP_INDEX_URL 覆盖。
