@@ -39,7 +39,7 @@ fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
-# torch：按驱动 CUDA 版本选 wheel 索引（GPU 必需）
+# torch：按驱动 CUDA 版本选 wheel 索引（GPU 必需）。国内实例优先阿里云镜像。
 CUDA_VER="$(nvidia-smi 2>/dev/null | grep -oP 'CUDA Version: \K[0-9.]+' | head -1 | cut -d. -f1-2)"
 case "$CUDA_VER" in
   12.*) TORCH_INDEX="cu121" ;;
@@ -47,9 +47,16 @@ case "$CUDA_VER" in
   *) TORCH_INDEX="cu121" ;;
 esac
 echo "== CUDA 驱动版本: ${CUDA_VER:-未知} -> torch 索引 ${TORCH_INDEX} =="
-pip install -q torch --index-url "https://download.pytorch.org/whl/${TORCH_INDEX}"
+TORCH_INDEX_URL="${TORCH_INDEX_URL:-https://mirrors.aliyun.com/pytorch-wheels/${TORCH_INDEX}}"
+echo "== torch 镜像: ${TORCH_INDEX_URL} =="
+pip install -q torch --index-url "$TORCH_INDEX_URL" \
+  || pip install -q torch --index-url "https://download.pytorch.org/whl/${TORCH_INDEX}"
 
-pip install -q -r requirements-autodl.txt
+# 国内实例直连 PyPI 易超时，默认走清华镜像；可用 PIP_INDEX_URL 覆盖。
+PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+echo "== pip 镜像: ${PIP_INDEX_URL} =="
+pip install -q -r requirements-autodl.txt -i "$PIP_INDEX_URL" \
+  || pip install -q -r requirements-autodl.txt
 
 # 1. preflight
 python scripts/rebuild_corpus_v2.py preflight --config "$CONFIG"
