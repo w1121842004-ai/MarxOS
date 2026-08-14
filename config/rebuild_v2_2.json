@@ -19,7 +19,7 @@
       "mes01.pdf", "mes02.pdf", "mes03.pdf", "mes04.pdf"
     ],
     "expand_corpus_during_rebuild": false,
-    "excluded_notes": "书信卷 letter01-04 与索引卷未缓存，不入库；me03 已换未裁边 PDF 并补齐页码（2026-08-14）"
+    "excluded_notes": "letter01-04 与 20210302c 已删除（不使用）；索引卷只做 locator；me03 已换未裁边 PDF 并补齐页码（2026-08-14）"
   },
   "inputs": {
     "pdf_dir": "data/marx_engels全集",
