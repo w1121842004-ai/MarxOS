@@ -882,6 +882,8 @@ def retrieve_documents(query, db, k, allow_exact_quote, ctx):
     log_phase("expand_semantic_parent_docs", phase_started, doc_count=len(docs or []))
     # 父段落扩展会重建文档对象，概念富化必须在扩展之后再做，
     # 否则 classic/article 补强会随子块一起被替换掉。
+    enrich_work_titles = _helper(ctx, "enrich_work_titles")
+    docs = enrich_work_titles(docs)
     if classify_query(query) == "concept_explain" or active_concept_terms(query):
         docs = enrich_concept_metadata(query, docs)
     phase_started = time.perf_counter()

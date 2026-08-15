@@ -443,6 +443,10 @@ def collect_retrieval_materials(
     )
     if topic_list_query:
         retrieve_k = max(retrieve_k, 10)
+    # 综述/论述题需要跨篇目材料（“如何论述法国小农”涉及雾月十八日、
+    # 法兰西阶级斗争、法德农民问题等），提高召回量。
+    if query_intent in {"theory_analysis", "deep_analysis"}:
+        retrieve_k = max(retrieve_k, 10)
     phase_started = time.perf_counter()
     docs = retrieve_with_plan(db, retrieve_k)
     log_retrieval_phase(

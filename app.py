@@ -537,6 +537,7 @@ def _retrieval_ctx():
         "is_quote_lookup_query": is_quote_lookup_query,
         "classify_query": classify_query,
         "enrich_concept_metadata": enrich_concept_metadata,
+        "enrich_work_titles": enrich_work_titles,
         "find_pdf_page_by_printed_page": find_pdf_page_by_printed_page,
         "load_ocr_page_text": load_ocr_page_text,
         "page_match_score": page_match_score,
@@ -1997,6 +1998,45 @@ def canonical_concept_entry_for_metadata(query, metadata):
             return term, classic, entry
 
     return None
+
+
+def enrich_work_titles(docs):
+    """全部 RAG 意图通用：article 为弱标题（章节号「七」/纯作者名等）时，
+    用确定性书目富化的 work_id 或 article_map 顶层条目把 article/section
+    补强为著作标题（全集卷的段落没有 work_id，需靠 article_map 层级回退）。"""
+    catalog = _get_work_catalog()
+    for doc in docs or []:
+        article = str(doc.metadata.get("section") or doc.metadata.get("article") or "")
+        article_norm = normalize_for_match(article)
+        if len(article_norm) >= 4 and article_norm not in {"恩格斯", "马克思", "马克思恩格斯"}:
+            # 已有实义标题则不覆盖；短章节号/纯作者名/噪声标题才补强。
+            if not is_noisy_article_title(article) and not re.fullmatch(r"[一二三四五六七八九十百\d]+", article_norm):
+                continue
+        title = ""
+        work_id = str(doc.metadata.get("work_id") or "")
+        if work_id:
+            work = catalog.lookup_by_id(work_id)
+            title = (work or {}).get("title") or ""
+        if not title:
+            # article_map 层级回退：找覆盖该页的 level-1 条目标题（去掉卷说明前缀）。
+            source = doc.metadata.get("source") or ""
+            page = metadata_printed_page(doc.metadata)
+            map_entry = ARTICLE_MAP.get(source) or {}
+            for entry in map_entry.get("entries") or []:
+                start_page = as_int(entry.get("start_printed_page"))
+                end_page = as_int(entry.get("end_printed_page"))
+                if entry.get("level") != 1 or start_page is None or end_page is None:
+                    continue
+                if page is not None and start_page <= page <= end_page:
+                    title = clean_article_title(entry.get("title") or "")
+                    break
+        if not title:
+            continue
+        doc.metadata.setdefault("raw_article", doc.metadata.get("article"))
+        doc.metadata.setdefault("raw_section", doc.metadata.get("section"))
+        doc.metadata["article"] = title
+        doc.metadata["section"] = title
+    return docs
 
 
 def enrich_concept_metadata(query, docs):
