@@ -128,6 +128,11 @@ def is_contextual_followup(query):
         "再说",
         "摘下来",
         "完整段落",
+        "类似的话",
+        "类似的",
+        "那有没有",
+        "还有类似",
+        "同样的话",
     ]
     query = query or ""
     return any(marker in query for marker in markers)

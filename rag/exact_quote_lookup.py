@@ -595,6 +595,60 @@ def collect_hits_with_constraints(query, normalized_quote, ocr_cache_dir, constr
     return hits
 
 
+_QUOTE_INDEX_CACHE = None
+
+
+def _quote_index(ocr_cache_dir):
+    """懒加载双字倒排索引（data/quote_index.pkl，由 build_quote_index.py 构建）。"""
+    global _QUOTE_INDEX_CACHE
+    if _QUOTE_INDEX_CACHE is None:
+        index_path = Path(ocr_cache_dir).parent / "quote_index.pkl"
+        if not index_path.exists():
+            return None
+        try:
+            import pickle
+
+            with index_path.open("rb") as handle:
+                _QUOTE_INDEX_CACHE = pickle.load(handle)
+        except Exception:
+            return None
+    return _QUOTE_INDEX_CACHE
+
+
+def quote_index_clause_hits(clause, ocr_cache_dir, top=60):
+    """用倒排索引定位包含子句的候选页，并对每页做精确 fuzzy 校验。"""
+    import json as _json
+
+    index = _quote_index(ocr_cache_dir)
+    if not index:
+        return []
+    from scripts.build_quote_index import query_index
+
+    candidates = query_index(index, clause, top=top)
+    hits = []
+    cache_root = Path(ocr_cache_dir)
+    for source, pdf_page in candidates:
+        path = cache_root / source / f"page_{pdf_page}.json"
+        if not path.exists():
+            continue
+        try:
+            page = _json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        text = normalize_quote(page.get("cleaned_text") or page.get("raw_text") or "")
+        # 索引已按双字筛选候选页，此处用精确子串校验（短子句走 fuzzy 滑窗
+        # 会被长页文本稀释比例而漏判）。
+        if clause not in text:
+            continue
+        metadata = metadata_from_page(page, None, path, preferred_entries=[])
+        metadata["lookup_scope"] = "quote_index"
+        metadata.setdefault("clause_match", clause)
+        quality = hit_quality_rank(page, page.get("cleaned_text") or "", clause)
+        hits.append(((quality, 9), Document(page_content=snippet_around(page.get("cleaned_text") or "", clause), metadata=metadata)))
+    hits.sort(key=lambda item: item[0])
+    return hits
+
+
 def collect_hits(query, normalized_quote, ocr_cache_dir, scoped, max_pages=None, deadline=None):
     quote = extract_query_quote(query)
     preferred_entries = classic_entries_for_query(query)
@@ -710,7 +764,7 @@ def exact_quote_lookup(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, limit=5, cons
         # If scoped search finds nothing, fall through to global search below
 
     preferred_entries = classic_entries_for_query(query)
-    timeout_sec = float(os.getenv("EXACT_QUOTE_LOOKUP_TIMEOUT_SEC", "3.0") or "3.0")
+    timeout_sec = float(os.getenv("EXACT_QUOTE_LOOKUP_TIMEOUT_SEC", "8.0") or "8.0")
     deadline = time.perf_counter() + max(timeout_sec, 0.1)
     scoped_max_pages = int(os.getenv("EXACT_QUOTE_SCOPED_MAX_PAGES", "800") or "800")
     hits = collect_hits(
@@ -737,13 +791,13 @@ def exact_quote_lookup(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, limit=5, cons
     if preferred_ids & STRICT_SCOPED_CLASSIC_IDS and not hits:
         return fallback_docs[:limit]
 
-    allow_global = os.getenv("EXACT_QUOTE_GLOBAL_FALLBACK", "0").strip().lower() in {"1", "true", "yes", "on"}
+    allow_global = os.getenv("EXACT_QUOTE_GLOBAL_FALLBACK", "1").strip().lower() in {"1", "true", "yes", "on"}
     if not allow_global:
         return fallback_docs[:limit]
 
     remaining = max(deadline - time.perf_counter(), 0.1)
     global_deadline = time.perf_counter() + remaining
-    global_max_pages = int(os.getenv("EXACT_QUOTE_GLOBAL_MAX_PAGES", "1200") or "1200")
+    global_max_pages = int(os.getenv("EXACT_QUOTE_GLOBAL_MAX_PAGES", "6000") or "6000")
     global_hits = collect_hits(
         query,
         normalized_quote,
@@ -752,6 +806,41 @@ def exact_quote_lookup(query, ocr_cache_dir=DEFAULT_OCR_CACHE_DIR, limit=5, cons
         max_pages=global_max_pages,
         deadline=global_deadline,
     )
+
+    # 子句级回退：记忆偏差的引文（「物质的集合体」vs 原文「既成事物的集合体」）
+    # 整句模糊匹配失败时，逐子句（≥8 字）在全库搜索命中片段。
+    if not global_hits and len(normalized_quote) >= 12:
+        for raw_clause in re.split(r"[,，。；;：:\s]", quote):
+            clause = normalize_quote(raw_clause)
+            if len(clause) < 8:
+                continue
+            clause_deadline = time.perf_counter() + max(timeout_sec, 0.1)
+            clause_hits = collect_hits(
+                query,
+                clause,
+                ocr_cache_dir,
+                scoped=False,
+                max_pages=global_max_pages,
+                deadline=clause_deadline,
+            )
+            if clause_hits:
+                for sort_key, doc in clause_hits:
+                    metadata = doc.metadata
+                    metadata.setdefault("clause_match", clause)
+                global_hits = clause_hits
+                break
+
+    # 双字倒排索引回退：子句在固定页范围内都找不到时，用索引定位候选页并
+    # 精确校验。覆盖记忆偏差引文（「物质的集合体」vs 原文「既成事物的集合体」）。
+    if not global_hits:
+        for raw_clause in re.split(r"[,，。；;：:\s]", quote):
+            clause = normalize_quote(raw_clause)
+            if len(clause) < 8:
+                continue
+            index_hits = quote_index_clause_hits(clause, ocr_cache_dir)
+            if index_hits:
+                global_hits = index_hits
+                break
 
     if global_hits:
         merged = {}

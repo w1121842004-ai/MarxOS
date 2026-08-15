@@ -310,6 +310,7 @@ def _body_has_citation_anchor(body, index):
     patterns = [
         rf"【\s*{index}\s*】",
         rf"\[\s*{index}\s*\]",
+        rf"\(\s*{index}\s*\)",
     ]
     return any(re.search(pattern, body or "") for pattern in patterns) or superscripts.get(index, "") in (body or "")
 
@@ -359,6 +360,12 @@ def repair_answer_citations(
     if not normalized.strip() or not evidence:
         return normalized
     normalized = _strip_unsupported_inline_citations(normalized, evidence, normalize_for_match)
+    # 清理正文尾部残留的裸数字引用组（[1][2]），引文注释小节已承载出处。
+    normalized = re.sub(
+        r"[\[［][0-9\s,，、]{1,16}[\]］]\s*$",
+        "",
+        normalized,
+    ).rstrip()
 
     ref_matched = evidence_by_refs(normalized, evidence)
     if ref_matched:
