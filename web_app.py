@@ -12,6 +12,7 @@ from marxos.config import get_settings
 from marxos.runtime_health import readiness_report, write_runtime_manifest
 from marxos.web import citations as web_citations
 from marxos.web import followups as web_followups
+from marxos.web import miss_log
 from marxos.web import support as web_support
 
 
@@ -60,6 +61,8 @@ button,textarea{font:inherit}button:focus-visible,textarea:focus-visible{outline
 .badge-ok{border-color:var(--green);color:var(--green)}
 .badge-warn{border-color:var(--amber);color:var(--amber)}
 .badge-err{border-color:var(--red);color:var(--red)}
+.fb-btn{background:none;border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-size:10px;color:var(--muted);cursor:pointer;margin-left:8px}
+.fb-btn:hover{color:var(--red);border-color:var(--red)}
 .msg-error .msg-body{color:var(--red);border:1px solid var(--red);border-radius:8px;padding:8px 10px;background:rgba(255,0,0,.04)}
 .evidence-box{margin-top:16px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;color:var(--muted);font-size:11px;background:rgba(255,255,255,.55)}
 .evidence-box summary{cursor:pointer;color:#4b4b47;font-weight:600;font-size:12px}
@@ -136,7 +139,8 @@ function buildHistory(){const c=getConv();if(!c)return[];const h=[];for(const m 
 function verifyBadge(v){if(!v||!v.total)return"";const ok=v.verified||0,pa=v.partial||0,ha=v.hallucinated||0;let cls="badge-ok",label="";if(ha>0){cls="badge-err";label=ha+"条引用待确认"}else if(pa>ok){cls="badge-warn";label=pa+"条转述引用"}else{label=ok+"条引用已校验"}return'<span class="badge '+cls+'">'+label+'</span>'}
 function evidenceHtml(ev){if(!Array.isArray(ev)||!ev.length)return"";const labels={exact_quote:"原文核对",locator_backstop:"定位提示",cache_backstop:"页段回退",vector_candidate:"未确认候选",sparse_candidate:"稀疏候选",paragraph_vector_candidate:"段落候选"};const items=ev.slice(0,6).map((e,i)=>{const cite=esc(e.citation||e.sentence_citation||""),src=esc(e.source||""),pg=esc(e.printed_page||e.citation_page||""),meta=src+(pg?" | 第"+pg+"页":""),ex=esc(String(e.excerpt||"").slice(0,200));const mt=e.match_type||"";const chip=labels[mt]?('<span class="evidence-chip '+(mt==="exact_quote"?"evidence-chip-ok":"evidence-chip-warn")+'">'+labels[mt]+'</span>'):"";return'<details class="evidence-item"><summary><span class="evidence-cite">['+(i+1)+'] '+cite+'</span><span class="evidence-mini">'+meta+'</span>'+chip+'</summary>'+(ex?'<div class="evidence-excerpt">'+ex+'</div>':'')+'</details>'}).join("");return'<details class="evidence-box"><summary>查看证据卡片 ('+ev.length+')</summary>'+items+'</details>'}
 function renderHistory(){const vis=conversations.filter(c=>c.messages&&c.messages.length);if(!vis.length){historyListEl.innerHTML="";return}historyListEl.innerHTML=vis.map(c=>{const act=c.id===currentId?" active":"";return'<button class="history-item'+act+'" data-id="'+esc(c.id)+'"><div class="history-item-title">'+esc(c.title||"新对话")+'</div><div class="history-item-time">'+esc(nowLabel(c.updatedAt||c.createdAt))+'</div></button>'}).join("");for(const n of historyListEl.querySelectorAll(".history-item")){n.addEventListener("click",()=>{const id=n.getAttribute("data-id");if(id){currentId=id;renderAll()}})}}
-function renderChat(){const c=getConv(),ms=c?c.messages:[];if(!ms.length){chatEl.innerHTML='<div class="welcome"><h2>MarxOS 学术助手</h2><p>精确问答：概念解释、引文出处、篇目定位<br>深度分析：理论分析、社会批判、学术论文<br>所有回答均附可核对的原文出处。</p></div>';return}chatEl.innerHTML=ms.map(m=>{if(m.role==="user")return'<div class="msg msg-user"><div class="msg-body">'+renderMd(m.text)+'</div></div>';if(m.intent==="error")return'<div class="msg msg-bot msg-error"><div class="msg-body">'+esc(m.text)+'</div><div class="msg-meta"><span class="badge badge-err">错误</span></div></div>';let meta='<div class="msg-meta">';if(m.intent)meta+='<span class="badge">'+esc(m.intent)+'</span>';if(m.mode)meta+='<span class="badge">'+esc(m.mode)+'</span>';if(m.path&&m.path!=="llm")meta+='<span class="badge">'+esc(m.path)+'</span>';if(m.verify)meta+=verifyBadge(m.verify);if(m.crag)meta+='<span class="badge">CRAG:'+esc(String(m.crag))+'</span>';meta+='<span>'+esc(String(m.cost||"-"))+'ms</span></div>';return'<div class="msg msg-bot"><div class="msg-body">'+renderMd(m.text)+'</div>'+evidenceHtml(m.evidence||[])+meta+'</div>'}).join("");chatEl.scrollTop=chatEl.scrollHeight}
+function renderChat(){const c=getConv(),ms=c?c.messages:[];if(!ms.length){chatEl.innerHTML='<div class="welcome"><h2>MarxOS 学术助手</h2><p>精确问答：概念解释、引文出处、篇目定位<br>深度分析：理论分析、社会批判、学术论文<br>所有回答均附可核对的原文出处。</p></div>';return}chatEl.innerHTML=ms.map((m,i)=>{if(m.role==="user")return'<div class="msg msg-user"><div class="msg-body">'+renderMd(m.text)+'</div></div>';if(m.intent==="error")return'<div class="msg msg-bot msg-error"><div class="msg-body">'+esc(m.text)+'</div><div class="msg-meta"><span class="badge badge-err">错误</span></div></div>';let meta='<div class="msg-meta">';if(m.intent)meta+='<span class="badge">'+esc(m.intent)+'</span>';if(m.mode)meta+='<span class="badge">'+esc(m.mode)+'</span>';if(m.path&&m.path!=="llm")meta+='<span class="badge">'+esc(m.path)+'</span>';if(m.verify)meta+=verifyBadge(m.verify);if(m.crag)meta+='<span class="badge">CRAG:'+esc(String(m.crag))+'</span>';meta+='<span>'+esc(String(m.cost||"-"))+'ms</span></div>';const prev=ms[i-1];const prevQ=prev&&prev.role==="user"?prev.text:"";meta+='<button class="fb-btn" data-q="'+esc(prevQ)+'" onclick="sendFeedback(this)">回答不准确</button>';return'<div class="msg msg-bot"><div class="msg-body">'+renderMd(m.text)+'</div>'+evidenceHtml(m.evidence||[])+meta+'</div>'}).join("");chatEl.scrollTop=chatEl.scrollHeight}
+function sendFeedback(btn){const q=btn.dataset.q||"";if(!q)return;fetch("/api/feedback",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,message:"用户标记回答不准确"})}).then(()=>{btn.textContent="已记录";btn.disabled=true}).catch(()=>{})}
 function renderAll(){renderHistory();renderChat()}
 function setMode(m){currentMode=m;modeAuto.classList.toggle("active",m==="auto");modePrecise.classList.toggle("active",m==="precise");modeDeep.classList.toggle("active",m==="deep")}
 modeAuto.addEventListener("click",()=>setMode("auto"));modePrecise.addEventListener("click",()=>setMode("precise"));modeDeep.addEventListener("click",()=>setMode("deep"));
@@ -337,11 +341,23 @@ class MarxOSHandler(BaseHTTPRequestHandler):
         self.send_error(404, "Not Found")
 
     def do_POST(self):
-        if self.path not in ("/api/ask", "/api/ask_stream"):
+        if self.path not in ("/api/ask", "/api/ask_stream", "/api/feedback"):
             self.send_error(404, "Not Found")
             return
         content_len = int(self.headers.get("Content-Length", "0"))
         raw = self.rfile.read(content_len)
+        if self.path == "/api/feedback":
+            try:
+                feedback = json.loads(raw.decode("utf-8"))
+                miss_log.log_query_miss(
+                    "user_feedback",
+                    str(feedback.get("query") or "")[:500],
+                    detail=str(feedback.get("message") or "")[:300],
+                )
+                self._send_json(200, {"status": "ok"})
+            except Exception:
+                self._send_json(400, {"error": "无效反馈"})
+            return
         try:
             data = json.loads(raw.decode("utf-8"))
         except json.JSONDecodeError:
@@ -440,6 +456,19 @@ class MarxOSHandler(BaseHTTPRequestHandler):
         # Answer class: local_lookup / local_view / refusal / llm /
         # out_of_domain / ambiguous_locator / trace_only.
         payload["path"] = getattr(app, "LAST_ANSWER_PATH", "")
+        # 失败案例自动采集（拒答/书目未收录/引文未确认/低 CRAG/引文审计问题）。
+        miss_log.detect_misses(
+            query=query,
+            intent=payload.get("intent") or "",
+            mode=performance,
+            path=payload.get("path") or "",
+            answer=answer or "",
+            evidence=payload.get("evidence") or [],
+            citation_audit=payload.get("citation_audit") or {},
+            crag_report=payload.get("crag") or {},
+            elapsed_ms=elapsed_ms,
+            history_turns=len(history or []),
+        )
         return 200, payload
 
     def _handle_ask_json(self, data):

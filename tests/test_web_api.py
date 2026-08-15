@@ -271,5 +271,60 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(json_error, error_events[0])
 
 
+    def test_feedback_endpoint_logs_user_miss(self):
+        import tempfile as _tempfile
+
+        from marxos.web import miss_log as ml
+
+        with _tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "misses.jsonl"
+            original = ml.miss_log_path
+            ml.miss_log_path = lambda: log_path
+            try:
+                server = web_app.ThreadingHTTPServer(("127.0.0.1", 0), web_app.MarxOSHandler)
+                host, port = server.server_address
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    conn = HTTPConnection(host, port, timeout=5)
+                    body = json.dumps({"query": "测试问题", "message": "不准"}).encode("utf-8")
+                    conn.request("POST", "/api/feedback", body=body, headers={"Content-Type": "application/json"})
+                    res = conn.getresponse()
+                    data = json.loads(res.read().decode("utf-8"))
+                    conn.close()
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join(timeout=2)
+                self.assertEqual(res.status, 200)
+                self.assertEqual(data, {"status": "ok"})
+                lines = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+                self.assertEqual(len(lines), 1)
+                self.assertEqual(lines[0]["kind"], "user_feedback")
+                self.assertEqual(lines[0]["query"], "测试问题")
+            finally:
+                ml.miss_log_path = original
+
+    def test_detect_misses_flags_refusal_and_quote_unconfirmed(self):
+        import tempfile as _tempfile
+
+        from marxos.web import miss_log as ml
+
+        with _tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "misses.jsonl"
+            original = ml.miss_log_path
+            ml.miss_log_path = lambda: log_path
+            try:
+                ml.detect_misses("随便的引文？", "quote_lookup", "fast", "refusal",
+                                 "当前语料库未检索到", [], {}, {}, 10, 0)
+                ml.detect_misses("某句话出自哪里", "quote_lookup", "fast", "llm",
+                                 "候选答案", [{"match_type": "vector_candidate"}], {}, {}, 20, 0)
+                lines = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+                self.assertEqual([line["kind"] for line in lines], ["refusal", "quote_unconfirmed"])
+            finally:
+                ml.miss_log_path = original
+
+
 if __name__ == "__main__":
     unittest.main()
+
